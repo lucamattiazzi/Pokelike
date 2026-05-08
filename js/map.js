@@ -44,7 +44,7 @@ function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
   // Layer sizes: start(1), catch/battle(2), content, boss(1)
   const CONTENT_SIZES = gen2Mode ? [3, 4, 3, 2] : [3, 4, 3, 4, 3, 2]; // gen2: layers 2–5, normal: layers 2–7
   // In gen2Mode on Silver maps, a Silver node sits between the last content layer and the boss
-  const hasSilverNode = gen2Mode && [1, 3, 5, 7, 9, 12, 14].includes(mapIndex);
+  const hasSilverNode = gen2Mode && [1, 3, 5, 7, 10, 13, 15].includes(mapIndex);
   const bossLayerIdx  = 2 + CONTENT_SIZES.length + (hasSilverNode ? 1 : 0); // 6 normally, 7 on Silver maps
   const bossId        = `n${bossLayerIdx}_0`;
 
@@ -288,8 +288,9 @@ function getNodeSprite(node) {
     if (typeof state !== 'undefined' && state.isEndlessMode) return 'sprites/misteryTrainer.png';
     const mi = node.mapIndex ?? -1;
     if (typeof state !== 'undefined' && state.gen2Mode) {
-      if (mi === 16) return 'https://play.pokemonshowdown.com/sprites/trainers/red.png';
-      if (mi >= 8 && mi < 16) return KANTO_GYM_LEADER_SPRITES[mi - 8];
+      if (mi === 17) return 'https://play.pokemonshowdown.com/sprites/trainers/red.png';
+      if (mi === 8)  return 'https://play.pokemonshowdown.com/sprites/trainers/lance.png';
+      if (mi >= 9 && mi < 17) return KANTO_GYM_LEADER_SPRITES[mi - 9];
       if (mi >= 0 && mi < 8) return JOHTO_GYM_LEADER_SPRITES[mi];
     }
     if (mi >= 0 && mi < GYM_LEADER_SPRITES.length) return GYM_LEADER_SPRITES[mi];

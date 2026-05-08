@@ -427,12 +427,15 @@ function showMapScreen() {
   const mapInfo = document.getElementById('map-info');
   if (mapInfo) {
     if (state.gen2Mode) {
-      const isFinal = state.currentMap === 16;
-      const leader = isFinal ? null : (state.currentMap < 8
+      const isFinal = state.currentMap === 17;
+      const isElite = state.currentMap === 8;
+      const leader = (isFinal || isElite) ? null : (state.currentMap < 8
         ? JOHTO_GYM_LEADERS[state.currentMap]
-        : KANTO_GYM_LEADERS[state.currentMap - 8]);
+        : KANTO_GYM_LEADERS[state.currentMap - 9]);
       mapInfo.innerHTML = isFinal
         ? `<span>Mt. Silver — Red</span>`
+        : isElite
+        ? `<span>Map 9: Elite Four &amp; Lance</span>`
         : `<span>Map ${state.currentMap+1}: vs <b>${leader.name}</b> (${leader.type})</span>`;
     } else {
       const isFinal = state.currentMap === 8;
@@ -479,7 +482,7 @@ function showMapScreen() {
 
   const mapContainer = document.getElementById('map-container');
   const mapBgNum = state.gen2Mode
-    ? (state.currentMap < 16 ? (state.currentMap % 8) + 1 : 9)
+    ? (state.currentMap < 17 ? (state.currentMap % 8) + 1 : 9)
     : state.currentMap + 1;
   mapContainer.style.backgroundImage = `url('ui/mapsNormalMode/map${mapBgNum}.png')`;
   renderMap(state.map, mapContainer, onNodeClick);
@@ -721,10 +724,11 @@ async function doBattleNode(node) {
 
 async function doBossNode(node) {
   if (state.gen2Mode) {
-    if (state.currentMap === 16) { await doRed(); return; }
+    if (state.currentMap === 17) { await doRed(); return; }
+    if (state.currentMap === 8)  { await doGen2Elite4(); return; }
     const leader = state.currentMap < 8
       ? JOHTO_GYM_LEADERS[state.currentMap]
-      : KANTO_GYM_LEADERS[state.currentMap - 8];
+      : KANTO_GYM_LEADERS[state.currentMap - 9];
     const enemyTeam = leader.team.map(p => ({
       ...createInstance(p, p.level, false, leader.moveTier ?? 1),
       heldItem: p.heldItem || null,
@@ -871,7 +875,7 @@ async function doGen2Elite4() {
   const eliteAch = unlockAchievement('elite_four');
   if (eliteAch) showAchievementToast(eliteAch);
   state.eliteIndex = 0;
-  startMap(8);
+  startMap(9);
 }
 
 
@@ -1967,12 +1971,8 @@ function showBadgeScreen(leader) {
   }
 
   document.getElementById('btn-next-map').onclick = () => {
-    if (state.gen2Mode && state.currentMap === 7) {
-      doGen2Elite4();
-      return;
-    }
-    const lastLeaderMap = state.gen2Mode ? 15 : 7;
-    const finalMapIndex = state.gen2Mode ? 16 : 8;
+    const lastLeaderMap = state.gen2Mode ? 16 : 7;
+    const finalMapIndex = state.gen2Mode ? 17 : 8;
     if (state.currentMap >= lastLeaderMap) {
       state.eliteIndex = 0;
       startMap(finalMapIndex);
