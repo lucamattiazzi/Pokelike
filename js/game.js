@@ -667,7 +667,7 @@ function getLevelForNode(node) {
     return Math.min(maxL, Math.max(minL, base + Math.floor(rng() * spread)));
   }
   // Normal mode (original behaviour)
-  const [minL, maxL] = MAP_LEVEL_RANGES[state.currentMap];
+  const [minL, maxL] = (state.gen2Mode ? GEN2_MAP_LEVEL_RANGES : MAP_LEVEL_RANGES)[state.currentMap];
   const t = Math.min(1, Math.max(0, (node.layer - 1) / (state.gen2Mode ? 3 : 5))); // gen2: 4 content layers, normal: 6
   const base = Math.round(minL + t * (maxL - minL));
   const spread = Math.max(1, Math.round((maxL - minL) / 8));
@@ -817,9 +817,10 @@ async function doSilverNode(node) {
   }));
   const starterLine = SILVER_STARTER_LINES[state.starterSpeciesId];
   if (starterLine) {
-    const starterStage = encounterIdx === 0 ? 0 : encounterIdx <= 3 ? 1 : 2;
+    const starterStage = encounterIdx < 2 ? 1 : 2;
     const starterSpecies = starterLine[starterStage];
-    enemyTeam[0] = { ...createInstance(starterSpecies, enemyTeam[0].level, false, 2), heldItem: starterSpecies.heldItem || null };
+    const lastIdx = enemyTeam.length - 1;
+    enemyTeam[lastIdx] = { ...createInstance(starterSpecies, enemyTeam[lastIdx].level, false, 2), heldItem: starterSpecies.heldItem || null };
   }
   showScreen('battle-screen');
   document.getElementById('battle-title').textContent = 'Silver wants to battle!';
@@ -831,6 +832,7 @@ async function doSilverNode(node) {
   for (const p of state.team) {
     p.level = Math.min(100, p.level + 2);
     p.maxHp = calcHp(p.baseStats.hp, p.level);
+    if (p.currentHp < p.maxHp) p.currentHp = p.maxHp;
   }
   state.silverBeaten = (state.silverBeaten || 0) + 1;
   advanceFromNode(state.map, node.id);
@@ -1601,7 +1603,7 @@ async function doLegendaryNode(node) {
   const species = await fetchPokemonById(legendId);
   if (!species) { advanceFromNode(state.map, node.id); showMapScreen(); return; }
 
-  const level = state.isEndlessMode ? getLevelForNode(node) + 5 : MAP_LEVEL_RANGES[state.currentMap][1];
+  const level = state.isEndlessMode ? getLevelForNode(node) + 5 : (state.gen2Mode ? GEN2_MAP_LEVEL_RANGES : MAP_LEVEL_RANGES)[state.currentMap][1];
   const legendary = createInstance(species, level, rng() < (hasShinyCharm() ? 0.02 : 0.01), 2);
 
   const titleEl = document.getElementById('battle-title');
