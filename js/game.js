@@ -828,7 +828,6 @@ async function doSilverNode(node) {
     p.currentHp = p.maxHp;
   }
   state.silverBeaten = (state.silverBeaten || 0) + 1;
-  showItemFoundToast('🥈', 'Silver defeated! +2 Levels to all!');
   advanceFromNode(state.map, node.id);
   showMapScreen();
 }
