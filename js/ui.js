@@ -3250,6 +3250,9 @@ async function animateLevelUp(levelUps) {
       if (nameEl) nameEl.textContent = `${pokemon.nickname || pokemon.name} Lv${lvl}`;
     };
     const flashLevelText = async (lvl) => {
+      // Skip-mode: the CSS keyframes can't be sped up, so the bounce gets
+      // visibly interrupted. Just bump the label and skip the animation.
+      if (battleSpeedMultiplier > 1) return;
       el.classList.add('level-up');
       const lvText = document.createElement('div');
       lvText.className = 'level-up-text';
