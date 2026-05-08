@@ -372,7 +372,7 @@ const SILVER_ENCOUNTERS = [
     { speciesId: 92,  name: 'Gastly',   types: ['Ghost','Poison'], baseStats: { hp:30,  atk:35,  def:30,  speed:80,  special:100 }, level: 28, heldItem: { id: 'life_orb',    name: 'Life Orb',    icon: '🔮' } },
   ]},
   { team: [
-    { speciesId: 160, name: 'Typhlosion', types: ['Fire'],           baseStats: { hp:78, atk:84,  def:78,  speed:100, special:109 }, level: 52, heldItem: { id: 'charcoal',     name: 'Charcoal',     icon: '🔥' } },
+    { speciesId: 157, name: 'Quilava',    types: ['Fire'],           baseStats: { hp:58, atk:64,  def:58,  speed:80,  special:80  }, level: 46, heldItem: { id: 'charcoal',     name: 'Charcoal',     icon: '🔥' } },
     { speciesId: 215, name: 'Sneasel',    types: ['Dark','Ice'],     baseStats: { hp:55, atk:95,  def:55,  speed:115, special:55  }, level: 48, heldItem: { id: 'eviolite',     name: 'Eviolite',     icon: '💎' } },
     { speciesId: 94,  name: 'Gengar',     types: ['Ghost','Poison'], baseStats: { hp:60, atk:65,  def:60,  speed:110, special:130 }, level: 50, heldItem: { id: 'life_orb',     name: 'Life Orb',     icon: '🔮' } },
     { speciesId: 229, name: 'Houndoom',   types: ['Dark','Fire'],    baseStats: { hp:75, atk:90,  def:50,  speed:95,  special:110 }, level: 49, heldItem: { id: 'choice_specs', name: 'Choice Specs', icon: '👓' } },
