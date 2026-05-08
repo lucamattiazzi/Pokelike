@@ -438,13 +438,21 @@ function renderBattleField(pTeam, eTeam) {
 
 // Animate HP bar from fromHp to toHp smoothly
 function animateHpBar(containerEl, fromHp, toHp, maxHp, duration = 250) {
+  return animateHpBarFull(containerEl, fromHp, maxHp, toHp, maxHp, duration);
+}
+
+// Smoothly interpolate both currentHp AND maxHp — used on level-ups so the
+// "X/Y" text doesn't snap to the new max before the bar visually grows.
+function animateHpBarFull(containerEl, fromHp, fromMax, toHp, toMax, duration = 250) {
   return new Promise(resolve => {
     const fillEl = containerEl.querySelector('.hp-bar-fill');
     const textEl = containerEl.querySelector('.hp-text');
     if (!fillEl) { resolve(); return; }
 
-    const fromPct = Math.min(1, Math.max(0, fromHp / maxHp));
-    const toPct = Math.min(1, Math.max(0, toHp / maxHp));
+    const safeFromMax = Math.max(1, fromMax);
+    const safeToMax   = Math.max(1, toMax);
+    const fromPct = Math.min(1, Math.max(0, fromHp / safeFromMax));
+    const toPct   = Math.min(1, Math.max(0, toHp / safeToMax));
     const scaledDuration = duration / battleSpeedMultiplier;
     const start = performance.now();
 
@@ -452,11 +460,12 @@ function animateHpBar(containerEl, fromHp, toHp, maxHp, duration = 250) {
       const elapsed = now - start;
       const t = Math.min(elapsed / scaledDuration, 1);
       const curPct = fromPct + (toPct - fromPct) * t;
-      const curHp = Math.round(fromHp + (toHp - fromHp) * t);
+      const curHp  = Math.round(fromHp + (toHp - fromHp) * t);
+      const curMax = Math.round(fromMax + (toMax - fromMax) * t);
 
       fillEl.style.width = `${Math.floor(curPct * 100)}%`;
       fillEl.style.background = hpBarColor(curPct);
-      if (textEl) textEl.textContent = `${Math.max(0, curHp)}/${maxHp}`;
+      if (textEl) textEl.textContent = `${Math.max(0, curHp)}/${curMax}`;
 
       if (t < 1) {
         requestAnimationFrame(frame);
@@ -3218,14 +3227,9 @@ async function animateLevelUp(levelUps) {
   const sleep = ms => new Promise(r => setTimeout(r, ms / battleSpeedMultiplier));
 
   await Promise.all(levelUps.map(async (entry) => {
-    const { idx, pokemon, oldLevel, newLevel, oldXp, newXp, preHp, segments, growth } = entry;
+    const { idx, pokemon, oldLevel, newLevel, oldXp, newXp, preHp, preMaxHp, segments, growth } = entry;
     const el = pEl.querySelector(`.battle-pokemon[data-idx="${idx}"]`);
     if (!el) return;
-
-    // Animate HP bar filling up (alive pokemon only)
-    if (pokemon.currentHp > 0 && pokemon.currentHp > (preHp ?? 0)) {
-      await animateHpBar(el, preHp ?? 0, pokemon.currentHp, pokemon.maxHp, 400);
-    }
 
     // ---- XP bar segments (gen 2) ----
     const xpFill = el.querySelector('.xp-bar-fill');
@@ -3289,10 +3293,20 @@ async function animateLevelUp(levelUps) {
       const finalPct     = Math.min(100, Math.max(0, ((newXp - finalFloor) / finalSpan) * 100));
       setFillPct(finalPct);
       await sleep(FILL_MS);
+
+      // After all level-up flashes, smoothly grow the HP bar to its new max.
+      // We interpolate both currentHp AND maxHp so the "X/Y" text doesn't
+      // snap to the new max before the bar visually fills.
+      if (newLevel > oldLevel && pokemon.currentHp > 0 && preMaxHp != null && pokemon.maxHp > preMaxHp) {
+        await animateHpBarFull(el, preHp ?? 0, preMaxHp, pokemon.currentHp, pokemon.maxHp, 500);
+      }
       return;
     }
 
     // Legacy / non-XP path: flash banner per level reached, no XP-bar driving.
+    if (pokemon.currentHp > 0 && pokemon.currentHp > (preHp ?? 0)) {
+      await animateHpBar(el, preHp ?? 0, pokemon.currentHp, pokemon.maxHp, 400);
+    }
     if (newLevel > oldLevel) {
       await flashLevelText(newLevel);
       setLevelLabel(newLevel);

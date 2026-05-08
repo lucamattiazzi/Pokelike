@@ -494,9 +494,10 @@ function applyXpGain(team, livingIdxs, totalYield, levelCap, getGrowthRate, getB
     const share = Math.floor(baseShare * (lucky ? 1.5 : 1));
     if (share <= 0) continue;
 
-    const oldLevel = p.level;
-    const oldXp    = p.xp ?? xpForLevel(oldLevel, growth);
-    const preHp    = p.currentHp;
+    const oldLevel  = p.level;
+    const oldXp     = p.xp ?? xpForLevel(oldLevel, growth);
+    const preHp     = p.currentHp;
+    const preMaxHp  = p.maxHp;
 
     let xp = oldXp + share;
     let level = oldLevel;
@@ -521,7 +522,7 @@ function applyXpGain(team, livingIdxs, totalYield, levelCap, getGrowthRate, getB
       p.maxHp = newMaxHp;
     }
 
-    levelUps.push({ idx, pokemon: p, oldLevel, newLevel: level, oldXp, newXp: xp, preHp, segments, growth });
+    levelUps.push({ idx, pokemon: p, oldLevel, newLevel: level, oldXp, newXp: xp, preHp, preMaxHp, segments, growth });
   }
 
   return levelUps;

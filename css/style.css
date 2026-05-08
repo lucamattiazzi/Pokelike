@@ -1484,7 +1484,7 @@ h1, h2, .pixel-font {
   inset: -8px;
   pointer-events: none;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 224, 102, 0.55) 0%, rgba(255, 215, 0, 0.0) 60%);
+  background: radial-gradient(circle, rgba(255, 224, 102, 0.28) 0%, rgba(255, 215, 0, 0.0) 65%);
   animation: level-up-burst 0.7s ease-out forwards;
   z-index: 5;
 }
@@ -1493,10 +1493,10 @@ h1, h2, .pixel-font {
 }
 
 @keyframes level-up-flash {
-  0%   { filter: brightness(1)   drop-shadow(0 0 0 transparent); }
-  20%  { filter: brightness(1.7) drop-shadow(0 0 14px #ffe066) drop-shadow(0 0 6px #fff); }
-  60%  { filter: brightness(1.3) drop-shadow(0 0 8px  #ffd700); }
-  100% { filter: brightness(1)   drop-shadow(0 0 0 transparent); }
+  0%   { filter: brightness(1)    drop-shadow(0 0 0 transparent); }
+  25%  { filter: brightness(1.18) drop-shadow(0 0 6px #ffe066); }
+  60%  { filter: brightness(1.08) drop-shadow(0 0 4px #ffd700); }
+  100% { filter: brightness(1)    drop-shadow(0 0 0 transparent); }
 }
 
 @keyframes level-up-bounce {
