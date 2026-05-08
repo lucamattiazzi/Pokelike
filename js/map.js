@@ -79,9 +79,6 @@ function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
       w.battle   = Math.round(w.battle   * 1.2);
       w.trainer  = Math.round(w.trainer  * 1.2);
       w.question = Math.round(w.question * 1.2);
-      // Gen 2: no wild battles — fold the battle weight into trainer
-      w.trainer += w.battle;
-      w.battle = 0;
     }
     const type = weightedRandom(w);
     // Endless region 3: 1/6 catch nodes become legendary encounters
@@ -136,15 +133,9 @@ function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
   layers.push([makeNode('n0_0', NODE_TYPES.START, 0, 0)]);
 
   // Layer 1: always Catch (left) and Battle (right); nuzlocke gets two Catch nodes
-  // Gen 2: no wild battles → trainer instead.
-  const layer1Right = nuzlockeMode
-    ? NODE_TYPES.CATCH
-    : gen2Mode
-      ? NODE_TYPES.TRAINER
-      : NODE_TYPES.BATTLE;
   layers.push([
     makeNode('n1_0', NODE_TYPES.CATCH, 1, 0),
-    makeNode('n1_1', layer1Right,      1, 1),
+    makeNode('n1_1', nuzlockeMode ? NODE_TYPES.CATCH : NODE_TYPES.BATTLE, 1, 1),
   ]);
 
   // Layers 2+: random content nodes (Silver maps use one fewer content layer)

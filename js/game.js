@@ -631,14 +631,6 @@ async function onNodeClick(node) {
 
 function resolveQuestionMark() {
   const r = rng();
-  if (state.gen2Mode) {
-    // Gen 2: no wild battles — wild-battle slots become trainer battles
-    if (r < 0.42) return NODE_TYPES.TRAINER;
-    if (r < 0.52) return NODE_TYPES.CATCH;
-    if (r < 0.65) return NODE_TYPES.ITEM;
-    if (r < (hasShinyCharm() ? 0.79 : 0.72)) return 'shiny';
-    return 'mega';
-  }
   if (r < 0.22) return NODE_TYPES.BATTLE;
   if (r < 0.42) return NODE_TYPES.TRAINER;
   if (r < 0.52) return state.nuzlockeMode ? NODE_TYPES.BATTLE : NODE_TYPES.CATCH;
