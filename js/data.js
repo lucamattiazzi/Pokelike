@@ -1497,8 +1497,15 @@ function resolveEvoForLevel(speciesId, level) {
   let changed = true;
   while (changed) {
     changed = false;
+    // Linear pre-evolution
     for (const [pre, evo] of Object.entries(EVOLUTIONS)) {
       if (evo.into === id && level < evo.level) { id = Number(pre); changed = true; break; }
+    }
+    if (changed) continue;
+    // Branching pre-evolution (e.g. Politoed → Poliwhirl, Bellossom → Gloom)
+    for (const [pre, branches] of Object.entries(BRANCHING_EVOLUTIONS)) {
+      const branch = branches.find(b => b.into === id);
+      if (branch && level < branch.level) { id = Number(pre); changed = true; break; }
     }
   }
   return id;
