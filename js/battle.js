@@ -480,18 +480,22 @@ function xpYield(baseExp, enemyLevel) {
   return Math.floor(b * L * 1.5);
 }
 
-// Distribute totalYield across livingIdxs (even split, lucky-egg holder gets 1.5×).
+// Distribute totalYield across livingIdxs. The lead (first living team member)
+// gets a full share (totalYield / livingCount); every non-lead living member
+// gets HALF of that share. Lucky-egg holder still gets a 1.5× multiplier.
 // Mutates p.xp / p.level / p.maxHp / p.currentHp; returns animation entries.
 function applyXpGain(team, livingIdxs, totalYield, levelCap, getGrowthRate, getBaseExp) {
   const levelUps = [];
   if (!livingIdxs || livingIdxs.length === 0 || totalYield <= 0) return levelUps;
 
   const baseShare = Math.floor(totalYield / livingIdxs.length);
+  const leadIdx   = livingIdxs[0];
   for (const idx of livingIdxs) {
     const p = team[idx];
     const growth = (getGrowthRate ? getGrowthRate(p.speciesId) : null) || 'medium_fast';
     const lucky = p.heldItem?.id === 'lucky_egg';
-    const share = Math.floor(baseShare * (lucky ? 1.5 : 1));
+    const isLead = idx === leadIdx;
+    const share = Math.floor(baseShare * (isLead ? 1 : 0.5) * (lucky ? 1.5 : 1));
     if (share <= 0) continue;
 
     const oldLevel  = p.level;
