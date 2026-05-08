@@ -608,6 +608,9 @@ async function onNodeClick(node) {
     case NODE_TYPES.SILVER:
       await doSilverNode(node);
       break;
+    case NODE_TYPES.XP_SHARE:
+      await doXpShareNode(node);
+      break;
     case 'shiny':
       await doShinyNode(node);
       break;
@@ -624,6 +627,14 @@ async function onNodeClick(node) {
 
 function resolveQuestionMark() {
   const r = rng();
+  if (state.gen2Mode) {
+    // Gen 2: no wild battles — wild-battle slots become trainer battles
+    if (r < 0.42) return NODE_TYPES.TRAINER;
+    if (r < 0.52) return NODE_TYPES.CATCH;
+    if (r < 0.65) return NODE_TYPES.ITEM;
+    if (r < (hasShinyCharm() ? 0.79 : 0.72)) return 'shiny';
+    return 'mega';
+  }
   if (r < 0.22) return NODE_TYPES.BATTLE;
   if (r < 0.42) return NODE_TYPES.TRAINER;
   if (r < 0.52) return state.nuzlockeMode ? NODE_TYPES.BATTLE : NODE_TYPES.CATCH;
@@ -1284,6 +1295,34 @@ function doItemNode(node) {
   };
 }
 
+async function doXpShareNode(node) {
+  // Gen 2 only — first content layer of map 2 grants the Exp. Share item
+  showScreen('item-screen');
+  renderTeamBar(state.team, document.getElementById('item-team-bar'));
+
+  const item = { ...EXP_SHARE_ITEM };
+  const el = document.getElementById('item-choices');
+  el.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = 'item-card';
+  div.innerHTML = `<div class="item-icon">${itemIconHtml(item, 36)}</div>
+    <div class="item-name">${item.name}</div>
+    <div class="item-desc">${item.desc}</div>`;
+  div.style.cursor = 'pointer';
+  div.addEventListener('click', () => {
+    state.pickedUpItem = true;
+    openItemEquipModal(item, {
+      onComplete: () => { advanceFromNode(state.map, node.id); showMapScreen(); },
+    });
+  });
+  el.appendChild(div);
+
+  document.getElementById('btn-skip-item').onclick = () => {
+    advanceFromNode(state.map, node.id);
+    showMapScreen();
+  };
+}
+
 function openItemEquipModal(item, { fromBagIdx = -1, fromPokemonIdx = -1, onComplete = null } = {}) {
   document.getElementById('item-equip-modal')?.remove();
 
@@ -1900,14 +1939,20 @@ function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, ene
       const maxEnemyLevel = Math.max(...resultE.map(p => p.level));
       let levelUps;
       if (state.gen2Mode) {
-        // Gen 2: only the first living team member gets XP (no exp share)
+        // Gen 2: lead living Pokémon gets XP. If an Exp. Share is held, the
+        // base gain drops to +1 and the holder also gains +1 (so total team
+        // XP stays the same as without it).
         const leadIdx = state.team.findIndex(p => p.currentHp > 0);
+        const holderIdx = state.team.findIndex(p => p.heldItem?.id === 'exp_share');
+        levelUps = [];
         if (leadIdx >= 0) {
-          const singleTeam = [state.team[leadIdx]];
-          const singleUps = applyLevelGain(singleTeam, state.items, new Set([0]), maxEnemyLevel, state.nuzlockeMode, baseGainOverride, 100);
-          levelUps = singleUps.map(lu => ({ ...lu, idx: leadIdx }));
-        } else {
-          levelUps = [];
+          const targets = new Set([leadIdx]);
+          if (holderIdx >= 0) targets.add(holderIdx);
+          const perTargetGain = holderIdx >= 0 ? 1 : baseGainOverride; // null → default +2
+          for (const idx of targets) {
+            const singleUps = applyLevelGain([state.team[idx]], state.items, new Set([0]), maxEnemyLevel, state.nuzlockeMode, perTargetGain, 100);
+            levelUps.push(...singleUps.map(lu => ({ ...lu, idx })));
+          }
         }
       } else {
         levelUps = applyLevelGain(state.team, state.nuzlockeMode ? [] : state.items, playerParticipants, maxEnemyLevel, state.nuzlockeMode, baseGainOverride, state.isEndlessMode ? Infinity : 100);

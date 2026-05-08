@@ -618,6 +618,14 @@ const USABLE_ITEM_POOL = [
   { id: 'moon_stone',  name: 'Moon Stone',        desc: 'Force evolves a Pokémon regardless of level',  icon: '🌙', usable: true },
 ];
 
+// Gen 2 Exp. Share — granted at the start of map 2; not part of any random pool
+const EXP_SHARE_ITEM = {
+  id: 'exp_share',
+  name: 'Exp. Share',
+  desc: 'After each trainer/gym/rival battle the lead gains +1 level (instead of +2) and the holder also gains +1 level.',
+  icon: '⭐',
+};
+
 const TYPE_ITEM_MAP = {
   Flying: 'sharp_beak', Fire: 'charcoal', Water: 'mystic_water', Electric: 'magnet',
   Grass: 'miracle_seed', Psychic: 'twisted_spoon', Fighting: 'black_belt',
