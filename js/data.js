@@ -421,6 +421,26 @@ const SILVER_ENCOUNTERS = [
   ]},
 ];
 
+// Silver always carries the starter that counters the player's choice.
+// Indexed by player's starterSpeciesId; stages = [base, 1st evo, final evo].
+const SILVER_STARTER_LINES = {
+  152: [ // Player: Chikorita (Grass) → Silver: Cyndaquil line (Fire beats Grass)
+    { speciesId: 155, name: 'Cyndaquil',  types: ['Fire'], baseStats: { hp:39, atk:52,  def:43,  speed:65,  special:60  }, heldItem: { id: 'charcoal', name: 'Charcoal', icon: '🔥' } },
+    { speciesId: 156, name: 'Quilava',    types: ['Fire'], baseStats: { hp:58, atk:64,  def:58,  speed:80,  special:80  }, heldItem: { id: 'charcoal', name: 'Charcoal', icon: '🔥' } },
+    { speciesId: 157, name: 'Typhlosion', types: ['Fire'], baseStats: { hp:78, atk:84,  def:78,  speed:100, special:109 }, heldItem: { id: 'charcoal', name: 'Charcoal', icon: '🔥' } },
+  ],
+  155: [ // Player: Cyndaquil (Fire) → Silver: Totodile line (Water beats Fire)
+    { speciesId: 158, name: 'Totodile',   types: ['Water'], baseStats: { hp:50, atk:65,  def:64,  speed:43,  special:44 }, heldItem: { id: 'mystic_water', name: 'Mystic Water', icon: '💧' } },
+    { speciesId: 159, name: 'Croconaw',   types: ['Water'], baseStats: { hp:65, atk:80,  def:80,  speed:58,  special:59 }, heldItem: { id: 'mystic_water', name: 'Mystic Water', icon: '💧' } },
+    { speciesId: 160, name: 'Feraligatr', types: ['Water'], baseStats: { hp:85, atk:105, def:100, speed:78,  special:79 }, heldItem: { id: 'mystic_water', name: 'Mystic Water', icon: '💧' } },
+  ],
+  158: [ // Player: Totodile (Water) → Silver: Chikorita line (Grass beats Water)
+    { speciesId: 152, name: 'Chikorita',  types: ['Grass'], baseStats: { hp:45, atk:49,  def:65,  speed:45,  special:65 }, heldItem: { id: 'miracle_seed', name: 'Miracle Seed', icon: '🌱' } },
+    { speciesId: 153, name: 'Bayleef',    types: ['Grass'], baseStats: { hp:60, atk:62,  def:80,  speed:60,  special:63 }, heldItem: { id: 'miracle_seed', name: 'Miracle Seed', icon: '🌱' } },
+    { speciesId: 154, name: 'Meganium',   types: ['Grass'], baseStats: { hp:80, atk:82,  def:100, speed:80,  special:83 }, heldItem: { id: 'miracle_seed', name: 'Miracle Seed', icon: '🌱' } },
+  ],
+};
+
 const RED_FINAL = {
   name: 'Red', title: 'The Champion', type: 'Mixed',
   team: [

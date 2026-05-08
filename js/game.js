@@ -815,6 +815,12 @@ async function doSilverNode(node) {
     ...createInstance(p, p.level, false, 2),
     heldItem: p.heldItem || null,
   }));
+  const starterLine = SILVER_STARTER_LINES[state.starterSpeciesId];
+  if (starterLine) {
+    const starterStage = encounterIdx === 0 ? 0 : encounterIdx <= 3 ? 1 : 2;
+    const starterSpecies = starterLine[starterStage];
+    enemyTeam[0] = { ...createInstance(starterSpecies, enemyTeam[0].level, false, 2), heldItem: starterSpecies.heldItem || null };
+  }
   showScreen('battle-screen');
   document.getElementById('battle-title').textContent = 'Silver wants to battle!';
   document.getElementById('battle-subtitle').textContent = 'Rival Battle — Win for +3 levels to all!';
