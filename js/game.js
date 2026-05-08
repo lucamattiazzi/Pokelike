@@ -46,6 +46,12 @@ function loadRun() {
     state.currentNode = saved.currentNodeId ? (state.map?.nodes?.[saved.currentNodeId] || null) : null;
     delete state.currentNodeId;
     delete state.rngSeed;
+    // Gen 2 XP migration: warm growth-rate cache, then backfill missing p.xp.
+    if (state.gen2Mode && Array.isArray(state.team) && state.team.length) {
+      Promise.all(state.team.map(p => fetchPokemonSpecies(p.speciesId)))
+        .then(() => { for (const p of state.team) if (p.xp == null) initPlayerXp(p); })
+        .catch(() => {});
+    }
     return true;
   } catch { return false; }
 }
@@ -385,6 +391,7 @@ async function selectStarter(pokemon) {
   markPokedexCaught(pokemon.speciesId, pokemon.name, pokemon.types, normalUrl);
   if (pokemon.isShiny) markShinyDexCaught(pokemon.speciesId, pokemon.name, pokemon.types, pokemon.spriteUrl);
   loadBuffsIntoPokemon(pokemon);
+  initPlayerXp(pokemon);
   state.team = [pokemon];
   state.starterSpeciesId = pokemon.speciesId;
   recordUsedStarter(pokemon.speciesId);
@@ -608,9 +615,6 @@ async function onNodeClick(node) {
     case NODE_TYPES.SILVER:
       await doSilverNode(node);
       break;
-    case NODE_TYPES.XP_SHARE:
-      await doXpShareNode(node);
-      break;
     case 'shiny':
       await doShinyNode(node);
       break;
@@ -740,6 +744,11 @@ async function doBossNode(node) {
     const leader = state.currentMap < 8
       ? JOHTO_GYM_LEADERS[state.currentMap]
       : KANTO_GYM_LEADERS[state.currentMap - 9];
+    // Warm species cache so getBaseExperience/getGrowthRate are accurate post-battle.
+    await Promise.all(leader.team.flatMap(p => [
+      fetchPokemonById(p.speciesId),
+      fetchPokemonSpecies(p.speciesId),
+    ]));
     const enemyTeam = leader.team.map(p => ({
       ...createInstance(p, p.level, false, leader.moveTier ?? 1),
       heldItem: p.heldItem || null,
@@ -807,6 +816,10 @@ async function doElite4() {
 
 async function doRed() {
   const boss = RED_FINAL;
+  await Promise.all(boss.team.flatMap(p => [
+    fetchPokemonById(p.speciesId),
+    fetchPokemonSpecies(p.speciesId),
+  ]));
   const enemyTeam = boss.team.map(p => ({
     ...createInstance(p, p.level, false, 2),
     heldItem: p.heldItem || null,
@@ -826,6 +839,10 @@ async function doRed() {
 async function doSilverNode(node) {
   const encounterIdx = Math.min(state.silverBeaten || 0, SILVER_ENCOUNTERS.length - 1);
   const silverData = SILVER_ENCOUNTERS[encounterIdx];
+  await Promise.all(silverData.team.flatMap(p => [
+    fetchPokemonById(p.speciesId),
+    fetchPokemonSpecies(p.speciesId),
+  ]));
   const enemyTeam = silverData.team.map(p => ({
     ...createInstance(p, p.level, false, 2),
     heldItem: p.heldItem || null,
@@ -834,6 +851,10 @@ async function doSilverNode(node) {
   if (starterLine) {
     const starterStage = encounterIdx < 2 ? 1 : 2;
     const starterSpecies = starterLine[starterStage];
+    await Promise.all([
+      fetchPokemonById(starterSpecies.speciesId),
+      fetchPokemonSpecies(starterSpecies.speciesId),
+    ]);
     const lastIdx = enemyTeam.length - 1;
     enemyTeam[lastIdx] = { ...createInstance(starterSpecies, enemyTeam[lastIdx].level, false, 2), heldItem: starterSpecies.heldItem || null };
   }
@@ -846,6 +867,7 @@ async function doSilverNode(node) {
   if (!won) { showGameOver(); return; }
   for (const p of state.team) {
     p.level = Math.min(100, p.level + 2);
+    p.xp = Math.max(p.xp ?? 0, xpForLevel(p.level, getGrowthRate(p.speciesId)));
     p.maxHp = calcHp(p.baseStats.hp, p.level);
     if (p.currentHp < p.maxHp) p.currentHp = p.maxHp;
   }
@@ -872,6 +894,10 @@ async function doGen2Elite4() {
   for (let i = 0; i < bosses.length; i++) {
     state.eliteIndex = i;
     const boss = bosses[i];
+    await Promise.all(boss.team.flatMap(p => [
+      fetchPokemonById(p.speciesId),
+      fetchPokemonSpecies(p.speciesId),
+    ]));
     const enemyTeam = boss.team.map(p => ({ ...createInstance(p, p.level, false, 2), heldItem: p.heldItem || null }));
     showScreen('battle-screen');
     document.getElementById('battle-title').textContent = `${boss.title}: ${boss.name}!`;
@@ -1108,6 +1134,7 @@ function catchPokemon(pokemon, node) {
   checkDexAchievements();
   if (state.team.length < 6) {
     loadBuffsIntoPokemon(pokemon);
+    initPlayerXp(pokemon);
     state.team.push(pokemon);
     if (state.team.length > state.maxTeamSize) state.maxTeamSize = state.team.length;
     state.savedCatch = null;
@@ -1155,6 +1182,7 @@ function showSwapScreen(newPoke, node) {
     addBtn.addEventListener('click', () => {
       cleanup();
       loadBuffsIntoPokemon(newPoke);
+      initPlayerXp(newPoke);
       state.team.push(newPoke);
       if (state.team.length > state.maxTeamSize) state.maxTeamSize = state.team.length;
       state.savedCatch = null;
@@ -1183,6 +1211,7 @@ function showSwapScreen(newPoke, node) {
       const released = state.team[idx];
       if (released.heldItem) state.items.push(released.heldItem);
       loadBuffsIntoPokemon(newPoke);
+      initPlayerXp(newPoke);
       state.team.splice(idx, 1, newPoke);
       state.savedCatch = null;
       state.savedQuestionResolve = null;
@@ -1295,36 +1324,6 @@ function doItemNode(node) {
     advanceFromNode(state.map, node.id);
     showMapScreen();
   };
-}
-
-async function doXpShareNode(node) {
-  // Gen 2 only — first content layer of map 2 grants the Exp. Share item.
-  // No skip option: picking this node means taking the Exp. Share.
-  showScreen('item-screen');
-  renderTeamBar(state.team, document.getElementById('item-team-bar'));
-
-  const item = { ...EXP_SHARE_ITEM };
-  const el = document.getElementById('item-choices');
-  el.innerHTML = '';
-  const div = document.createElement('div');
-  div.className = 'item-card';
-  div.innerHTML = `<div class="item-icon">${itemIconHtml(item, 36)}</div>
-    <div class="item-name">${item.name}</div>
-    <div class="item-desc">${item.desc}</div>`;
-  div.style.cursor = 'pointer';
-  div.addEventListener('click', () => {
-    state.pickedUpItem = true;
-    openItemEquipModal(item, {
-      onComplete: () => { advanceFromNode(state.map, node.id); showMapScreen(); },
-    });
-  });
-  el.appendChild(div);
-
-  const skipBtn = document.getElementById('btn-skip-item');
-  if (skipBtn) {
-    skipBtn.style.display = 'none';
-    skipBtn.onclick = null;
-  }
 }
 
 function openItemEquipModal(item, { fromBagIdx = -1, fromPokemonIdx = -1, onComplete = null } = {}) {
@@ -1502,6 +1501,7 @@ function openUsableItemModal(item, bagIdx) {
         for (let i = 0; i < 3; i++) {
           if (pokemon.level < 100) pokemon.level++;
         }
+        pokemon.xp = Math.max(pokemon.xp ?? 0, xpForLevel(pokemon.level, getGrowthRate(pokemon.speciesId)));
         showMapNotification(`${pokemon.nickname || pokemon.name} grew to Lv ${pokemon.level}!`);
         renderItemBadges(state.items);
         renderTeamBar(state.team);
@@ -1629,6 +1629,10 @@ async function doTrainerNode(node) {
   }
 
   if (!speciesList.length) { advanceFromNode(state.map, node.id); showMapScreen(); return; }
+  // Warm species cache for gen 2 XP yield/curve lookups.
+  if (state.gen2Mode) {
+    await Promise.all(speciesList.map(sp => fetchPokemonSpecies(sp.id ?? sp.speciesId)));
+  }
   const ENDLESS_ENEMY_ITEM_POOL = [
     { id: 'choice_band',  name: 'Choice Band',  icon: '🎀' },
     { id: 'choice_specs', name: 'Choice Specs', icon: '👓' },
@@ -1854,6 +1858,7 @@ async function doShinyNode(node) {
     checkDexAchievements();
     if (state.team.length < 6) {
       loadBuffsIntoPokemon(shiny);
+      initPlayerXp(shiny);
       state.team.push(shiny);
       if (state.team.length > state.maxTeamSize) state.maxTeamSize = state.team.length;
       advanceFromNode(state.map, node.id);
@@ -1943,21 +1948,14 @@ function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, ene
       const maxEnemyLevel = Math.max(...resultE.map(p => p.level));
       let levelUps;
       if (state.gen2Mode) {
-        // Gen 2: lead living Pokémon gets XP. If an Exp. Share is held, the
-        // base gain drops to +1 and the holder also gains +1 (so total team
-        // XP stays the same as without it).
-        const leadIdx = state.team.findIndex(p => p.currentHp > 0);
-        const holderIdx = state.team.findIndex(p => p.heldItem?.id === 'exp_share');
-        levelUps = [];
-        if (leadIdx >= 0) {
-          const targets = new Set([leadIdx]);
-          if (holderIdx >= 0) targets.add(holderIdx);
-          const perTargetGain = holderIdx >= 0 ? 1 : baseGainOverride; // null → default +2
-          for (const idx of targets) {
-            const singleUps = applyLevelGain([state.team[idx]], state.items, new Set([0]), maxEnemyLevel, state.nuzlockeMode, perTargetGain, 100);
-            levelUps.push(...singleUps.map(lu => ({ ...lu, idx })));
-          }
-        }
+        // Gen 2: real XP system. Each defeated enemy yields baseExp × level × 1.5.
+        // Total yield is split evenly across living team members; lucky-egg holders get 1.5×.
+        const totalYield = resultE.reduce((s, e) =>
+          s + xpYield(getBaseExperience(e.speciesId), e.level), 0);
+        const livingIdxs = state.team
+          .map((p, i) => p.currentHp > 0 ? i : -1)
+          .filter(i => i >= 0);
+        levelUps = applyXpGain(state.team, livingIdxs, totalYield, 100, getGrowthRate, getBaseExperience);
       } else {
         levelUps = applyLevelGain(state.team, state.nuzlockeMode ? [] : state.items, playerParticipants, maxEnemyLevel, state.nuzlockeMode, baseGainOverride, state.isEndlessMode ? Infinity : 100);
       }
@@ -2404,6 +2402,7 @@ async function applyEndlessBugTrait() {
     if (p.currentHp > 0) {
       const oldLevel = p.level;
       p.level = p.level + bugBonus;
+      p.xp = Math.max(p.xp ?? 0, xpForLevel(p.level, getGrowthRate(p.speciesId)));
       const hpBuff = p.statBuffs?.hp ?? 0;
       const buffMult = 1 + 0.1 * hpBuff;
       p.maxHp = Math.floor(calcHp(p.baseStats.hp, p.level) * buffMult);

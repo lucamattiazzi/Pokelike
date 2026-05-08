@@ -618,14 +618,6 @@ const USABLE_ITEM_POOL = [
   { id: 'moon_stone',  name: 'Moon Stone',        desc: 'Force evolves a Pokémon regardless of level',  icon: '🌙', usable: true },
 ];
 
-// Gen 2 Exp. Share — granted at the start of map 2; not part of any random pool
-const EXP_SHARE_ITEM = {
-  id: 'exp_share',
-  name: 'Exp. Share',
-  desc: 'After each trainer/gym/rival battle the lead gains +1 level (instead of +2) and the holder also gains +1 level.',
-  icon: '⭐',
-};
-
 const TYPE_ITEM_MAP = {
   Flying: 'sharp_beak', Fire: 'charcoal', Water: 'mystic_water', Electric: 'magnet',
   Grass: 'miracle_seed', Psychic: 'twisted_spoon', Fighting: 'black_belt',
@@ -816,6 +808,7 @@ async function fetchPokemonById(idOrSlug) {
       types,
       baseStats,
       bst,
+      base_experience: d.base_experience ?? 64,
       // Use API sprite URL directly — it's correct for both base forms and variants
       spriteUrl: d.sprites.front_default || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${d.id}.png`,
       shinySpriteUrl: d.sprites.front_shiny || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${d.id}.png`,
@@ -828,10 +821,11 @@ async function fetchPokemonById(idOrSlug) {
   }
 }
 
+// Cache key bumped to v2 because growth_rate was added later — old entries lack it.
 async function fetchPokemonSpecies(id) {
-  const key = `pkrl_species_${id}`;
+  const key = `pkrl_species_v2_${id}`;
   const cached = getCached(key);
-  if (cached) return cached;
+  if (cached && cached.growthRate !== undefined) return cached;
   try {
     const r = await fetch(`https://pokeapi.co/api/v2/pokemon-species/${id}`);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -840,10 +834,42 @@ async function fetchPokemonSpecies(id) {
     const flavorText = entry
       ? entry.flavor_text.replace(/\f|\n|­/g, ' ').replace(/\s{2,}/g, ' ').trim()
       : '';
-    const result = { id, flavorText };
+    const result = { id, flavorText, growthRate: normalizeGrowthRate(d.growth_rate?.name) };
     setCached(key, result);
     return result;
-  } catch { return { id, flavorText: '' }; }
+  } catch { return { id, flavorText: '', growthRate: 'medium_fast' }; }
+}
+
+// PokeAPI uses hyphenated names; normalize to our internal keys.
+function normalizeGrowthRate(slug) {
+  switch (slug) {
+    case 'fast':                 return 'fast';
+    case 'medium':               return 'medium_fast';
+    case 'medium-slow':          return 'medium_slow';
+    case 'slow':                 return 'slow';
+    case 'slow-then-very-fast':  return 'erratic';
+    case 'fast-then-very-slow':  return 'fluctuating';
+    default:                     return 'medium_fast';
+  }
+}
+
+// Synchronous read of cached base_experience. Default 64 (gen-1 average) on miss.
+function getBaseExperience(speciesId) {
+  const cached = getCached(`pkrl_poke_${speciesId}`);
+  return cached?.base_experience ?? 64;
+}
+
+// Synchronous read of cached growth_rate. Default 'medium_fast' on miss.
+function getGrowthRate(speciesId) {
+  const cached = getCached(`pkrl_species_v2_${speciesId}`);
+  return cached?.growthRate ?? 'medium_fast';
+}
+
+// Initialize p.xp at the start-of-level threshold for the player-side instance.
+function initPlayerXp(p) {
+  if (!p) return;
+  const growth = getGrowthRate(p.speciesId);
+  p.xp = xpForLevel(p.level, growth);
 }
 
 function buildEvoChain(speciesId) {

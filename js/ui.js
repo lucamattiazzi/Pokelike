@@ -82,6 +82,15 @@ function renderHpBar(current, max) {
           <span class="hp-text">${Math.max(0,current)}/${max}</span>`;
 }
 
+function renderXpBar(xp, level, growth = 'medium_fast') {
+  if (level >= 100) return `<div class="xp-bar-bg"><div class="xp-bar-fill" style="width:100%"></div></div>`;
+  const floor   = xpForLevel(level, growth);
+  const ceiling = xpForLevel(level + 1, growth);
+  const span    = Math.max(1, ceiling - floor);
+  const pct     = Math.min(1, Math.max(0, ((xp ?? floor) - floor) / span));
+  return `<div class="xp-bar-bg"><div class="xp-bar-fill" style="width:${Math.floor(pct*100)}%"></div></div>`;
+}
+
 function renderPokemonCard(pokemon, onClick, selected, dexCaught = false, hofStarterBadge = false) {
   const pct = pokemon.currentHp / pokemon.maxHp;
   const typeHtml = (pokemon.types || ['???']).map(t =>
@@ -387,12 +396,14 @@ function renderBattleField(pTeam, eTeam) {
   const eActiveIdx = eTeam.findIndex(p => p.currentHp > 0);
 
   if (pEl) {
+    const showXp = typeof state !== 'undefined' && state.gen2Mode;
     pEl.innerHTML = pTeam.map((p, i) => {
       const fainted = p.currentHp <= 0;
       const active  = i === pActiveIdx;
+      const xpHtml  = showXp ? renderXpBar(p.xp, p.level, getGrowthRate(p.speciesId)) : '';
       return `<div class="battle-pokemon ${fainted?'fainted':''} ${active?'active-pokemon':''}" data-idx="${i}">
         <div class="battle-poke-name">${p.nickname||p.name} Lv${p.level}</div>
-        <div class="poke-hp">${renderHpBar(p.currentHp, p.maxHp)}</div>
+        <div class="poke-hp">${renderHpBar(p.currentHp, p.maxHp)}${xpHtml}</div>
         <img src="ui/battleBase.png" class="battle-base" alt="">
         <img src="${p.spriteUrl||''}" alt="${p.name}" class="battle-sprite" onerror="this.src=''">
         <div class="battle-stages"></div>
@@ -3195,29 +3206,66 @@ async function animateLevelUp(levelUps) {
   if (!pEl || levelUps.length === 0) return;
   const sleep = ms => new Promise(r => setTimeout(r, ms / battleSpeedMultiplier));
 
-  await Promise.all(levelUps.map(async ({ idx, pokemon, newLevel, preHp }) => {
+  await Promise.all(levelUps.map(async (entry) => {
+    const { idx, pokemon, oldLevel, newLevel, oldXp, newXp, preHp, segments, growth } = entry;
     const el = pEl.querySelector(`.battle-pokemon[data-idx="${idx}"]`);
     if (!el) return;
 
     // Animate HP bar filling up (alive pokemon only)
-    if (pokemon.currentHp > 0 && pokemon.currentHp > preHp) {
-      await animateHpBar(el, preHp, pokemon.currentHp, pokemon.maxHp, 400);
+    if (pokemon.currentHp > 0 && pokemon.currentHp > (preHp ?? 0)) {
+      await animateHpBar(el, preHp ?? 0, pokemon.currentHp, pokemon.maxHp, 400);
     }
 
-    // Golden glow + floating "Lv X!" text
-    el.classList.add('level-up');
-    const lvText = document.createElement('div');
-    lvText.className = 'level-up-text';
-    lvText.textContent = `Lv ${newLevel}!`;
-    el.appendChild(lvText);
+    // ---- XP bar segments (gen 2) ----
+    const xpFill = el.querySelector('.xp-bar-fill');
+    const useXp  = xpFill && oldXp !== undefined && newXp !== undefined;
+    const setFillPct = pct => { if (xpFill) xpFill.style.width = `${Math.max(0, Math.min(100, pct))}%`; };
+    const setLevelLabel = lvl => {
+      const nameEl = el.querySelector('.battle-poke-name');
+      if (nameEl) nameEl.textContent = `${pokemon.nickname || pokemon.name} Lv${lvl}`;
+    };
+    const flashLevelText = async (lvl) => {
+      el.classList.add('level-up');
+      const lvText = document.createElement('div');
+      lvText.className = 'level-up-text';
+      lvText.textContent = `Lv ${lvl}!`;
+      el.appendChild(lvText);
+      await sleep(900);
+      el.classList.remove('level-up');
+      lvText.remove();
+    };
 
-    await sleep(900);
-    el.classList.remove('level-up');
-    lvText.remove();
+    if (useXp && (segments?.length || oldXp !== newXp)) {
+      // Walk each segment: fill old → ceiling, snap to 0, then continue.
+      let curXp = oldXp;
+      let curLvl = oldLevel;
+      for (const seg of segments || []) {
+        const span = Math.max(1, seg.xpCeiling - seg.xpFloor);
+        const fromPct = ((curXp - seg.xpFloor) / span) * 100;
+        setFillPct(fromPct);
+        await sleep(20);
+        setFillPct(100);
+        await sleep(360);
+        curLvl = seg.level;
+        setFillPct(0);
+        setLevelLabel(curLvl);
+        await flashLevelText(curLvl);
+        curXp = seg.xpCeiling;
+      }
+      // Final partial fill toward newXp at the new level threshold.
+      const finalFloor   = xpForLevel(curLvl, growth || 'medium_fast');
+      const finalCeiling = xpForLevel(curLvl + 1, growth || 'medium_fast');
+      const finalSpan    = Math.max(1, finalCeiling - finalFloor);
+      const finalPct     = Math.min(100, Math.max(0, ((newXp - finalFloor) / finalSpan) * 100));
+      setFillPct(finalPct);
+      return;
+    }
 
-    // Update name/level label after animation
-    const nameEl = el.querySelector('.battle-poke-name');
-    if (nameEl) nameEl.textContent = `${pokemon.nickname || pokemon.name} Lv${newLevel}`;
+    // Legacy / non-XP path: flash banner per level reached, no XP-bar driving.
+    if (newLevel > oldLevel) {
+      await flashLevelText(newLevel);
+      setLevelLabel(newLevel);
+    }
   }));
 }
 

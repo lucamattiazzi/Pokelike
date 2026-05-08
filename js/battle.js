@@ -445,6 +445,88 @@ function getLevelGain(team, bagItems) {
   return 2;
 }
 
+// ---- XP system (gen 2) ----
+
+// Total cumulative XP needed to *reach* `level`. Per-species growth curves.
+// Reference: https://bulbapedia.bulbagarden.net/wiki/Experience
+function xpForLevel(level, growth = 'medium_fast') {
+  const n = Math.max(1, Math.min(100, level | 0));
+  if (n <= 1) return 0;
+  switch (growth) {
+    case 'fast':         return Math.floor(4 * n ** 3 / 5);
+    case 'slow':         return Math.floor(5 * n ** 3 / 4);
+    case 'medium_slow':  return Math.floor(6 * n ** 3 / 5 - 15 * n ** 2 + 100 * n - 140);
+    case 'erratic': {
+      if (n <= 50)  return Math.floor(n ** 3 * (100 - n) / 50);
+      if (n <= 68)  return Math.floor(n ** 3 * (150 - n) / 100);
+      if (n <= 98)  return Math.floor(n ** 3 * Math.floor((1911 - 10 * n) / 3) / 500);
+      return Math.floor(n ** 3 * (160 - n) / 100);
+    }
+    case 'fluctuating': {
+      if (n <= 15)  return Math.floor(n ** 3 * (Math.floor((n + 1) / 3) + 24) / 50);
+      if (n <= 36)  return Math.floor(n ** 3 * (n + 14) / 50);
+      return Math.floor(n ** 3 * (Math.floor(n / 2) + 32) / 50);
+    }
+    case 'medium_fast':
+    default:             return n ** 3;
+  }
+}
+
+// XP yielded by a defeated enemy. Pokelike-tuned: skip the canonical /7 so
+// pacing matches the legacy +2-level system (~2–3 trainer wins per level).
+function xpYield(baseExp, enemyLevel) {
+  const b = Math.max(1, baseExp | 0);
+  const L = Math.max(1, enemyLevel | 0);
+  return Math.floor(b * L * 1.5);
+}
+
+// Distribute totalYield across livingIdxs (even split, lucky-egg holder gets 1.5×).
+// Mutates p.xp / p.level / p.maxHp / p.currentHp; returns animation entries.
+function applyXpGain(team, livingIdxs, totalYield, levelCap, getGrowthRate, getBaseExp) {
+  const levelUps = [];
+  if (!livingIdxs || livingIdxs.length === 0 || totalYield <= 0) return levelUps;
+
+  const baseShare = Math.floor(totalYield / livingIdxs.length);
+  for (const idx of livingIdxs) {
+    const p = team[idx];
+    const growth = (getGrowthRate ? getGrowthRate(p.speciesId) : null) || 'medium_fast';
+    const lucky = p.heldItem?.id === 'lucky_egg';
+    const share = Math.floor(baseShare * (lucky ? 1.5 : 1));
+    if (share <= 0) continue;
+
+    const oldLevel = p.level;
+    const oldXp    = p.xp ?? xpForLevel(oldLevel, growth);
+    const preHp    = p.currentHp;
+
+    let xp = oldXp + share;
+    let level = oldLevel;
+    const segments = [];
+    while (level < levelCap && xp >= xpForLevel(level + 1, growth)) {
+      const xpFloor   = xpForLevel(level, growth);
+      const xpCeiling = xpForLevel(level + 1, growth);
+      segments.push({ level: level + 1, xpFloor, xpCeiling });
+      level++;
+    }
+    if (level === levelCap) xp = Math.min(xp, xpForLevel(levelCap, growth));
+
+    p.level = level;
+    p.xp    = xp;
+
+    if (level !== oldLevel) {
+      const hpBuff   = p.statBuffs?.hp ?? 0;
+      const newMaxHp = Math.floor(calcHp(p.baseStats.hp, level) * (1 + 0.1 * hpBuff));
+      if (p.currentHp > 0) {
+        p.currentHp = Math.min(p.currentHp + (newMaxHp - p.maxHp), newMaxHp);
+      }
+      p.maxHp = newMaxHp;
+    }
+
+    levelUps.push({ idx, pokemon: p, oldLevel, newLevel: level, oldXp, newXp: xp, preHp, segments, growth });
+  }
+
+  return levelUps;
+}
+
 // Applies level gains and returns an array of level-up events for animation.
 // Each entry: { idx, pokemon, oldLevel, newLevel, preHp }
 // baseGainOverride: if set, uses this as the base gain (e.g. 1 for wild battles)

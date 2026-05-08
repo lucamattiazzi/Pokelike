@@ -13,7 +13,6 @@ const NODE_TYPES = {
   MOVE_TUTOR: 'move_tutor',
   TRADE: 'trade',
   SILVER: 'silver',
-  XP_SHARE: 'xp_share',
 };
 
 const NODE_WEIGHTS = [
@@ -137,14 +136,12 @@ function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
   layers.push([makeNode('n0_0', NODE_TYPES.START, 0, 0)]);
 
   // Layer 1: always Catch (left) and Battle (right); nuzlocke gets two Catch nodes
-  // Gen 2: no wild battles → trainer instead. Map 2 specifically grants Exp. Share as the right-side option.
-  const layer1Right = (gen2Mode && mapIndex === 1)
-    ? NODE_TYPES.XP_SHARE
-    : nuzlockeMode
-      ? NODE_TYPES.CATCH
-      : gen2Mode
-        ? NODE_TYPES.TRAINER
-        : NODE_TYPES.BATTLE;
+  // Gen 2: no wild battles → trainer instead.
+  const layer1Right = nuzlockeMode
+    ? NODE_TYPES.CATCH
+    : gen2Mode
+      ? NODE_TYPES.TRAINER
+      : NODE_TYPES.BATTLE;
   layers.push([
     makeNode('n1_0', NODE_TYPES.CATCH, 1, 0),
     makeNode('n1_1', layer1Right,      1, 1),
@@ -328,7 +325,6 @@ function getNodeSprite(node) {
     return 'sprites/champ.png';
   }
   if (node.type === NODE_TYPES.SILVER) return 'https://play.pokemonshowdown.com/sprites/trainers/silver.png';
-  if (node.type === NODE_TYPES.XP_SHARE) return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/exp-share.png';
   return null;
 }
 
@@ -629,7 +625,6 @@ function getNodeColor(node) {
     [NODE_TYPES.MOVE_TUTOR]: '#3a4a6a',
     [NODE_TYPES.TRADE]:      '#1a5a5a',
     [NODE_TYPES.SILVER]:     '#5a2a7a',
-    [NODE_TYPES.XP_SHARE]:   '#7a6a2a',
   };
   return colors[node.type] || '#444';
 }
@@ -649,7 +644,6 @@ function getNodeIcon(node) {
     [NODE_TYPES.MOVE_TUTOR]: '♪',
     [NODE_TYPES.TRADE]:      '⇄',
     [NODE_TYPES.SILVER]:     '⚔',
-    [NODE_TYPES.XP_SHARE]:   '⭐',
   };
   return icons[node.type] || '●';
 }
@@ -687,7 +681,6 @@ function getNodeLabel(node) {
     [NODE_TYPES.MOVE_TUTOR]: 'Move Tutor',
     [NODE_TYPES.TRADE]:      'Trade — swap a Pokémon for one 3 levels higher',
     [NODE_TYPES.SILVER]:     'Rival Silver — Win for +2 levels to all Pokémon!',
-    [NODE_TYPES.XP_SHARE]:   'Exp. Share — Holder gains +1 level after each trainer/gym/rival battle (lead\'s XP is split).',
   };
   return labels[node.type] || node.type;
 }
