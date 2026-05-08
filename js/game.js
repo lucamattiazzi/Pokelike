@@ -839,16 +839,39 @@ async function doSilverNode(node) {
   showMapScreen();
 }
 
-function showEliteTransition(defeatedName, nextIndex) {
+function showEliteTransition(defeatedName, nextIndex, bossArray = ELITE_4) {
   return new Promise(resolve => {
     const el = document.getElementById('transition-screen');
     if (!el) { resolve(); return; }
     document.getElementById('transition-msg').textContent = `${defeatedName} defeated!`;
     document.getElementById('transition-sub').textContent =
-      nextIndex < 4 ? `Next: ${ELITE_4[nextIndex].name}...` : `The Champion awaits!`;
+      nextIndex < bossArray.length - 1 ? `Next: ${bossArray[nextIndex].name}...` : `The Champion awaits!`;
     showScreen('transition-screen');
     setTimeout(() => resolve(), 2000);
   });
+}
+
+async function doGen2Elite4() {
+  const bosses = GEN2_ELITE_4;
+  state.eliteIndex = 0;
+  for (let i = 0; i < bosses.length; i++) {
+    state.eliteIndex = i;
+    const boss = bosses[i];
+    const enemyTeam = boss.team.map(p => ({ ...createInstance(p, p.level, false, 2), heldItem: p.heldItem || null }));
+    showScreen('battle-screen');
+    document.getElementById('battle-title').textContent = `${boss.title}: ${boss.name}!`;
+    document.getElementById('battle-subtitle').textContent =
+      i < bosses.length - 1 ? `Elite Four — Battle ${i + 1}/${bosses.length - 1}` : 'Final Battle!';
+    const won = await new Promise(resolve => {
+      runBattleScreen(enemyTeam, true, () => resolve(true), () => resolve(false), boss.name);
+    });
+    if (!won) { showGameOver(); return; }
+    if (i < bosses.length - 1) await showEliteTransition(boss.name, i + 1, bosses);
+  }
+  const eliteAch = unlockAchievement('elite_four');
+  if (eliteAch) showAchievementToast(eliteAch);
+  state.eliteIndex = 0;
+  startMap(8);
 }
 
 
@@ -1944,6 +1967,10 @@ function showBadgeScreen(leader) {
   }
 
   document.getElementById('btn-next-map').onclick = () => {
+    if (state.gen2Mode && state.currentMap === 7) {
+      doGen2Elite4();
+      return;
+    }
     const lastLeaderMap = state.gen2Mode ? 15 : 7;
     const finalMapIndex = state.gen2Mode ? 16 : 8;
     if (state.currentMap >= lastLeaderMap) {
