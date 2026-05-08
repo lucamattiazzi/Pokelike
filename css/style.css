@@ -1500,11 +1500,11 @@ h1, h2, .pixel-font {
 }
 
 @keyframes level-up-bounce {
-  0%   { transform: translateX(-50%) scale(1, 1)       translateY(0); }
-  20%  { transform: translateX(-50%) scale(0.92, 1.12) translateY(-6px); }
-  45%  { transform: translateX(-50%) scale(1.18, 0.88) translateY(0); }
-  70%  { transform: translateX(-50%) scale(0.98, 1.04) translateY(-2px); }
-  100% { transform: translateX(-50%) scale(1, 1)       translateY(0); }
+  0%   { transform: translateX(-50%) translateY(0)     scale(1); }
+  35%  { transform: translateX(-50%) translateY(-10px) scale(1.05); }
+  65%  { transform: translateX(-50%) translateY(0)     scale(1.0); }
+  85%  { transform: translateX(-50%) translateY(-3px)  scale(1.02); }
+  100% { transform: translateX(-50%) translateY(0)     scale(1); }
 }
 
 @keyframes level-up-burst {
