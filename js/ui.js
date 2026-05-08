@@ -3294,6 +3294,11 @@ async function animateLevelUp(levelUps) {
       const finalCeiling = xpForLevel(curLvl + 1, growth || 'medium_fast');
       const finalSpan    = Math.max(1, finalCeiling - finalFloor);
       const finalPct     = Math.min(100, Math.max(0, ((newXp - finalFloor) / finalSpan) * 100));
+      // Force a layout flush so the transition fires. In the level-up path
+      // the loop's snapFillTo already flushes layout each iteration; in the
+      // no-level-up path setFillPct would otherwise change width in the same
+      // frame as the initial render and the browser would skip the transition.
+      if (xpFill) void xpFill.offsetWidth;
       setFillPct(finalPct);
       await sleep(FILL_MS);
 
