@@ -906,7 +906,12 @@ async function getCatchChoices(mapIndex, count = 3, maxGenId = 151, excludeStart
 
   const starterIds = excludeStarters ? (minGenId >= 152 ? GEN2_STARTER_IDS : STARTER_IDS) : [];
   const starterSet = new Set(starterIds);
-  const filtered = bucket.filter(id => !LEGENDARY_IDS.includes(id) && id >= minGenId && id <= maxGenId && !starterSet.has(id));
+  const larvitarLine = new Set([246, 247, 248]);
+  const filtered = bucket.filter(id => {
+    if (LEGENDARY_IDS.includes(id) || id < minGenId || id > maxGenId || starterSet.has(id)) return false;
+    if (larvitarLine.has(id) && typeof state !== 'undefined' && state.gen2Mode && state.currentMap < 13) return false;
+    return true;
+  });
   const shuffled = [...filtered];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
