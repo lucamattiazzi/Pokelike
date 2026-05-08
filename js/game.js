@@ -1289,14 +1289,17 @@ function doItemNode(node) {
     el.appendChild(div);
   }
 
-  document.getElementById('btn-skip-item').onclick = () => {
+  const itemSkipBtn = document.getElementById('btn-skip-item');
+  itemSkipBtn.style.display = '';
+  itemSkipBtn.onclick = () => {
     advanceFromNode(state.map, node.id);
     showMapScreen();
   };
 }
 
 async function doXpShareNode(node) {
-  // Gen 2 only — first content layer of map 2 grants the Exp. Share item
+  // Gen 2 only — first content layer of map 2 grants the Exp. Share item.
+  // No skip option: picking this node means taking the Exp. Share.
   showScreen('item-screen');
   renderTeamBar(state.team, document.getElementById('item-team-bar'));
 
@@ -1317,10 +1320,11 @@ async function doXpShareNode(node) {
   });
   el.appendChild(div);
 
-  document.getElementById('btn-skip-item').onclick = () => {
-    advanceFromNode(state.map, node.id);
-    showMapScreen();
-  };
+  const skipBtn = document.getElementById('btn-skip-item');
+  if (skipBtn) {
+    skipBtn.style.display = 'none';
+    skipBtn.onclick = null;
+  }
 }
 
 function openItemEquipModal(item, { fromBagIdx = -1, fromPokemonIdx = -1, onComplete = null } = {}) {
