@@ -42,10 +42,11 @@ function weightedRandom(weights) {
 
 function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
   // Layer sizes: start(1), catch/battle(2), content, boss(1)
-  const CONTENT_SIZES = gen2Mode ? [3, 4, 3, 2] : [3, 4, 3, 4, 3, 2]; // gen2: layers 2–5, normal: layers 2–7
-  // In gen2Mode on Silver maps, a Silver node sits between the last content layer and the boss
+  const CONTENT_SIZES = [3, 4, 3, 4, 3, 2]; // layers 2–7
+  // In gen2Mode on Silver maps, Silver replaces the last content layer (no extra depth added)
   const hasSilverNode = gen2Mode && [1, 3, 5, 7, 10, 13, 15].includes(mapIndex);
-  const bossLayerIdx  = 2 + CONTENT_SIZES.length + (hasSilverNode ? 1 : 0); // 6 normally, 7 on Silver maps
+  const contentCount  = hasSilverNode ? CONTENT_SIZES.length - 1 : CONTENT_SIZES.length;
+  const bossLayerIdx  = 2 + CONTENT_SIZES.length;
   const bossId        = `n${bossLayerIdx}_0`;
 
   // ── Helpers ──────────────────────────────────────────────────────
@@ -73,6 +74,12 @@ function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
     if (mapIndex >= 5 && ci >= 2 && !(typeof state !== 'undefined' && state.isEndlessMode)) w.legendary = 2;
     if (nuzlockeMode) { w.catch = 0; w.trade = 0; }
     if (typeof state !== 'undefined' && state.isEndlessMode) { w.trade = 0; w.catch = Math.floor(w.catch / 2); }
+    if (gen2Mode) {
+      // Gen 2: bump combat/event nodes by 20%
+      w.battle   = Math.round(w.battle   * 1.2);
+      w.trainer  = Math.round(w.trainer  * 1.2);
+      w.question = Math.round(w.question * 1.2);
+    }
     const type = weightedRandom(w);
     // Endless region 3: 1/6 catch nodes become legendary encounters
     if (type === NODE_TYPES.CATCH &&
@@ -131,14 +138,14 @@ function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
     makeNode('n1_1', nuzlockeMode ? NODE_TYPES.CATCH : NODE_TYPES.BATTLE, 1, 1),
   ]);
 
-  // Layers 2–7: random content nodes
-  for (let ci = 0; ci < CONTENT_SIZES.length; ci++) {
+  // Layers 2+: random content nodes (Silver maps use one fewer content layer)
+  for (let ci = 0; ci < contentCount; ci++) {
     const l    = ci + 2;
     const size = CONTENT_SIZES[ci];
     const layer = Array.from({ length: size }, (_, c) => makeNode(`n${l}_${c}`, pickType(ci), l, c));
 
     // Guarantee a pokecenter in the last content layer
-    if (ci === CONTENT_SIZES.length - 1 && !layer.some(n => n.type === NODE_TYPES.POKECENTER)) {
+    if (ci === contentCount - 1 && !layer.some(n => n.type === NODE_TYPES.POKECENTER)) {
       const idx = Math.floor(rng() * size);
       layer[idx].type = NODE_TYPES.POKECENTER;
     }
@@ -146,9 +153,9 @@ function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
     layers.push(layer);
   }
 
-  // Silver pre-boss layer (gen2Mode only on maps 2, 5, 7)
+  // Silver node replaces the last content layer slot (gen2Mode only on select maps)
   if (hasSilverNode) {
-    const silverLayerIdx = bossLayerIdx - 1;
+    const silverLayerIdx = 2 + contentCount;
     layers.push([makeNode(`n${silverLayerIdx}_0`, NODE_TYPES.SILVER, silverLayerIdx, 0)]);
   }
 
@@ -227,6 +234,18 @@ const TRAINER_SPRITE_NAMES = {
   policeman:   'Policeman',
   Scientist:   'Scientist',
   teamRocket:  'Team Rocket Grunt',
+};
+
+const TRAINER_SPECIALTIES = {
+  aceTrainer:  'Various Pokemon',
+  bugCatcher:  'Bug Pokemon',
+  fireSpitter: 'Fire Pokemon',
+  fisher:      'Water Pokemon',
+  hiker:       'Rock/Ground Pokemon',
+  oldGuy:      'Various Pokemon',
+  policeman:   'Fire Pokemon',
+  Scientist:   'Electric/Poison Pokemon',
+  teamRocket:  'Poison Pokemon',
 };
 
 const RANDOM_TRAINER_SPRITES = TRAINER_SPRITE_KEYS.map(k => `sprites/${k}.png`);
@@ -646,7 +665,9 @@ function getNodeLabel(node) {
     [NODE_TYPES.ITEM]:       'Item',
     [NODE_TYPES.QUESTION]:   'Random Event',
     [NODE_TYPES.POKECENTER]: 'Pokemon Center',
-    [NODE_TYPES.TRAINER]:    `Trainer Battle — +2 levels${node.trainerSprite && TRAINER_SPRITE_NAMES[node.trainerSprite] ? ' — ' + TRAINER_SPRITE_NAMES[node.trainerSprite] : ''}`,
+    [NODE_TYPES.TRAINER]:    (node.trainerSprite && TRAINER_SPRITE_NAMES[node.trainerSprite])
+      ? `${TRAINER_SPRITE_NAMES[node.trainerSprite]} — +2 Levels — ${TRAINER_SPECIALTIES[node.trainerSprite] || 'Various Pokemon'}`
+      : `Trainer Battle — +2 Levels`,
     [NODE_TYPES.LEGENDARY]:  'Legendary Pokemon',
     [NODE_TYPES.MOVE_TUTOR]: 'Move Tutor',
     [NODE_TYPES.TRADE]:      'Trade — swap a Pokémon for one 3 levels higher',

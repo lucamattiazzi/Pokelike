@@ -448,12 +448,16 @@ function getLevelGain(team, bagItems) {
 // Applies level gains and returns an array of level-up events for animation.
 // Each entry: { idx, pokemon, oldLevel, newLevel, preHp }
 // baseGainOverride: if set, uses this as the base gain (e.g. 1 for wild battles)
-function applyLevelGain(team, bagItems, participantIdxs, maxEnemyLevel = 0, hardMode = false, baseGainOverride = null, levelCap = Infinity) {
+function applyLevelGain(team, bagItems, participantIdxs, maxEnemyLevel = 0, hardMode = false, baseGainOverride = null, levelCap = Infinity, leadOnly = false) {
   const isWild = baseGainOverride !== null;
   const baseGain = isWild ? baseGainOverride : (hardMode ? 1 : getLevelGain(team, bagItems));
   const levelUps = [];
 
+  // leadOnly: XP goes only to the first living team member (gen 2 — no exp share)
+  const leadIdx = leadOnly ? team.findIndex(p => p.currentHp > 0) : -1;
+
   for (let i = 0; i < team.length; i++) {
+    if (leadOnly && i !== leadIdx) continue;
     const p = team[i];
     const getsXp = p.currentHp > 0 || (participantIdxs && participantIdxs.has(i));
     if (!getsXp) continue;
