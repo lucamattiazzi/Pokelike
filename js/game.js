@@ -825,7 +825,6 @@ async function doSilverNode(node) {
   for (const p of state.team) {
     p.level = Math.min(100, p.level + 2);
     p.maxHp = calcHp(p.baseStats.hp, p.level);
-    p.currentHp = p.maxHp;
   }
   state.silverBeaten = (state.silverBeaten || 0) + 1;
   advanceFromNode(state.map, node.id);
