@@ -1898,7 +1898,20 @@ function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, ene
         if (resultP[i]) state.team[i].currentHp = resultP[i].currentHp;
       }
       const maxEnemyLevel = Math.max(...resultE.map(p => p.level));
-      const levelUps = applyLevelGain(state.team, state.nuzlockeMode ? [] : state.items, playerParticipants, maxEnemyLevel, state.nuzlockeMode, baseGainOverride, state.isEndlessMode ? Infinity : 100, state.gen2Mode);
+      let levelUps;
+      if (state.gen2Mode) {
+        // Gen 2: only the first living team member gets XP (no exp share)
+        const leadIdx = state.team.findIndex(p => p.currentHp > 0);
+        if (leadIdx >= 0) {
+          const singleTeam = [state.team[leadIdx]];
+          const singleUps = applyLevelGain(singleTeam, state.items, new Set([0]), maxEnemyLevel, state.nuzlockeMode, baseGainOverride, 100);
+          levelUps = singleUps.map(lu => ({ ...lu, idx: leadIdx }));
+        } else {
+          levelUps = [];
+        }
+      } else {
+        levelUps = applyLevelGain(state.team, state.nuzlockeMode ? [] : state.items, playerParticipants, maxEnemyLevel, state.nuzlockeMode, baseGainOverride, state.isEndlessMode ? Infinity : 100);
+      }
       const skipAll = autoSkip || manuallySkipped;
       battleSpeedMultiplier = skipAll ? SKIP_SPEED : 1;
       skipBtn.textContent = 'Skip';
