@@ -3234,34 +3234,16 @@ async function animateLevelUp(levelUps) {
     // ---- XP bar segments (gen 2) ----
     const xpFill = el.querySelector('.xp-bar-fill');
     const useXp  = xpFill && oldXp !== undefined && newXp !== undefined;
-    const FILL_MS  = 750;
-    const FLASH_MS = 700;
-    const clamp = pct => `${Math.max(0, Math.min(100, pct))}%`;
-    // Snap to a value with no transition.
-    const snapFill = pct => {
+    const FILL_MS  = 750;   // matches CSS transition (0.75s ease-out)
+    const FLASH_MS = 700;   // covers the level-up pulse animation length
+    const setFillPct = pct => { if (xpFill) xpFill.style.width = `${Math.max(0, Math.min(100, pct))}%`; };
+    const snapFillTo = pct => {
       if (!xpFill) return;
+      const prev = xpFill.style.transition;
       xpFill.style.transition = 'none';
-      xpFill.style.width = clamp(pct);
-      void xpFill.offsetWidth;
-    };
-    // Snap to fromPct, wait one frame so the snap is committed, then animate
-    // to toPct over durationMs (scaled by skip multiplier). The frame wait
-    // is critical: without it, browsers can collapse the two width writes
-    // into one and skip the animation entirely. Awaits the full duration.
-    const fillFromTo = async (fromPct, toPct, durationMs) => {
-      if (!xpFill) return;
-      // Step 1: snap start without transition.
-      xpFill.style.transition = 'none';
-      xpFill.style.width = clamp(fromPct);
-      // Step 2: wait for the next paint frame — guarantees the snap is
-      // committed before the transition begins.
-      await new Promise(resolve => requestAnimationFrame(resolve));
-      // Step 3: install the explicit transition (speed-scaled) and write
-      // the target width — this triggers the animation we just primed.
-      const scaled = Math.max(20, Math.round(durationMs / battleSpeedMultiplier));
-      xpFill.style.transition = `width ${scaled}ms cubic-bezier(0.25, 1, 0.5, 1)`;
-      xpFill.style.width = clamp(toPct);
-      await sleep(durationMs);
+      setFillPct(pct);
+      void xpFill.offsetWidth; // force reflow so the snap takes effect before re-enabling
+      xpFill.style.transition = prev;
     };
     const setLevelLabel = lvl => {
       const nameEl = el.querySelector('.battle-poke-name');
@@ -3287,26 +3269,33 @@ async function animateLevelUp(levelUps) {
       for (const seg of segments || []) {
         const span = Math.max(1, seg.xpCeiling - seg.xpFloor);
         const fromPct = ((curXp - seg.xpFloor) / span) * 100;
-        // Fill from current position to 100% of this level.
-        await fillFromTo(fromPct, 100, FILL_MS);
-        // Snap to 0 and trigger the flash.
+        // Set start position without animating (so we don't see a backwards jump).
+        snapFillTo(fromPct);
+        // Smooth fill to 100%.
+        setFillPct(100);
+        await sleep(FILL_MS);
+        // Snap to 0 and bump the level label, then start the flash.
+        // The next segment's fill (or the final partial fill) overlaps with
+        // the rest of the flash so we don't get a dead pause.
         curLvl = seg.level;
-        snapFill(0);
+        snapFillTo(0);
         setLevelLabel(curLvl);
         const flashPromise = flashLevelText(curLvl);
         curXp = seg.xpCeiling;
+        // If there are more segments, kick off the next fill in parallel
+        // with the flash; otherwise wait briefly then continue to final fill.
         await sleep(120);
+        // Wait for the flash to finish before the next iteration so banners
+        // don't pile up on top of each other.
         await flashPromise;
       }
-      // Final partial fill toward newXp.
+      // Final partial fill toward newXp at the new level threshold.
       const finalFloor   = xpForLevel(curLvl, growth || 'medium_fast');
       const finalCeiling = xpForLevel(curLvl + 1, growth || 'medium_fast');
       const finalSpan    = Math.max(1, finalCeiling - finalFloor);
-      const finalFromPct = Math.min(100, Math.max(0, ((curXp - finalFloor) / finalSpan) * 100));
-      const finalToPct   = Math.min(100, Math.max(0, ((newXp - finalFloor) / finalSpan) * 100));
-      if (finalToPct !== finalFromPct) {
-        await fillFromTo(finalFromPct, finalToPct, FILL_MS);
-      }
+      const finalPct     = Math.min(100, Math.max(0, ((newXp - finalFloor) / finalSpan) * 100));
+      setFillPct(finalPct);
+      await sleep(FILL_MS);
 
       // After all level-up flashes, smoothly grow the HP bar to its new max.
       // We interpolate both currentHp AND maxHp so the "X/Y" text doesn't
