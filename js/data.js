@@ -366,23 +366,54 @@ const JOHTO_GYM_LEADERS = [
 ];
 
 const SILVER_ENCOUNTERS = [
+  // Map 1 — Azalea area: Silver just got his starter
   { team: [
-    { speciesId: 157, name: 'Quilava',  types: ['Fire'],           baseStats: { hp:58,  atk:64,  def:58,  speed:80,  special:80  }, level: 31, heldItem: { id: 'charcoal',    name: 'Charcoal',    icon: '🔥' } },
-    { speciesId: 215, name: 'Sneasel',  types: ['Dark','Ice'],     baseStats: { hp:55,  atk:95,  def:55,  speed:115, special:55  }, level: 29, heldItem: { id: 'eviolite',    name: 'Eviolite',    icon: '💎' } },
-    { speciesId: 92,  name: 'Gastly',   types: ['Ghost','Poison'], baseStats: { hp:30,  atk:35,  def:30,  speed:80,  special:100 }, level: 28, heldItem: { id: 'life_orb',    name: 'Life Orb',    icon: '🔮' } },
+    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],           baseStats: { hp:39, atk:52, def:43, speed:65, special:60  }, level: 14, heldItem: { id: 'charcoal',   name: 'Charcoal',   icon: '🔥' } },
+    { speciesId: 92,  name: 'Gastly',    types: ['Ghost','Poison'], baseStats: { hp:30, atk:35, def:30, speed:80, special:100 }, level: 12, heldItem: { id: 'life_orb',   name: 'Life Orb',   icon: '🔮' } },
   ]},
+  // Map 3 — Ecruteak area: Quilava, team growing
   { team: [
-    { speciesId: 157, name: 'Quilava',    types: ['Fire'],           baseStats: { hp:58, atk:64,  def:58,  speed:80,  special:80  }, level: 46, heldItem: { id: 'charcoal',     name: 'Charcoal',     icon: '🔥' } },
-    { speciesId: 215, name: 'Sneasel',    types: ['Dark','Ice'],     baseStats: { hp:55, atk:95,  def:55,  speed:115, special:55  }, level: 48, heldItem: { id: 'eviolite',     name: 'Eviolite',     icon: '💎' } },
-    { speciesId: 94,  name: 'Gengar',     types: ['Ghost','Poison'], baseStats: { hp:60, atk:65,  def:60,  speed:110, special:130 }, level: 50, heldItem: { id: 'life_orb',     name: 'Life Orb',     icon: '🔮' } },
-    { speciesId: 229, name: 'Houndoom',   types: ['Dark','Fire'],    baseStats: { hp:75, atk:90,  def:50,  speed:95,  special:110 }, level: 49, heldItem: { id: 'choice_specs', name: 'Choice Specs', icon: '👓' } },
+    { speciesId: 157, name: 'Quilava',   types: ['Fire'],           baseStats: { hp:58,  atk:64, def:58, speed:80,  special:80  }, level: 28, heldItem: { id: 'charcoal',   name: 'Charcoal',   icon: '🔥' } },
+    { speciesId: 215, name: 'Sneasel',   types: ['Dark','Ice'],     baseStats: { hp:55,  atk:95, def:55, speed:115, special:55  }, level: 25, heldItem: { id: 'eviolite',   name: 'Eviolite',   icon: '💎' } },
+    { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'], baseStats: { hp:45,  atk:50, def:45, speed:95,  special:115 }, level: 26, heldItem: { id: 'spell_tag',  name: 'Spell Tag',  icon: '👻' } },
   ]},
+  // Map 5 — Jasmine area: full mid-Johto team, still Quilava
   { team: [
-    { speciesId: 160, name: 'Typhlosion', types: ['Fire'],           baseStats: { hp:78,  atk:84,  def:78,  speed:100, special:109 }, level: 62, heldItem: { id: 'charcoal',      name: 'Charcoal',      icon: '🔥' } },
-    { speciesId: 215, name: 'Sneasel',    types: ['Dark','Ice'],     baseStats: { hp:55,  atk:95,  def:55,  speed:115, special:55  }, level: 58, heldItem: { id: 'choice_band',   name: 'Choice Band',   icon: '🎀' } },
-    { speciesId: 94,  name: 'Gengar',     types: ['Ghost','Poison'], baseStats: { hp:60,  atk:65,  def:60,  speed:110, special:130 }, level: 60, heldItem: { id: 'life_orb',      name: 'Life Orb',      icon: '🔮' } },
-    { speciesId: 229, name: 'Houndoom',   types: ['Dark','Fire'],    baseStats: { hp:75,  atk:90,  def:50,  speed:95,  special:110 }, level: 59, heldItem: { id: 'choice_specs',  name: 'Choice Specs',  icon: '👓' } },
-    { speciesId: 248, name: 'Tyranitar',  types: ['Rock','Dark'],    baseStats: { hp:100, atk:134, def:110, speed:61,  special:95  }, level: 61, heldItem: { id: 'rocky_helmet',  name: 'Rocky Helmet',  icon: '⛑️' } },
+    { speciesId: 157, name: 'Quilava',   types: ['Fire'],           baseStats: { hp:58, atk:64, def:58, speed:80,  special:80  }, level: 46, heldItem: { id: 'charcoal',     name: 'Charcoal',     icon: '🔥' } },
+    { speciesId: 215, name: 'Sneasel',   types: ['Dark','Ice'],     baseStats: { hp:55, atk:95, def:55, speed:115, special:55  }, level: 44, heldItem: { id: 'eviolite',     name: 'Eviolite',     icon: '💎' } },
+    { speciesId: 94,  name: 'Gengar',    types: ['Ghost','Poison'], baseStats: { hp:60, atk:65, def:60, speed:110, special:130 }, level: 46, heldItem: { id: 'life_orb',     name: 'Life Orb',     icon: '🔮' } },
+    { speciesId: 229, name: 'Houndoom',  types: ['Dark','Fire'],    baseStats: { hp:75, atk:90, def:50, speed:95,  special:110 }, level: 45, heldItem: { id: 'choice_specs', name: 'Choice Specs', icon: '👓' } },
+  ]},
+  // Map 7 — Clair area: end of Johto, Pupitar joins
+  { team: [
+    { speciesId: 157, name: 'Quilava',   types: ['Fire'],           baseStats: { hp:58,  atk:64,  def:58, speed:80,  special:80  }, level: 57, heldItem: { id: 'charcoal',     name: 'Charcoal',     icon: '🔥' } },
+    { speciesId: 215, name: 'Sneasel',   types: ['Dark','Ice'],     baseStats: { hp:55,  atk:95,  def:55, speed:115, special:55  }, level: 54, heldItem: { id: 'choice_band',  name: 'Choice Band',  icon: '🎀' } },
+    { speciesId: 94,  name: 'Gengar',    types: ['Ghost','Poison'], baseStats: { hp:60,  atk:65,  def:60, speed:110, special:130 }, level: 56, heldItem: { id: 'life_orb',     name: 'Life Orb',     icon: '🔮' } },
+    { speciesId: 229, name: 'Houndoom',  types: ['Dark','Fire'],    baseStats: { hp:75,  atk:90,  def:50, speed:95,  special:110 }, level: 55, heldItem: { id: 'choice_specs', name: 'Choice Specs', icon: '👓' } },
+    { speciesId: 247, name: 'Pupitar',   types: ['Rock','Ground'],  baseStats: { hp:70,  atk:84,  def:70, speed:51,  special:70  }, level: 56, heldItem: { id: 'eviolite',     name: 'Eviolite',     icon: '💎' } },
+  ]},
+  // Map 9 — Kanto (Misty area / Mt. Moon): Typhlosion finally evolves
+  { team: [
+    { speciesId: 160, name: 'Typhlosion', types: ['Fire'],           baseStats: { hp:78, atk:84, def:78, speed:100, special:109 }, level: 62, heldItem: { id: 'charcoal',     name: 'Charcoal',     icon: '🔥' } },
+    { speciesId: 215, name: 'Sneasel',    types: ['Dark','Ice'],     baseStats: { hp:55, atk:95, def:55, speed:115, special:55  }, level: 59, heldItem: { id: 'choice_band',  name: 'Choice Band',  icon: '🎀' } },
+    { speciesId: 94,  name: 'Gengar',     types: ['Ghost','Poison'], baseStats: { hp:60, atk:65, def:60, speed:110, special:130 }, level: 60, heldItem: { id: 'life_orb',     name: 'Life Orb',     icon: '🔮' } },
+    { speciesId: 229, name: 'Houndoom',   types: ['Dark','Fire'],    baseStats: { hp:75, atk:90, def:50, speed:95,  special:110 }, level: 60, heldItem: { id: 'choice_specs', name: 'Choice Specs', icon: '👓' } },
+  ]},
+  // Map 12 — Kanto (Janine area): Tyranitar joins
+  { team: [
+    { speciesId: 160, name: 'Typhlosion', types: ['Fire'],           baseStats: { hp:78,  atk:84,  def:78,  speed:100, special:109 }, level: 67, heldItem: { id: 'charcoal',     name: 'Charcoal',     icon: '🔥' } },
+    { speciesId: 215, name: 'Sneasel',    types: ['Dark','Ice'],     baseStats: { hp:55,  atk:95,  def:55,  speed:115, special:55  }, level: 64, heldItem: { id: 'choice_band',  name: 'Choice Band',  icon: '🎀' } },
+    { speciesId: 94,  name: 'Gengar',     types: ['Ghost','Poison'], baseStats: { hp:60,  atk:65,  def:60,  speed:110, special:130 }, level: 65, heldItem: { id: 'life_orb',     name: 'Life Orb',     icon: '🔮' } },
+    { speciesId: 229, name: 'Houndoom',   types: ['Dark','Fire'],    baseStats: { hp:75,  atk:90,  def:50,  speed:95,  special:110 }, level: 65, heldItem: { id: 'choice_specs', name: 'Choice Specs', icon: '👓' } },
+    { speciesId: 248, name: 'Tyranitar',  types: ['Rock','Dark'],    baseStats: { hp:100, atk:134, def:110, speed:61,  special:95  }, level: 66, heldItem: { id: 'rocky_helmet', name: 'Rocky Helmet', icon: '⛑️' } },
+  ]},
+  // Map 14 — Kanto (Blaine area): final Silver battle, full team
+  { team: [
+    { speciesId: 160, name: 'Typhlosion', types: ['Fire'],           baseStats: { hp:78,  atk:84,  def:78,  speed:100, special:109 }, level: 72, heldItem: { id: 'charcoal',     name: 'Charcoal',     icon: '🔥' } },
+    { speciesId: 215, name: 'Sneasel',    types: ['Dark','Ice'],     baseStats: { hp:55,  atk:95,  def:55,  speed:115, special:55  }, level: 69, heldItem: { id: 'choice_band',  name: 'Choice Band',  icon: '🎀' } },
+    { speciesId: 94,  name: 'Gengar',     types: ['Ghost','Poison'], baseStats: { hp:60,  atk:65,  def:60,  speed:110, special:130 }, level: 70, heldItem: { id: 'life_orb',     name: 'Life Orb',     icon: '🔮' } },
+    { speciesId: 229, name: 'Houndoom',   types: ['Dark','Fire'],    baseStats: { hp:75,  atk:90,  def:50,  speed:95,  special:110 }, level: 70, heldItem: { id: 'choice_specs', name: 'Choice Specs', icon: '👓' } },
+    { speciesId: 248, name: 'Tyranitar',  types: ['Rock','Dark'],    baseStats: { hp:100, atk:134, def:110, speed:61,  special:95  }, level: 71, heldItem: { id: 'rocky_helmet', name: 'Rocky Helmet', icon: '⛑️' } },
   ]},
 ];
 
