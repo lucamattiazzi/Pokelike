@@ -165,6 +165,10 @@ function getBestMove(types, baseStats, speciesId, moveTier = 1) {
     const move = MOVE_POOL['Rock'][isSpecial ? 'special' : 'physical'][tier];
     return { ...move, type: 'Rock', isSpecial };
   }
+  if ([170, 171].includes(speciesId)) {
+    const move = MOVE_POOL['Electric'][isSpecial ? 'special' : 'physical'][tier];
+    return { ...move, type: 'Electric', isSpecial };
+  }
   for (const t of types) {
     // Skip Normal if the Pokémon also has a more specific type (e.g. Normal/Flying → use Flying)
     if (t.toLowerCase() === 'normal' && types.length > 1) continue;
