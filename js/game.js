@@ -668,7 +668,7 @@ function getLevelForNode(node) {
   }
   // Normal mode (original behaviour)
   const [minL, maxL] = MAP_LEVEL_RANGES[state.currentMap];
-  const t = Math.min(1, Math.max(0, (node.layer - 1) / 5)); // 0.0 at layer 1, 1.0 at layer 6
+  const t = Math.min(1, Math.max(0, (node.layer - 1) / 3)); // 0.0 at layer 1, 1.0 at layer 4
   const base = Math.round(minL + t * (maxL - minL));
   const spread = Math.max(1, Math.round((maxL - minL) / 8));
   return Math.min(maxL, Math.max(minL, base + Math.floor(rng() * spread)));

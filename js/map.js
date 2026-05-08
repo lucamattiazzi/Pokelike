@@ -41,11 +41,11 @@ function weightedRandom(weights) {
 }
 
 function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
-  // Layer sizes: start(1), catch/battle(2), 3,4,3,4,3,2, boss(1)
-  const CONTENT_SIZES = [3, 4, 3, 4, 3, 2]; // layers 2–7
+  // Layer sizes: start(1), catch/battle(2), 3,4,3,4, boss(1)
+  const CONTENT_SIZES = [3, 4, 3, 4]; // layers 2–5
   // In gen2Mode on Silver maps, a Silver node sits between the last content layer and the boss
   const hasSilverNode = gen2Mode && [1, 3, 5, 7, 9, 12, 14].includes(mapIndex);
-  const bossLayerIdx  = 2 + CONTENT_SIZES.length + (hasSilverNode ? 1 : 0); // 8 normally, 9 on Silver maps
+  const bossLayerIdx  = 2 + CONTENT_SIZES.length + (hasSilverNode ? 1 : 0); // 6 normally, 7 on Silver maps
   const bossId        = `n${bossLayerIdx}_0`;
 
   // ── Helpers ──────────────────────────────────────────────────────
