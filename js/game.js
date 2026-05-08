@@ -426,23 +426,49 @@ function showMapScreen() {
   showScreen('map-screen');
   const mapInfo = document.getElementById('map-info');
   if (mapInfo) {
-    const isFinal = state.currentMap === 8;
-    const leaders = state.gen2Mode ? JOHTO_GYM_LEADERS : GYM_LEADERS;
-    const leader = isFinal ? null : leaders[state.currentMap];
-    mapInfo.innerHTML = isFinal
-      ? `<span>${state.gen2Mode ? 'Mt. Silver — Red' : 'Elite Four & Champion'}</span>`
-      : `<span>Map ${state.currentMap+1}: vs <b>${leader.name}</b> (${leader.type})</span>`;
+    if (state.gen2Mode) {
+      const isFinal = state.currentMap === 16;
+      const leader = isFinal ? null : (state.currentMap < 8
+        ? JOHTO_GYM_LEADERS[state.currentMap]
+        : KANTO_GYM_LEADERS[state.currentMap - 8]);
+      mapInfo.innerHTML = isFinal
+        ? `<span>Mt. Silver — Red</span>`
+        : `<span>Map ${state.currentMap+1}: vs <b>${leader.name}</b> (${leader.type})</span>`;
+    } else {
+      const isFinal = state.currentMap === 8;
+      const leader = isFinal ? null : GYM_LEADERS[state.currentMap];
+      mapInfo.innerHTML = isFinal
+        ? `<span>Elite Four & Champion</span>`
+        : `<span>Map ${state.currentMap+1}: vs <b>${leader.name}</b> (${leader.type})</span>`;
+    }
   }
   const BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/';
-  const badgeOffset = state.gen2Mode ? 8 : 0;
-  const badgeLeaders = state.gen2Mode ? JOHTO_GYM_LEADERS : GYM_LEADERS;
-  const badgeHtml = Array.from({ length: 8 }, (_, i) => {
-    const earned = i < state.badges;
-    const label = badgeLeaders[i].badge;
-    return earned
-      ? `<img src="${BASE}${i + 1 + badgeOffset}.png" alt="${label}" title="${label}" class="badge-icon-img">`
-      : `<span class="badge-icon-empty" title="${label}"></span>`;
-  }).join('');
+  let badgeHtml;
+  if (state.gen2Mode) {
+    const johtoBadges = Array.from({ length: 8 }, (_, i) => {
+      const earned = i < state.badges;
+      const label = JOHTO_GYM_LEADERS[i].badge;
+      return earned
+        ? `<img src="${BASE}${i + 9}.png" alt="${label}" title="${label}" class="badge-icon-img">`
+        : `<span class="badge-icon-empty" title="${label}"></span>`;
+    }).join('');
+    const kantoBadges = Array.from({ length: 8 }, (_, i) => {
+      const earned = (i + 8) < state.badges;
+      const label = KANTO_GYM_LEADERS[i].badge;
+      return earned
+        ? `<img src="${BASE}${i + 1}.png" alt="${label}" title="${label}" class="badge-icon-img">`
+        : `<span class="badge-icon-empty" title="${label}"></span>`;
+    }).join('');
+    badgeHtml = johtoBadges + kantoBadges;
+  } else {
+    badgeHtml = Array.from({ length: 8 }, (_, i) => {
+      const earned = i < state.badges;
+      const label = GYM_LEADERS[i].badge;
+      return earned
+        ? `<img src="${BASE}${i + 1}.png" alt="${label}" title="${label}" class="badge-icon-img">`
+        : `<span class="badge-icon-empty" title="${label}"></span>`;
+    }).join('');
+  }
   const badgeEl = document.getElementById('badge-count');
   if (badgeEl) badgeEl.innerHTML = badgeHtml;
   const badgePanelEl = document.getElementById('badge-count-panel');
@@ -452,7 +478,10 @@ function showMapScreen() {
   renderItemBadges(state.items);
 
   const mapContainer = document.getElementById('map-container');
-  mapContainer.style.backgroundImage = `url('ui/mapsNormalMode/map${state.currentMap + 1}.png')`;
+  const mapBgNum = state.gen2Mode
+    ? (state.currentMap < 16 ? (state.currentMap % 8) + 1 : 9)
+    : state.currentMap + 1;
+  mapContainer.style.backgroundImage = `url('ui/mapsNormalMode/map${mapBgNum}.png')`;
   renderMap(state.map, mapContainer, onNodeClick);
   saveRun();
 
@@ -692,8 +721,10 @@ async function doBattleNode(node) {
 
 async function doBossNode(node) {
   if (state.gen2Mode) {
-    if (state.currentMap === 8) { await doRed(); return; }
-    const leader = JOHTO_GYM_LEADERS[state.currentMap];
+    if (state.currentMap === 16) { await doRed(); return; }
+    const leader = state.currentMap < 8
+      ? JOHTO_GYM_LEADERS[state.currentMap]
+      : KANTO_GYM_LEADERS[state.currentMap - 8];
     const enemyTeam = leader.team.map(p => ({
       ...createInstance(p, p.level, false, leader.moveTier ?? 1),
       heldItem: p.heldItem || null,
@@ -1894,14 +1925,24 @@ function showBadgeScreen(leader) {
   showScreen('badge-screen');
   document.getElementById('badge-msg').textContent = `You earned the ${leader.badge}!`;
   document.getElementById('badge-leader').textContent = '';
-  document.getElementById('badge-count-display').textContent = `Badges: ${state.badges}/8`;
+  const totalBadges = state.gen2Mode ? 16 : 8;
+  document.getElementById('badge-count-display').textContent = `Badges: ${state.badges}/${totalBadges}`;
   const badgeImg = document.getElementById('badge-icon-img');
-  if (badgeImg) badgeImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/${state.badges + (state.gen2Mode ? 8 : 0)}.png`;
+  if (badgeImg) {
+    if (state.gen2Mode) {
+      const badgeNum = state.badges <= 8 ? state.badges + 8 : state.badges - 8;
+      badgeImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/${badgeNum}.png`;
+    } else {
+      badgeImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/${state.badges}.png`;
+    }
+  }
 
   document.getElementById('btn-next-map').onclick = () => {
-    if (state.currentMap >= 7) {
+    const lastLeaderMap = state.gen2Mode ? 15 : 7;
+    const finalMapIndex = state.gen2Mode ? 16 : 8;
+    if (state.currentMap >= lastLeaderMap) {
       state.eliteIndex = 0;
-      startMap(8);
+      startMap(finalMapIndex);
     } else {
       startMap(state.currentMap + 1);
     }

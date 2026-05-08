@@ -242,6 +242,28 @@ const GYM_LEADER_SPRITES = [
   'sprites/giovanni.png',
 ];
 
+const JOHTO_GYM_LEADER_SPRITES = [
+  'https://play.pokemonshowdown.com/sprites/trainers/falkner.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/bugsy.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/whitney.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/morty.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/chuck.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/jasmine.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/pryce.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/clair.png',
+];
+
+const KANTO_GYM_LEADER_SPRITES = [
+  'https://play.pokemonshowdown.com/sprites/trainers/brock.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/misty.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/ltsurge.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/erika.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/janine.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/sabrina.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/blaine.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/blue.png',
+];
+
 function getNodeSprite(node) {
   const ICON_SPRITES = {
     [NODE_TYPES.BATTLE]:    'sprites/grass.png',
@@ -266,8 +288,9 @@ function getNodeSprite(node) {
     if (typeof state !== 'undefined' && state.isEndlessMode) return 'sprites/misteryTrainer.png';
     const mi = node.mapIndex ?? -1;
     if (typeof state !== 'undefined' && state.gen2Mode) {
-      if (mi === 8) return 'https://play.pokemonshowdown.com/sprites/trainers/red.png';
-      if (mi >= 0 && mi < GYM_LEADER_SPRITES.length) return GYM_LEADER_SPRITES[mi];
+      if (mi === 16) return 'https://play.pokemonshowdown.com/sprites/trainers/red.png';
+      if (mi >= 8 && mi < 16) return KANTO_GYM_LEADER_SPRITES[mi - 8];
+      if (mi >= 0 && mi < 8) return JOHTO_GYM_LEADER_SPRITES[mi];
     }
     if (mi >= 0 && mi < GYM_LEADER_SPRITES.length) return GYM_LEADER_SPRITES[mi];
     return 'sprites/champ.png';
