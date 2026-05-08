@@ -400,10 +400,21 @@ function renderBattleField(pTeam, eTeam) {
     pEl.innerHTML = pTeam.map((p, i) => {
       const fainted = p.currentHp <= 0;
       const active  = i === pActiveIdx;
-      const xpHtml  = showXp ? renderXpBar(p.xp, p.level, getGrowthRate(p.speciesId)) : '';
+      let hpBlock;
+      if (showXp) {
+        const hpPct   = Math.min(1, Math.max(0, p.currentHp / p.maxHp));
+        const hpColor = hpBarColor(hpPct);
+        const hpBar   = `<div class="hp-bar-bg"><div class="hp-bar-fill" style="width:${Math.floor(hpPct*100)}%;background:${hpColor}"><div class="hp-bar-shadow"></div></div></div>`;
+        const xpBar   = renderXpBar(p.xp, p.level, getGrowthRate(p.speciesId));
+        const hpText  = `<span class="hp-text">${Math.max(0,p.currentHp)}/${p.maxHp}</span>`;
+        // Wrap HP+XP into a single stack so they sit flush; HP text follows below.
+        hpBlock = `<div class="hp-xp-stack">${hpBar}${xpBar}</div>${hpText}`;
+      } else {
+        hpBlock = renderHpBar(p.currentHp, p.maxHp);
+      }
       return `<div class="battle-pokemon ${fainted?'fainted':''} ${active?'active-pokemon':''}" data-idx="${i}">
         <div class="battle-poke-name">${p.nickname||p.name} Lv${p.level}</div>
-        <div class="poke-hp">${renderHpBar(p.currentHp, p.maxHp)}${xpHtml}</div>
+        <div class="poke-hp">${hpBlock}</div>
         <img src="ui/battleBase.png" class="battle-base" alt="">
         <img src="${p.spriteUrl||''}" alt="${p.name}" class="battle-sprite" onerror="this.src=''">
         <div class="battle-stages"></div>
@@ -3219,7 +3230,17 @@ async function animateLevelUp(levelUps) {
     // ---- XP bar segments (gen 2) ----
     const xpFill = el.querySelector('.xp-bar-fill');
     const useXp  = xpFill && oldXp !== undefined && newXp !== undefined;
+    const FILL_MS  = 600;   // matches CSS transition
+    const FLASH_MS = 500;   // shorter, runs partly in parallel with the snap
     const setFillPct = pct => { if (xpFill) xpFill.style.width = `${Math.max(0, Math.min(100, pct))}%`; };
+    const snapFillTo = pct => {
+      if (!xpFill) return;
+      const prev = xpFill.style.transition;
+      xpFill.style.transition = 'none';
+      setFillPct(pct);
+      void xpFill.offsetWidth; // force reflow so the snap takes effect before re-enabling
+      xpFill.style.transition = prev;
+    };
     const setLevelLabel = lvl => {
       const nameEl = el.querySelector('.battle-poke-name');
       if (nameEl) nameEl.textContent = `${pokemon.nickname || pokemon.name} Lv${lvl}`;
@@ -3230,27 +3251,36 @@ async function animateLevelUp(levelUps) {
       lvText.className = 'level-up-text';
       lvText.textContent = `Lv ${lvl}!`;
       el.appendChild(lvText);
-      await sleep(900);
+      await sleep(FLASH_MS);
       el.classList.remove('level-up');
       lvText.remove();
     };
 
     if (useXp && (segments?.length || oldXp !== newXp)) {
-      // Walk each segment: fill old → ceiling, snap to 0, then continue.
       let curXp = oldXp;
       let curLvl = oldLevel;
       for (const seg of segments || []) {
         const span = Math.max(1, seg.xpCeiling - seg.xpFloor);
         const fromPct = ((curXp - seg.xpFloor) / span) * 100;
-        setFillPct(fromPct);
-        await sleep(20);
+        // Set start position without animating (so we don't see a backwards jump).
+        snapFillTo(fromPct);
+        // Smooth fill to 100%.
         setFillPct(100);
-        await sleep(360);
+        await sleep(FILL_MS);
+        // Snap to 0 and bump the level label, then start the flash.
+        // The next segment's fill (or the final partial fill) overlaps with
+        // the rest of the flash so we don't get a dead pause.
         curLvl = seg.level;
-        setFillPct(0);
+        snapFillTo(0);
         setLevelLabel(curLvl);
-        await flashLevelText(curLvl);
+        const flashPromise = flashLevelText(curLvl);
         curXp = seg.xpCeiling;
+        // If there are more segments, kick off the next fill in parallel
+        // with the flash; otherwise wait briefly then continue to final fill.
+        await sleep(120);
+        // Wait for the flash to finish before the next iteration so banners
+        // don't pile up on top of each other.
+        await flashPromise;
       }
       // Final partial fill toward newXp at the new level threshold.
       const finalFloor   = xpForLevel(curLvl, growth || 'medium_fast');
@@ -3258,6 +3288,7 @@ async function animateLevelUp(levelUps) {
       const finalSpan    = Math.max(1, finalCeiling - finalFloor);
       const finalPct     = Math.min(100, Math.max(0, ((newXp - finalFloor) / finalSpan) * 100));
       setFillPct(finalPct);
+      await sleep(FILL_MS);
       return;
     }
 
