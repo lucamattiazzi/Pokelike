@@ -3250,17 +3250,27 @@ async function animateLevelUp(levelUps) {
       if (nameEl) nameEl.textContent = `${pokemon.nickname || pokemon.name} Lv${lvl}`;
     };
     const flashLevelText = async (lvl) => {
-      // Skip-mode: the CSS keyframes can't be sped up, so the bounce gets
-      // visibly interrupted. Just bump the label and skip the animation.
-      if (battleSpeedMultiplier > 1) return;
+      // Scale the CSS animation duration via custom properties so the bounce,
+      // flash, burst, and floating text all complete together — even in skip
+      // mode. The JS sleep below uses a small extra buffer so the CSS
+      // animation has fully finished before we strip the .level-up class
+      // (otherwise the sprite would freeze mid-jump).
+      const animMs     = Math.round(FLASH_MS / battleSpeedMultiplier);
+      const animTextMs = Math.round(900       / battleSpeedMultiplier);
+      el.style.setProperty('--levelup-dur',      `${animMs}ms`);
+      el.style.setProperty('--levelup-text-dur', `${animTextMs}ms`);
       el.classList.add('level-up');
       const lvText = document.createElement('div');
       lvText.className = 'level-up-text';
       lvText.textContent = `Lv ${lvl}!`;
       el.appendChild(lvText);
-      await sleep(FLASH_MS);
+      // Raw setTimeout (not the speed-scaled sleep) — we already scaled the
+      // CSS duration; this wait is in real ms with a tiny buffer.
+      await new Promise(r => setTimeout(r, animMs + 40));
       el.classList.remove('level-up');
       lvText.remove();
+      el.style.removeProperty('--levelup-dur');
+      el.style.removeProperty('--levelup-text-dur');
     };
 
     if (useXp && (segments?.length || oldXp !== newXp)) {
