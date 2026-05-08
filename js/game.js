@@ -744,11 +744,13 @@ async function doBossNode(node) {
     const leader = state.currentMap < 8
       ? JOHTO_GYM_LEADERS[state.currentMap]
       : KANTO_GYM_LEADERS[state.currentMap - 9];
-    // Warm species cache so getBaseExperience/getGrowthRate are accurate post-battle.
-    await Promise.all(leader.team.flatMap(p => [
-      fetchPokemonById(p.speciesId),
-      fetchPokemonSpecies(p.speciesId),
-    ]));
+    // Warm species cache so getBaseExperience/getGrowthRate are accurate
+    // post-battle. Fire-and-forget — battles run for several seconds, plenty
+    // of time for these to resolve before the XP award reads the cache.
+    leader.team.forEach(p => {
+      fetchPokemonById(p.speciesId);
+      fetchPokemonSpecies(p.speciesId);
+    });
     const enemyTeam = leader.team.map(p => ({
       ...createInstance(p, p.level, false, leader.moveTier ?? 1),
       heldItem: p.heldItem || null,
@@ -816,10 +818,10 @@ async function doElite4() {
 
 async function doRed() {
   const boss = RED_FINAL;
-  await Promise.all(boss.team.flatMap(p => [
-    fetchPokemonById(p.speciesId),
-    fetchPokemonSpecies(p.speciesId),
-  ]));
+  boss.team.forEach(p => {
+    fetchPokemonById(p.speciesId);
+    fetchPokemonSpecies(p.speciesId);
+  });
   const enemyTeam = boss.team.map(p => ({
     ...createInstance(p, p.level, false, 2),
     heldItem: p.heldItem || null,
@@ -839,10 +841,10 @@ async function doRed() {
 async function doSilverNode(node) {
   const encounterIdx = Math.min(state.silverBeaten || 0, SILVER_ENCOUNTERS.length - 1);
   const silverData = SILVER_ENCOUNTERS[encounterIdx];
-  await Promise.all(silverData.team.flatMap(p => [
-    fetchPokemonById(p.speciesId),
-    fetchPokemonSpecies(p.speciesId),
-  ]));
+  silverData.team.forEach(p => {
+    fetchPokemonById(p.speciesId);
+    fetchPokemonSpecies(p.speciesId);
+  });
   const enemyTeam = silverData.team.map(p => ({
     ...createInstance(p, p.level, false, 2),
     heldItem: p.heldItem || null,
@@ -851,10 +853,8 @@ async function doSilverNode(node) {
   if (starterLine) {
     const starterStage = encounterIdx < 2 ? 1 : 2;
     const starterSpecies = starterLine[starterStage];
-    await Promise.all([
-      fetchPokemonById(starterSpecies.speciesId),
-      fetchPokemonSpecies(starterSpecies.speciesId),
-    ]);
+    fetchPokemonById(starterSpecies.speciesId);
+    fetchPokemonSpecies(starterSpecies.speciesId);
     const lastIdx = enemyTeam.length - 1;
     enemyTeam[lastIdx] = { ...createInstance(starterSpecies, enemyTeam[lastIdx].level, false, 2), heldItem: starterSpecies.heldItem || null };
   }
@@ -894,10 +894,10 @@ async function doGen2Elite4() {
   for (let i = 0; i < bosses.length; i++) {
     state.eliteIndex = i;
     const boss = bosses[i];
-    await Promise.all(boss.team.flatMap(p => [
-      fetchPokemonById(p.speciesId),
-      fetchPokemonSpecies(p.speciesId),
-    ]));
+    boss.team.forEach(p => {
+      fetchPokemonById(p.speciesId);
+      fetchPokemonSpecies(p.speciesId);
+    });
     const enemyTeam = boss.team.map(p => ({ ...createInstance(p, p.level, false, 2), heldItem: p.heldItem || null }));
     showScreen('battle-screen');
     document.getElementById('battle-title').textContent = `${boss.title}: ${boss.name}!`;
@@ -1629,9 +1629,10 @@ async function doTrainerNode(node) {
   }
 
   if (!speciesList.length) { advanceFromNode(state.map, node.id); showMapScreen(); return; }
-  // Warm species cache for gen 2 XP yield/curve lookups.
+  // Warm species cache for gen 2 XP curves — fire-and-forget; battle runs
+  // long enough for these to land before the post-battle XP award.
   if (state.gen2Mode) {
-    await Promise.all(speciesList.map(sp => fetchPokemonSpecies(sp.id ?? sp.speciesId)));
+    speciesList.forEach(sp => fetchPokemonSpecies(sp.id ?? sp.speciesId));
   }
   const ENDLESS_ENEMY_ITEM_POOL = [
     { id: 'choice_band',  name: 'Choice Band',  icon: '🎀' },

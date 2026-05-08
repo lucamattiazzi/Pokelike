@@ -3230,8 +3230,8 @@ async function animateLevelUp(levelUps) {
     // ---- XP bar segments (gen 2) ----
     const xpFill = el.querySelector('.xp-bar-fill');
     const useXp  = xpFill && oldXp !== undefined && newXp !== undefined;
-    const FILL_MS  = 600;   // matches CSS transition
-    const FLASH_MS = 500;   // shorter, runs partly in parallel with the snap
+    const FILL_MS  = 750;   // matches CSS transition (0.75s ease-out)
+    const FLASH_MS = 700;   // covers the level-up pulse animation length
     const setFillPct = pct => { if (xpFill) xpFill.style.width = `${Math.max(0, Math.min(100, pct))}%`; };
     const snapFillTo = pct => {
       if (!xpFill) return;
