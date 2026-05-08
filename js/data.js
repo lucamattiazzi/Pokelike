@@ -309,7 +309,7 @@ const JOHTO_GYM_LEADERS = [
   { name: 'Falkner', badge: 'Zephyr Badge', type: 'Flying', moveTier: 0,
     team: [
       { speciesId: 163, name: 'Hoothoot',  types: ['Normal','Flying'], baseStats: { hp:60,  atk:30,  def:30,  speed:50,  special:36 }, level: 7 },
-      { speciesId: 17,  name: 'Pidgeotto', types: ['Normal','Flying'], baseStats: { hp:63,  atk:60,  def:55,  speed:71,  special:50 }, level: 10, heldItem: { id: 'sharp_beak', name: 'Sharp Beak', icon: '🦅' } },
+      { speciesId: 17,  name: 'Pidgeotto', types: ['Normal','Flying'], baseStats: { hp:63,  atk:60,  def:55,  speed:71,  special:50 }, level: 9, heldItem: { id: 'sharp_beak', name: 'Sharp Beak', icon: '🦅' } },
     ]
   },
   { name: 'Bugsy', badge: 'Hive Badge', type: 'Bug', moveTier: 0,
