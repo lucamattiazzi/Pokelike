@@ -157,6 +157,11 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
   const detailedLog = [];
   const addLog = (msg, cls = '') => { log.push({ msg, cls }); if (onLog) onLog(msg, cls); };
   const playerParticipants = new Set();
+  // Slots that started the battle alive — XP from any KO is awarded to all of
+  // them, including those that faint later in the same fight.
+  const xpEligibleIdxs = pTeam
+    .map((p, i) => p.currentHp > 0 ? i : -1)
+    .filter(i => i >= 0);
 
   // Announce initial send-outs
   const firstP = pTeam[0];
@@ -365,14 +370,11 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
           traitsConfig.onKO(target, tIdx, tSide, attacker, aIdx, side, detailedLog, pTeam, eTeam);
         }
         if (tSide === 'enemy') {
-          const livingIdxs = pTeam
-            .map((p, i) => p.currentHp > 0 ? i : -1)
-            .filter(i => i >= 0);
           detailedLog.push({
             type: 'xp_award',
             enemySpeciesId: target.speciesId,
             enemyLevel: target.level,
-            livingIdxs,
+            livingIdxs: xpEligibleIdxs,
           });
         }
         const nextTeam = tSide === 'player' ? pTeam : eTeam;
@@ -430,14 +432,11 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
             addLog(`${p.nickname || p.name} fainted from poison!`, 'log-faint');
             detailedLog.push({ type: 'faint', side: teamSide, idx: i, name: p.nickname || p.name });
             if (teamSide === 'enemy') {
-              const livingIdxs = pTeam
-                .map((pp, ii) => pp.currentHp > 0 ? ii : -1)
-                .filter(ii => ii >= 0);
               detailedLog.push({
                 type: 'xp_award',
                 enemySpeciesId: p.speciesId,
                 enemyLevel: p.level,
-                livingIdxs,
+                livingIdxs: xpEligibleIdxs,
               });
             }
           } else if (traitsConfig?.afterStatusTick) {

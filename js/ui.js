@@ -2484,8 +2484,10 @@ async function animateBattleVisually(detailedLog, pTeamInit, eTeamInit) {
   // Sim damage events emit hpAfter on the original maxHp scale; we add this to
   // shift them onto the leveled-up scale so the bars stay coherent.
   const pBoost = pTeamInit.map(() => 0);
-  const adjPlayerHp = (idx, hpAfter) =>
-    Math.min(pHp[idx].max, Math.max(0, hpAfter + pBoost[idx]));
+  const adjPlayerHp = (idx, hpAfter) => {
+    if (hpAfter <= 0) return 0; // sim says fainted; don't let the boost revive it
+    return Math.min(pHp[idx].max, hpAfter + pBoost[idx]);
+  };
   const emptyStages = () => ({ atk: 0, def: 0, speed: 0, special: 0, spdef: 0 });
   const pStages = pTeamInit.map(emptyStages);
   const eStages = eTeamInit.map(emptyStages);
