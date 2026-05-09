@@ -357,7 +357,7 @@ const JOHTO_GYM_LEADERS = [
   { name: 'Falkner', badge: 'Zephyr Badge', type: 'Flying', moveTier: 0,
     team: [
       { speciesId: 16,  name: 'Pidgey',    types: ['Normal','Flying'], baseStats: { hp:40,  atk:45,  def:40,  speed:56,  special:35  }, level: 5 },
-      { speciesId: 17,  name: 'Pidgeotto', types: ['Normal','Flying'], baseStats: { hp:63,  atk:60,  def:55,  speed:71,  special:50  }, level: 9,  heldItem: { id: 'sharp_beak',  name: 'Sharp Beak',  icon: '🦅' } },
+      { speciesId: 17,  name: 'Pidgeotto', types: ['Normal','Flying'], baseStats: { hp:63,  atk:60,  def:55,  speed:71,  special:50  }, level: 8,  heldItem: { id: 'sharp_beak',  name: 'Sharp Beak',  icon: '🦅' } },
     ]
   },
   { name: 'Bugsy', badge: 'Hive Badge', type: 'Bug', moveTier: 0,
@@ -369,8 +369,8 @@ const JOHTO_GYM_LEADERS = [
   },
   { name: 'Whitney', badge: 'Plain Badge', type: 'Normal', moveTier: 0,
     team: [
-      { speciesId: 35,  name: 'Clefairy', types: ['Normal'], baseStats: { hp:70,  atk:45,  def:48,  speed:35,  special:60  }, level: 17, heldItem: { id: 'eviolite',    name: 'Eviolite',    icon: '💎' } },
-      { speciesId: 241, name: 'Miltank',  types: ['Normal'], baseStats: { hp:95,  atk:80,  def:105, speed:100, special:60  }, level: 19, heldItem: { id: 'choice_band', name: 'Choice Band', icon: '🎀' } },
+      { speciesId: 35,  name: 'Clefairy', types: ['Normal'], baseStats: { hp:70,  atk:45,  def:48,  speed:35,  special:60  }, level: 19, heldItem: { id: 'eviolite',    name: 'Eviolite',    icon: '💎' } },
+      { speciesId: 241, name: 'Miltank',  types: ['Normal'], baseStats: { hp:95,  atk:80,  def:105, speed:100, special:60  }, level: 21, heldItem: { id: 'choice_band', name: 'Choice Band', icon: '🎀' } },
     ]
   },
   { name: 'Morty', badge: 'Fog Badge', type: 'Ghost', moveTier: 1,

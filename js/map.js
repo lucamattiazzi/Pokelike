@@ -248,6 +248,11 @@ const TRAINER_SPECIALTIES = {
   teamRocket:  'Poison Pokemon',
 };
 
+const TRAINER_SPECIALTIES_GEN2 = {
+  aceTrainer:  'Dragon/Psychic/Fighting Pokemon',
+  oldGuy:      'Normal/Flying/Fire Pokemon',
+};
+
 const RANDOM_TRAINER_SPRITES = TRAINER_SPRITE_KEYS.map(k => `sprites/${k}.png`);
 
 const GYM_LEADER_SPRITES = [
@@ -666,7 +671,7 @@ function getNodeLabel(node) {
     [NODE_TYPES.QUESTION]:   'Random Event',
     [NODE_TYPES.POKECENTER]: 'Pokemon Center',
     [NODE_TYPES.TRAINER]:    (node.trainerSprite && TRAINER_SPRITE_NAMES[node.trainerSprite])
-      ? `${TRAINER_SPRITE_NAMES[node.trainerSprite]} — +2 Levels — ${TRAINER_SPECIALTIES[node.trainerSprite] || 'Various Pokemon'}`
+      ? `${TRAINER_SPRITE_NAMES[node.trainerSprite]} — +2 Levels — ${(typeof state !== 'undefined' && state.gen2Mode && TRAINER_SPECIALTIES_GEN2[node.trainerSprite]) || TRAINER_SPECIALTIES[node.trainerSprite] || 'Various Pokemon'}`
       : `Trainer Battle — +2 Levels`,
     [NODE_TYPES.LEGENDARY]:  'Legendary Pokemon',
     [NODE_TYPES.MOVE_TUTOR]: 'Move Tutor',
