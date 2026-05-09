@@ -491,7 +491,18 @@ function showMapScreen() {
   const mapBgNum = state.gen2Mode
     ? (state.currentMap < 17 ? (state.currentMap % 8) + 1 : 9)
     : state.currentMap + 1;
-  mapContainer.style.backgroundImage = `url('ui/mapsNormalMode/map${mapBgNum}.png')`;
+  const fallbackBg = `ui/mapsNormalMode/map${mapBgNum}.png`;
+  if (state.gen2Mode) {
+    // Prefer a per-route custom background if one exists; otherwise fall back
+    // to the normal-mode background for that slot.
+    const customBg = `ui/mapsGen2/route${state.currentMap + 1}.png`;
+    const probe = new Image();
+    probe.onload  = () => { mapContainer.style.backgroundImage = `url('${customBg}')`; };
+    probe.onerror = () => { mapContainer.style.backgroundImage = `url('${fallbackBg}')`; };
+    probe.src = customBg;
+  } else {
+    mapContainer.style.backgroundImage = `url('${fallbackBg}')`;
+  }
   renderMap(state.map, mapContainer, onNodeClick);
   saveRun();
 
