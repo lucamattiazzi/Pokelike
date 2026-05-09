@@ -1611,7 +1611,9 @@ async function doTrainerNode(node) {
   if (activePool) {
     // Dedupe pool, filter out evolved forms the battle level can't reach, then shuffle
     const eligible = [...new Set(activePool)]
-      .filter(id => minLevelForSpecies(id) <= level);
+      .filter(id => minLevelForSpecies(id) <= level)
+      // Aerodactyl: Kanto-only (map 9+) in gen 2
+      .filter(id => !(id === 142 && state.gen2Mode && state.currentMap < 9));
     const pool = eligible.length ? eligible : [...new Set(activePool)]; // fallback: use full pool
     const shuffled = pool.sort(() => rng() - 0.5);
     const ids = Array.from({ length: teamSize }, (_, i) => resolveEvoForLevel(shuffled[i % shuffled.length], level));

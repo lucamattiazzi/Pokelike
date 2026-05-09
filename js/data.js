@@ -1117,6 +1117,8 @@ async function getCatchChoices(mapIndex, count = 3, maxGenId = 151, excludeStart
   const filtered = bucket.filter(id => {
     if (LEGENDARY_IDS.includes(id) || id < minGenId || id > maxGenId || starterSet.has(id)) return false;
     if (larvitarLine.has(id) && typeof state !== 'undefined' && state.gen2Mode && state.currentMap < 13) return false;
+    // Aerodactyl: Kanto-only (map 9+) in gen 2
+    if (id === 142 && typeof state !== 'undefined' && state.gen2Mode && state.currentMap < 9) return false;
     return true;
   });
   const shuffled = [...filtered];
