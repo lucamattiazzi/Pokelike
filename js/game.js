@@ -843,9 +843,9 @@ async function doSilverNode(node) {
   }));
   const starterLine = SILVER_STARTER_LINES[state.starterSpeciesId];
   if (starterLine) {
-    // Match canon HG/SS pacing: base form for the first two fights, first evo
-    // for the next two, final evo from fight 5 onward.
-    const starterStage = encounterIdx < 2 ? 0 : encounterIdx < 4 ? 1 : 2;
+    // Track natural evolution thresholds against the encounter level: base
+    // form for fight 1, first evo for fights 2-3, final evo from fight 4 on.
+    const starterStage = encounterIdx < 1 ? 0 : encounterIdx < 3 ? 1 : 2;
     const starterSpecies = starterLine[starterStage];
     fetchPokemonById(starterSpecies.speciesId);
     fetchPokemonSpecies(starterSpecies.speciesId);
