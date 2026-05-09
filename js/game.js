@@ -843,7 +843,9 @@ async function doSilverNode(node) {
   }));
   const starterLine = SILVER_STARTER_LINES[state.starterSpeciesId];
   if (starterLine) {
-    const starterStage = encounterIdx < 2 ? 1 : 2;
+    // Match canon HG/SS pacing: base form for the first two fights, first evo
+    // for the next two, final evo from fight 5 onward.
+    const starterStage = encounterIdx < 2 ? 0 : encounterIdx < 4 ? 1 : 2;
     const starterSpecies = starterLine[starterStage];
     fetchPokemonById(starterSpecies.speciesId);
     fetchPokemonSpecies(starterSpecies.speciesId);
@@ -2040,7 +2042,16 @@ function showBadgeScreen(leader) {
     }
   }
 
-  document.getElementById('btn-next-map').onclick = () => {
+  const nextBtn = document.getElementById('btn-next-map');
+  // Spacebar shortcut while the badge screen is visible
+  const onKey = (e) => {
+    if (e.code !== 'Space' && e.key !== ' ') return;
+    if (!document.getElementById('badge-screen')?.classList.contains('active')) return;
+    e.preventDefault();
+    advance();
+  };
+  const advance = () => {
+    document.removeEventListener('keydown', onKey);
     const lastLeaderMap = state.gen2Mode ? 16 : 7;
     const finalMapIndex = state.gen2Mode ? 17 : 8;
     if (state.currentMap >= lastLeaderMap) {
@@ -2050,6 +2061,8 @@ function showBadgeScreen(leader) {
       startMap(state.currentMap + 1);
     }
   };
+  nextBtn.onclick = advance;
+  document.addEventListener('keydown', onKey);
 }
 
 async function showGameOver() {
