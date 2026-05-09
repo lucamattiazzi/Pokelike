@@ -733,6 +733,29 @@ function getPokemonLocations(speciesId, bst) {
 // PokeAPI cache helpers
 const CACHE_KEY_SPECIES = 'pkrl_species_list';
 
+// Bundled static pokedex — populated once at boot from data/pokedex.json.
+// Keyed by numeric id. Avoids per-pokemon PokeAPI fetches for the 649 covered species.
+let _staticPokedex = null;
+let _staticPokedexPromise = null;
+
+function loadStaticPokedex() {
+  if (_staticPokedex) return Promise.resolve(_staticPokedex);
+  if (_staticPokedexPromise) return _staticPokedexPromise;
+  _staticPokedexPromise = fetch('data/pokedex.json')
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { _staticPokedex = d || {}; return _staticPokedex; })
+    .catch(() => { _staticPokedex = {}; return _staticPokedex; });
+  return _staticPokedexPromise;
+}
+
+// Best-effort sync lookup once the bundle is loaded
+function getStaticPokedexEntry(id) {
+  return _staticPokedex ? _staticPokedex[id] : null;
+}
+
+// Kick off the load eagerly so the catch screen can use it without blocking
+if (typeof window !== 'undefined') loadStaticPokedex();
+
 function getCached(key) {
   try {
     const v = localStorage.getItem(key);
@@ -785,6 +808,23 @@ function formatFormName(apiName) {
 }
 
 async function fetchPokemonById(idOrSlug) {
+  // Static bundle short-circuit (numeric IDs only — form slugs still go through the network)
+  if (typeof idOrSlug === 'number') {
+    const dex = _staticPokedex || await loadStaticPokedex();
+    const entry = dex[idOrSlug];
+    if (entry) {
+      return {
+        id: idOrSlug,
+        name: entry.name,
+        types: entry.types,
+        baseStats: entry.baseStats,
+        bst: Object.values(entry.baseStats).reduce((a,b)=>a+b,0),
+        base_experience: entry.base_experience,
+        spriteUrl: entry.spriteUrl,
+        shinySpriteUrl: entry.shinySpriteUrl,
+      };
+    }
+  }
   const key = `pkrl_poke_${idOrSlug}`;
   const cached = getCached(key);
   if (cached && cached.baseStats?.special !== undefined && cached.baseStats?.spdef !== undefined) return cached;
@@ -823,6 +863,13 @@ async function fetchPokemonById(idOrSlug) {
 
 // Cache key bumped to v2 because growth_rate was added later — old entries lack it.
 async function fetchPokemonSpecies(id) {
+  if (typeof id === 'number') {
+    const dex = _staticPokedex || await loadStaticPokedex();
+    const entry = dex[id];
+    if (entry && entry.growthRate) {
+      return { id, flavorText: entry.flavorText || '', growthRate: entry.growthRate };
+    }
+  }
   const key = `pkrl_species_v2_${id}`;
   const cached = getCached(key);
   if (cached && cached.growthRate !== undefined) return cached;
