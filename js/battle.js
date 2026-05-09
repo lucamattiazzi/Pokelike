@@ -480,9 +480,10 @@ function xpYield(baseExp, enemyLevel) {
   return Math.floor(b * L * 1.5);
 }
 
-// Distribute totalYield across livingIdxs. Each living member gets half of
-// (totalYield / livingCount) — this halves the team-total compared to a full
-// even split. Lucky-egg holder still gets a 1.5× multiplier on their share.
+// Distribute totalYield across livingIdxs. Each living member gets 0.6× of
+// (totalYield / livingCount) — keeps team-total below a full even split while
+// giving 20% more XP than the old halved share. Lucky-egg holder still gets
+// a 1.5× multiplier on their share.
 // Mutates p.xp / p.level / p.maxHp / p.currentHp; returns animation entries.
 function applyXpGain(team, livingIdxs, totalYield, levelCap, getGrowthRate, getBaseExp) {
   const levelUps = [];
@@ -493,7 +494,7 @@ function applyXpGain(team, livingIdxs, totalYield, levelCap, getGrowthRate, getB
     const p = team[idx];
     const growth = (getGrowthRate ? getGrowthRate(p.speciesId) : null) || 'medium_fast';
     const lucky = p.heldItem?.id === 'lucky_egg';
-    const share = Math.floor(baseShare * 0.5 * (lucky ? 1.5 : 1));
+    const share = Math.floor(baseShare * 0.6 * (lucky ? 1.5 : 1));
     if (share <= 0) continue;
 
     const oldLevel  = p.level;
