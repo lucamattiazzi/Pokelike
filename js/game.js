@@ -488,21 +488,22 @@ function showMapScreen() {
   renderItemBadges(state.items);
 
   const mapContainer = document.getElementById('map-container');
-  const mapBgNum = state.gen2Mode
-    ? (state.currentMap < 17 ? (state.currentMap % 8) + 1 : 9)
-    : state.currentMap + 1;
-  const fallbackBg = `ui/mapsNormalMode/map${mapBgNum}.png`;
+  let bgUrl;
   if (state.gen2Mode) {
-    // Prefer a per-route custom background if one exists; otherwise fall back
-    // to the normal-mode background for that slot.
-    const customBg = `ui/mapsGen2/route${state.currentMap + 1}.png`;
-    const probe = new Image();
-    probe.onload  = () => { mapContainer.style.backgroundImage = `url('${customBg}')`; };
-    probe.onerror = () => { mapContainer.style.backgroundImage = `url('${fallbackBg}')`; };
-    probe.src = customBg;
+    if (state.currentMap < 9) {
+      // Johto routes 1-9 (last covers Lance / Mt. Silver at map 8)
+      bgUrl = `ui/mapsGen2/${state.currentMap + 1}.png`;
+    } else if (state.currentMap < 17) {
+      // Kanto leaders reuse the normal-mode Kanto backgrounds (Brock = map1)
+      bgUrl = `ui/mapsNormalMode/map${state.currentMap - 8}.png`;
+    } else {
+      // Elite Four / Champion finale
+      bgUrl = `ui/mapsNormalMode/map9.png`;
+    }
   } else {
-    mapContainer.style.backgroundImage = `url('${fallbackBg}')`;
+    bgUrl = `ui/mapsNormalMode/map${state.currentMap + 1}.png`;
   }
+  mapContainer.style.backgroundImage = `url('${bgUrl}')`;
   renderMap(state.map, mapContainer, onNodeClick);
   saveRun();
 
