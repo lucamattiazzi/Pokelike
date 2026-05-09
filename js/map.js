@@ -75,10 +75,12 @@ function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
     if (nuzlockeMode) { w.catch = 0; w.trade = 0; }
     if (typeof state !== 'undefined' && state.isEndlessMode) { w.trade = 0; w.catch = Math.floor(w.catch / 2); }
     if (gen2Mode) {
-      // Gen 2: bump combat/event nodes by 20%
+      // Gen 2: bump combat/event nodes by 20%, halve catch nodes
+      // (the layer-1 catch is hardcoded above so it's unaffected)
       w.battle   = Math.round(w.battle   * 1.2);
       w.trainer  = Math.round(w.trainer  * 1.2);
       w.question = Math.round(w.question * 1.2);
+      w.catch    = Math.floor(w.catch / 2);
     }
     const type = weightedRandom(w);
     // Endless region 3: 1/6 catch nodes become legendary encounters
