@@ -1572,7 +1572,7 @@ const TRAINER_BATTLE_CONFIG = {
                  gen2Pool: [170,171,183,184,186,194,195,211,222,223,224] },
   Scientist:   { name: 'Scientist',     sprite: 'scientist',
                  pool: [81,82,88,89,92,93,94,100,101,137],
-                 gen2Pool: [81,82,201,233,239,240] },
+                 gen2Pool: [81,82,201,233,239] },
   teamRocket:  { name: 'Rocket Grunt',  sprite: 'teamrocket',
                  pool: [19,20,23,24,41,42,52,53,88,89,109,110],
                  gen2Pool: [19,20,41,42,88,89,169,215,228,229] },

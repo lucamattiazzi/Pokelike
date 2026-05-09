@@ -644,6 +644,27 @@ function getNodeIcon(node) {
   return icons[node.type] || '●';
 }
 
+function getSilverHoverLabel() {
+  if (typeof SILVER_ENCOUNTERS === 'undefined') {
+    return 'Rival Silver — Win for +2 levels to all Pokémon!';
+  }
+  const beaten     = (typeof state !== 'undefined' && state.silverBeaten) || 0;
+  const idx        = Math.min(beaten, SILVER_ENCOUNTERS.length - 1);
+  const data       = SILVER_ENCOUNTERS[idx];
+  const team       = data.team.slice();
+  const starterId  = typeof state !== 'undefined' ? state.starterSpeciesId : null;
+  const starterArr = starterId && typeof SILVER_STARTER_LINES !== 'undefined' ? SILVER_STARTER_LINES[starterId] : null;
+  if (starterArr && team.length) {
+    const stage  = idx < 2 ? 1 : 2;
+    const last   = team[team.length - 1];
+    team[team.length - 1] = { ...starterArr[stage], level: last.level };
+  }
+  const teamHtml = team.map(p =>
+    `<div style="color:#ccc;font-size:9px;">${p.name} <span style="color:#aaa;">Lv${p.level}</span></div>`
+  ).join('');
+  return `<div style="font-weight:bold;margin-bottom:4px;">Rival Silver</div>${teamHtml}`;
+}
+
 function getNodeLabel(node) {
   if (node.visited) return 'Visited';
   if (node.type === NODE_TYPES.BOSS) {
@@ -663,20 +684,23 @@ function getNodeLabel(node) {
     }
     return 'Gym Leader';
   }
+  const isGen2Mode = typeof state !== 'undefined' && state.gen2Mode;
   const labels = {
     [NODE_TYPES.START]:      'Start',
-    [NODE_TYPES.BATTLE]:     'Wild Battle — +1 level',
+    [NODE_TYPES.BATTLE]:     isGen2Mode ? 'Wild Battle' : 'Wild Battle — +1 level',
     [NODE_TYPES.CATCH]:      'Catch Pokemon',
     [NODE_TYPES.ITEM]:       'Item',
     [NODE_TYPES.QUESTION]:   'Random Event',
     [NODE_TYPES.POKECENTER]: 'Pokemon Center',
     [NODE_TYPES.TRAINER]:    (node.trainerSprite && TRAINER_SPRITE_NAMES[node.trainerSprite])
-      ? `${TRAINER_SPRITE_NAMES[node.trainerSprite]} — +2 Levels — ${(typeof state !== 'undefined' && state.gen2Mode && TRAINER_SPECIALTIES_GEN2[node.trainerSprite]) || TRAINER_SPECIALTIES[node.trainerSprite] || 'Various Pokemon'}`
-      : `Trainer Battle — +2 Levels`,
+      ? (isGen2Mode
+          ? `${TRAINER_SPRITE_NAMES[node.trainerSprite]} — ${TRAINER_SPECIALTIES_GEN2[node.trainerSprite] || TRAINER_SPECIALTIES[node.trainerSprite] || 'Various Pokemon'}`
+          : `${TRAINER_SPRITE_NAMES[node.trainerSprite]} — +2 Levels — ${TRAINER_SPECIALTIES[node.trainerSprite] || 'Various Pokemon'}`)
+      : (isGen2Mode ? 'Trainer Battle' : 'Trainer Battle — +2 Levels'),
     [NODE_TYPES.LEGENDARY]:  'Legendary Pokemon',
     [NODE_TYPES.MOVE_TUTOR]: 'Move Tutor',
     [NODE_TYPES.TRADE]:      'Trade — swap a Pokémon for one 3 levels higher',
-    [NODE_TYPES.SILVER]:     'Rival Silver — Win for +2 levels to all Pokémon!',
+    [NODE_TYPES.SILVER]:     getSilverHoverLabel(),
   };
   return labels[node.type] || node.type;
 }
