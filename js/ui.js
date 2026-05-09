@@ -2480,6 +2480,12 @@ async function animateBattleVisually(detailedLog, pTeamInit, eTeamInit) {
     current: p.currentHp !== undefined ? p.currentHp : p.maxHp,
     max: p.maxHp,
   }));
+  // Cumulative maxHp boost per player slot from mid-battle level-ups (gen 2 only).
+  // Sim damage events emit hpAfter on the original maxHp scale; we add this to
+  // shift them onto the leveled-up scale so the bars stay coherent.
+  const pBoost = pTeamInit.map(() => 0);
+  const adjPlayerHp = (idx, hpAfter) =>
+    Math.min(pHp[idx].max, Math.max(0, hpAfter + pBoost[idx]));
   const emptyStages = () => ({ atk: 0, def: 0, speed: 0, special: 0, spdef: 0 });
   const pStages = pTeamInit.map(emptyStages);
   const eStages = eTeamInit.map(emptyStages);
@@ -2621,7 +2627,9 @@ async function animateBattleVisually(detailedLog, pTeamInit, eTeamInit) {
         // Consume the following effect event and sync HP tracker (HP unchanged)
         if (detailedLog[i + 1]?.type === 'effect' && detailedLog[i + 1].idx === event.targetIdx) {
           const targetHpTrack = event.targetSide === 'player' ? pHp : eHp;
-          targetHpTrack[event.targetIdx].current = detailedLog[i + 1].hpAfter;
+          targetHpTrack[event.targetIdx].current = event.targetSide === 'player'
+            ? adjPlayerHp(event.targetIdx, detailedLog[i + 1].hpAfter)
+            : detailedLog[i + 1].hpAfter;
           i++; // consume effect
         }
       } else {
@@ -2636,10 +2644,14 @@ async function animateBattleVisually(detailedLog, pTeamInit, eTeamInit) {
           setTimeout(() => popup.remove(), 800);
         }
         if (targetEl) {
-          const targetHpTrack = event.side === 'player' ? eHp : pHp;
+          const targetSide = event.side === 'player' ? 'enemy' : 'player';
+          const targetHpTrack = targetSide === 'player' ? pHp : eHp;
           const prev = targetHpTrack[event.targetIdx].current;
-          await animateHpBar(targetEl, prev, event.targetHpAfter, targetHpTrack[event.targetIdx].max);
-          targetHpTrack[event.targetIdx].current = event.targetHpAfter;
+          const adjAfter = targetSide === 'player'
+            ? adjPlayerHp(event.targetIdx, event.targetHpAfter)
+            : event.targetHpAfter;
+          await animateHpBar(targetEl, prev, adjAfter, targetHpTrack[event.targetIdx].max);
+          targetHpTrack[event.targetIdx].current = adjAfter;
         }
         await sleep(300);
         if (targetEl) targetEl.classList.remove(hitClass);
@@ -2675,8 +2687,9 @@ async function animateBattleVisually(detailedLog, pTeamInit, eTeamInit) {
         setTimeout(() => popup.remove(), 900);
         const teamHp = event.side === 'player' ? pHp : eHp;
         const prev = teamHp[event.idx].current;
-        await animateHpBar(el, prev, event.hpAfter, teamHp[event.idx].max);
-        teamHp[event.idx].current = event.hpAfter;
+        const adjAfter = event.side === 'player' ? adjPlayerHp(event.idx, event.hpAfter) : event.hpAfter;
+        await animateHpBar(el, prev, adjAfter, teamHp[event.idx].max);
+        teamHp[event.idx].current = adjAfter;
         await sleep(300);
         el.classList.remove('hit-normal');
       }
@@ -2687,11 +2700,12 @@ async function animateBattleVisually(detailedLog, pTeamInit, eTeamInit) {
       const teamHp = event.side === 'player' ? pHp : eHp;
       const prev = teamHp[event.idx].current;
       if (event.newMaxHp) teamHp[event.idx].max = event.newMaxHp;
+      const adjAfter = event.side === 'player' ? adjPlayerHp(event.idx, event.hpAfter) : event.hpAfter;
 
       if (el) {
-        await animateHpBar(el, prev, event.hpAfter, teamHp[event.idx].max);
+        await animateHpBar(el, prev, adjAfter, teamHp[event.idx].max);
       }
-      teamHp[event.idx].current = event.hpAfter;
+      teamHp[event.idx].current = adjAfter;
 
       addLogEntry(event.reason, 'log-item');
       await sleep(100);
@@ -2714,6 +2728,38 @@ async function animateBattleVisually(detailedLog, pTeamInit, eTeamInit) {
       if (el) { el.classList.add('fainted'); el.classList.remove('active-pokemon'); }
       addLogEntry(`${event.name} fainted!`, 'log-faint');
       await sleep(300);
+
+    } else if (event.type === 'xp_award') {
+      // Per-KO XP — only fired in gen 2 sims; no-op otherwise
+      if (typeof state !== 'undefined' && state.gen2Mode && event.livingIdxs.length > 0) {
+        const yieldAmt    = xpYield(getBaseExperience(event.enemySpeciesId), event.enemyLevel);
+        const oldMaxHps   = event.livingIdxs.map(idx => state.team[idx].maxHp);
+        const dispCurHps  = event.livingIdxs.map(idx => pHp[idx].current);
+        const dispMaxHps  = event.livingIdxs.map(idx => pHp[idx].max);
+        const levelUps    = applyXpGain(state.team, event.livingIdxs, yieldAmt, 100, getGrowthRate, getBaseExperience);
+        // Apply level-up boosts to the animation HP tracker additively so the
+        // damaged proportion is preserved on the new (larger) scale.
+        for (let k = 0; k < event.livingIdxs.length; k++) {
+          const idx    = event.livingIdxs[k];
+          const newMax = state.team[idx].maxHp;
+          const delta  = newMax - oldMaxHps[k];
+          if (delta > 0) {
+            pBoost[idx]   += delta;
+            pHp[idx].max    = newMax;
+            pHp[idx].current = dispCurHps[k] + delta;
+            // Rewrite the level-up entry so the HP-bar grow animation starts
+            // from the damaged-and-displayed HP, not state.team's pre-battle
+            // value (which doesn't reflect mid-battle damage).
+            const lu = levelUps.find(e => e.idx === idx);
+            if (lu) {
+              lu.preHp     = dispCurHps[k];
+              lu.preMaxHp  = dispMaxHps[k];
+              lu.pokemon   = { ...lu.pokemon, currentHp: pHp[idx].current, maxHp: pHp[idx].max };
+            }
+          }
+        }
+        await animateLevelUp(levelUps);
+      }
 
     } else if (event.type === 'send_out') {
       const sideId = event.side === 'player' ? 'player-side' : 'enemy-side';
@@ -2770,8 +2816,9 @@ async function animateBattleVisually(detailedLog, pTeamInit, eTeamInit) {
       if (event.status === 'poison' && el) {
         el.classList.add('hit-poison');
         const prev = teamHp[event.idx]?.current ?? event.hpAfter - event.hpChange;
-        await animateHpBar(el, prev, event.hpAfter, teamHp[event.idx]?.max ?? event.hpAfter + 1);
-        if (teamHp[event.idx]) teamHp[event.idx].current = event.hpAfter;
+        const adjAfter = event.side === 'player' ? adjPlayerHp(event.idx, event.hpAfter) : event.hpAfter;
+        await animateHpBar(el, prev, adjAfter, teamHp[event.idx]?.max ?? event.hpAfter + 1);
+        if (teamHp[event.idx]) teamHp[event.idx].current = adjAfter;
         el.classList.remove('hit-poison');
       } else if (event.status === 'freeze_thaw' && el) {
         removeStatusBadge(el, 'freeze');

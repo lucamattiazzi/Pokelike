@@ -364,6 +364,17 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
         if (traitsConfig?.onKO) {
           traitsConfig.onKO(target, tIdx, tSide, attacker, aIdx, side, detailedLog, pTeam, eTeam);
         }
+        if (tSide === 'enemy') {
+          const livingIdxs = pTeam
+            .map((p, i) => p.currentHp > 0 ? i : -1)
+            .filter(i => i >= 0);
+          detailedLog.push({
+            type: 'xp_award',
+            enemySpeciesId: target.speciesId,
+            enemyLevel: target.level,
+            livingIdxs,
+          });
+        }
         const nextTeam = tSide === 'player' ? pTeam : eTeam;
         const next = nextTeam.map((p, i) => ({ p, idx: i })).find(x => x.p.currentHp > 0);
         if (next) {
@@ -418,6 +429,17 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
           if (p.currentHp === 0) {
             addLog(`${p.nickname || p.name} fainted from poison!`, 'log-faint');
             detailedLog.push({ type: 'faint', side: teamSide, idx: i, name: p.nickname || p.name });
+            if (teamSide === 'enemy') {
+              const livingIdxs = pTeam
+                .map((pp, ii) => pp.currentHp > 0 ? ii : -1)
+                .filter(ii => ii >= 0);
+              detailedLog.push({
+                type: 'xp_award',
+                enemySpeciesId: p.speciesId,
+                enemyLevel: p.level,
+                livingIdxs,
+              });
+            }
           } else if (traitsConfig?.afterStatusTick) {
             traitsConfig.afterStatusTick(p, i, teamSide, detailedLog, pTeam, eTeam);
           }

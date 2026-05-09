@@ -1890,6 +1890,9 @@ function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, ene
     renderTrainerIcons(state.trainer, enemyName || null, showPlayer);
 
     const pTeamCopy = state.team.map(p => ({ ...p }));
+    // Capture pre-battle maxHp so we can compute damage taken in the sim,
+    // even after gen 2 mid-battle level-ups bump maxHp on state.team.
+    const origMaxHp = state.team.map(p => p.maxHp);
     // enemyTeam HP init (runBattle will deep-copy, but we need initial state for animation)
     const eTeamInit = enemyTeam.map(p => ({
       ...p,
@@ -1938,21 +1941,31 @@ function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, ene
     renderBattleField(resultP, resultE);
 
     if (playerWon) {
-      // Sync battle-result HP onto state team, then apply level gains
-      for (let i = 0; i < state.team.length; i++) {
-        if (resultP[i]) state.team[i].currentHp = resultP[i].currentHp;
+      if (state.gen2Mode) {
+        // Per-KO XP and level-ups already applied during animation. Sync HP via
+        // damage delta so post-level-up maxHp is preserved.
+        for (let i = 0; i < state.team.length; i++) {
+          if (!resultP[i]) continue;
+          if (resultP[i].currentHp <= 0) {
+            state.team[i].currentHp = 0;
+          } else {
+            const damage = origMaxHp[i] - resultP[i].currentHp;
+            state.team[i].currentHp = Math.max(0, state.team[i].maxHp - damage);
+          }
+        }
+        // Re-render with leveled-up state.team so HP bars reflect new maxHp
+        renderBattleField(state.team, resultE);
+      } else {
+        // Sync battle-result HP onto state team, then apply level gains
+        for (let i = 0; i < state.team.length; i++) {
+          if (resultP[i]) state.team[i].currentHp = resultP[i].currentHp;
+        }
       }
       const maxEnemyLevel = Math.max(...resultE.map(p => p.level));
       let levelUps;
       if (state.gen2Mode) {
-        // Gen 2: real XP system. Each defeated enemy yields baseExp × level × 1.5.
-        // Total yield is split evenly across living team members; lucky-egg holders get 1.5×.
-        const totalYield = resultE.reduce((s, e) =>
-          s + xpYield(getBaseExperience(e.speciesId), e.level), 0);
-        const livingIdxs = state.team
-          .map((p, i) => p.currentHp > 0 ? i : -1)
-          .filter(i => i >= 0);
-        levelUps = applyXpGain(state.team, livingIdxs, totalYield, 100, getGrowthRate, getBaseExperience);
+        // Already awarded per-KO during animation
+        levelUps = [];
       } else {
         levelUps = applyLevelGain(state.team, state.nuzlockeMode ? [] : state.items, playerParticipants, maxEnemyLevel, state.nuzlockeMode, baseGainOverride, state.isEndlessMode ? Infinity : 100);
       }
