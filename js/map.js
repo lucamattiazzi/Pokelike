@@ -662,7 +662,7 @@ function getNodeIcon(node) {
 
 function getSilverHoverLabel() {
   if (typeof SILVER_ENCOUNTERS === 'undefined') {
-    return 'Rival Silver';
+    return 'Rival Silver — Optional · Double XP';
   }
   // Encounter scales to the current map slot, not the win count, so skipping
   // earlier Silver fights doesn't trivialize a later one.
@@ -681,7 +681,9 @@ function getSilverHoverLabel() {
   const teamHtml = team.map(p =>
     `<div style="color:#ccc;font-size:9px;">${p.name} <span style="color:#aaa;">Lv${p.level}</span></div>`
   ).join('');
-  return `<div style="font-weight:bold;margin-bottom:4px;">Rival Silver</div>${teamHtml}`;
+  return `<div style="font-weight:bold;margin-bottom:2px;">Rival Silver</div>` +
+         `<div style="color:#ffd76b;font-size:9px;margin-bottom:4px;">Optional · Double XP</div>` +
+         teamHtml;
 }
 
 function getNodeLabel(node) {

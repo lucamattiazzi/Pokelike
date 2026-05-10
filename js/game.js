@@ -887,7 +887,7 @@ async function doSilverNode(node) {
   }
   showScreen('battle-screen');
   document.getElementById('battle-title').textContent = 'Silver wants to battle!';
-  document.getElementById('battle-subtitle').textContent = 'Rival Battle';
+  document.getElementById('battle-subtitle').textContent = 'Rival Battle — Optional · Double XP';
   // Tell the per-KO XP system to double Silver's yield for this fight only.
   state._silverFight = true;
   const won = await new Promise(resolve => {
