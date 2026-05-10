@@ -139,8 +139,8 @@ h1, h2, .pixel-font {
   padding: 0;
 }
 .gen-btn:hover { color: #bbb; border-color: #666; }
-.gen-btn[data-gen="1"].gen-btn--active { color: #ff4d4d; border-color: #ff4d4d; }
-.gen-btn[data-gen="2"].gen-btn--active { color: #ffc833; border-color: #ffc833; }
+.gen-btn[data-gen="1"].gen-btn--active { color: #c46a6a; border-color: #c46a6a; }
+.gen-btn[data-gen="2"].gen-btn--active { color: #c9a85a; border-color: #c9a85a; }
 
 
 
