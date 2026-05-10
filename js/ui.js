@@ -88,7 +88,11 @@ function renderXpBar(xp, level, growth = 'medium_fast') {
   const ceiling = xpForLevel(level + 1, growth);
   const span    = Math.max(1, ceiling - floor);
   const pct     = Math.min(1, Math.max(0, ((xp ?? floor) - floor) / span));
-  return `<div class="xp-bar-bg"><div class="xp-bar-fill" style="width:${Math.floor(pct*100)}%"></div></div>`;
+  // Use the fractional percent directly. Math.floor would render any sub-1%
+  // progress as 0% — a visible bug when over-leveled, where each battle's
+  // share can be a tiny fraction of the next-level threshold.
+  const width = pct >= 1 ? 100 : Math.max(0, pct * 100);
+  return `<div class="xp-bar-bg"><div class="xp-bar-fill" style="width:${width}%"></div></div>`;
 }
 
 function renderPokemonCard(pokemon, onClick, selected, dexCaught = false, hofStarterBadge = false) {
