@@ -679,6 +679,30 @@ const MAP_BST_RANGES = [
   { min: 530, max: 999 },   // Final
 ];
 
+// Gen 2 has 18 maps — fall back to MAP_BST_RANGES (clamped to map 8) would
+// stuff every Kanto encounter into veryHigh. Use a tailored ladder so each
+// Kanto map has a distinct BST band.
+const GEN2_MAP_BST_RANGES = [
+  { min: 200, max: 310 }, // 0  Falkner
+  { min: 250, max: 360 }, // 1  Bugsy
+  { min: 290, max: 400 }, // 2  Whitney
+  { min: 320, max: 430 }, // 3  Morty
+  { min: 350, max: 460 }, // 4  Chuck
+  { min: 380, max: 490 }, // 5  Jasmine
+  { min: 410, max: 510 }, // 6  Pryce
+  { min: 440, max: 530 }, // 7  Clair
+  { min: 460, max: 999 }, // 8  Lance / Mt Silver
+  { min: 470, max: 999 }, // 9  Brock (Kanto starts)
+  { min: 485, max: 999 }, // 10 Misty
+  { min: 495, max: 999 }, // 11 Lt. Surge
+  { min: 505, max: 999 }, // 12 Erika
+  { min: 515, max: 999 }, // 13 Janine
+  { min: 525, max: 999 }, // 14 Sabrina
+  { min: 535, max: 999 }, // 15 Blaine
+  { min: 545, max: 999 }, // 16 Blue
+  { min: 555, max: 999 }, // 17 Red
+];
+
 const MAP_LEVEL_RANGES = [
   [1, 5], [8, 15], [14, 21], [21, 29],
   [29, 37], [37, 43], [43, 47], [47, 52], [53, 64]
@@ -1113,7 +1137,9 @@ const LEGENDARY_POOL_HIGH     = [144, 145, 146]; // Birds ~485-490
 const LEGENDARY_POOL_VERYHIGH = [150,151,243,244,245,249,250,251,377,378,379,380,381,382,383,384,385,386];
 
 async function getRandomLegendary(mapIndex, allowAllGens = false) {
-  const range = MAP_BST_RANGES[Math.min(mapIndex, MAP_BST_RANGES.length - 1)];
+  const isGen2 = typeof state !== 'undefined' && state.gen2Mode;
+  const ranges = isGen2 ? GEN2_MAP_BST_RANGES : MAP_BST_RANGES;
+  const range  = ranges[Math.min(mapIndex, ranges.length - 1)];
   const veryHighPool = allowAllGens ? LEGENDARY_POOL_VERYHIGH : [150, 151];
   let pool;
   if (range.min >= 530) pool = veryHighPool;
@@ -1126,16 +1152,23 @@ async function getRandomLegendary(mapIndex, allowAllGens = false) {
 // Get random pokemon from the right BST bucket for a given mapIndex.
 // maxGenId restricts to IDs <= that number (151 = Gen 1 only, 649 = all gens).
 async function getCatchChoices(mapIndex, count = 3, maxGenId = 151, excludeStarters = false, minGenId = 1) {
-  const range = MAP_BST_RANGES[Math.min(mapIndex, MAP_BST_RANGES.length - 1)];
-  const pool = await getSpeciesPool();
+  const isGen2  = typeof state !== 'undefined' && state.gen2Mode;
+  const ranges  = isGen2 ? GEN2_MAP_BST_RANGES : MAP_BST_RANGES;
+  const range   = ranges[Math.min(mapIndex, ranges.length - 1)];
+  const pool    = await getSpeciesPool();
 
+  // Gen 2 widens the bucket at higher tiers by combining it with the next-lower
+  // tier (deduped). The default Kanto pool was ~36 mostly-overlapping species
+  // — pulling in the band below roughly doubles diversity without dragging
+  // BST through the floor.
+  const widen = (a, b) => isGen2 ? [...new Set([...a, ...b])] : a;
   let bucket;
-  if (range.min >= 530) bucket = GEN1_BST_APPROX.veryHigh;
-  else if (range.min >= 460) bucket = GEN1_BST_APPROX.high;
-  else if (range.min >= 400) bucket = GEN1_BST_APPROX.midHigh;
+  if (range.min >= 530)      bucket = widen(GEN1_BST_APPROX.veryHigh, GEN1_BST_APPROX.high);
+  else if (range.min >= 460) bucket = widen(GEN1_BST_APPROX.high,     GEN1_BST_APPROX.midHigh);
+  else if (range.min >= 400) bucket = widen(GEN1_BST_APPROX.midHigh,  GEN1_BST_APPROX.mid);
   else if (range.min >= 340) bucket = GEN1_BST_APPROX.mid;
   else if (range.min >= 280) bucket = GEN1_BST_APPROX.midLow;
-  else bucket = GEN1_BST_APPROX.low;
+  else                        bucket = GEN1_BST_APPROX.low;
 
   const starterIds = excludeStarters ? (minGenId >= 152 ? GEN2_STARTER_IDS : STARTER_IDS) : [];
   const starterSet = new Set(starterIds);
