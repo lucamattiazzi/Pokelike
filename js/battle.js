@@ -315,19 +315,12 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
         target.flinch = true;
       }
 
-      // Weakness Policy: super-effective hit grants persistent +1 ATK / +1 Sp.Atk
-      // (Battle Tower stat-buffs system). Applies to both the in-battle copy
-      // and state.team for player slots so the buff carries over between fights.
-      if (target.currentHp > 0 && typeEff >= 2 && target.heldItem?.id === 'weakness_policy') {
-        target.statBuffs = target.statBuffs || {};
-        target.statBuffs.atk     = Math.min(10, (target.statBuffs.atk     ?? 0) + 1);
-        target.statBuffs.special = Math.min(10, (target.statBuffs.special ?? 0) + 1);
-        if (tSide === 'player' && typeof state !== 'undefined' && state.team[tIdx]) {
-          const live = state.team[tIdx];
-          live.statBuffs = live.statBuffs || {};
-          live.statBuffs.atk     = Math.min(10, (live.statBuffs.atk     ?? 0) + 1);
-          live.statBuffs.special = Math.min(10, (live.statBuffs.special ?? 0) + 1);
-        }
+      // Adrenaline Orb: when the holder lands a super-effective hit, gain +1
+      // ATK / +1 Sp.Atk battle stages (resets after the fight, like Battle
+      // Tower trait buffs). Stacks with subsequent SE hits up to the +10 cap.
+      if (typeEff >= 2 && attacker.heldItem?.id === 'adrenaline_orb') {
+        applyStageChange(attacker, 'atk',     1, side, aIdx, detailedLog);
+        applyStageChange(attacker, 'special', 1, side, aIdx, detailedLog);
       }
 
       const aName = attacker.nickname || attacker.name;
