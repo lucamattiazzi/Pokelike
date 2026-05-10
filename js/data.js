@@ -908,6 +908,11 @@ function getBaseExperience(speciesId) {
 
 // Synchronous read of cached growth_rate. Default 'medium_fast' on miss.
 function getGrowthRate(speciesId) {
+  // Prefer the bundled static pokedex (covers all 649 species) so freshly
+  // evolved pokemon don't fall back to 'medium_fast' before their species
+  // entry is fetched + cached. Fall back to localStorage cache, then default.
+  const staticEntry = _staticPokedex && _staticPokedex[speciesId];
+  if (staticEntry?.growthRate) return staticEntry.growthRate;
   const cached = getCached(`pkrl_species_v2_${speciesId}`);
   return cached?.growthRate ?? 'medium_fast';
 }
