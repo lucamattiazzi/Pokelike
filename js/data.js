@@ -626,7 +626,7 @@ const ITEM_POOL = [
   { id: 'quick_claw',         name: 'Quick Claw',         desc: '50% chance to attack first regardless of speed',                     icon: '🪝' },
   { id: 'king_stone',         name: "King's Rock",         desc: '30% chance to flinch the target on a hit',                          icon: '👑' },
   { id: 'lagging_tail',       name: 'Lagging Tail',       desc: 'Always moves last, but +100% move damage',                            icon: '🐌' },
-  { id: 'weakness_policy',    name: 'Weakness Policy',    desc: 'On super-effective hit: permanent +1 ATK / +1 Sp.Atk buff',           icon: '📜' },
+  { id: 'weakness_policy',    name: 'Weakness Policy',    desc: 'When hit by a SUPER-EFFECTIVE move (×2+): permanent +1 ATK / +1 Sp.Atk',  icon: '📜' },
   { id: 'red_card',           name: 'Red Card',           desc: 'Take 50% less damage from super-effective hits',                      icon: '🟥' },
 ];
 
