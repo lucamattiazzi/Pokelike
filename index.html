@@ -30,9 +30,9 @@
   <div class="game-logo">POKELIKE</div>
   <div class="game-subtitle">Pokemon Roguelike</div>
   <div style="color:var(--text-dim);font-size:9px;margin-bottom:6px;cursor:pointer;" onclick="openPatchNotesModal()">v1.4.5 — patch notes</div>
-  <div id="gen-toggle" class="gen-toggle">
-    <button class="gen-btn gen-btn--active" data-gen="1">Gen 1</button>
-    <button class="gen-btn" data-gen="2">Gen 2</button>
+  <div id="gen-toggle" class="gen-toggle" title="Choose generation">
+    <button class="gen-btn gen-btn--active" data-gen="1" aria-label="Gen 1 (Kanto)">I</button>
+    <button class="gen-btn" data-gen="2" aria-label="Gen 2 (Johto)">II</button>
   </div>
   <button id="btn-continue-run" class="btn-primary" style="display:none;margin-bottom:10px;">Continue Run</button>
   <button id="btn-continue-endless" class="btn-primary" style="display:none;margin-bottom:10px;">Continue Battle Tower</button>
