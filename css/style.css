@@ -106,10 +106,21 @@ h1, h2, .pixel-font {
 .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Generation toggle (title screen) — color-themed Roman numerals */
+.gen-toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.gen-toggle-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  color: #aaa;
+  letter-spacing: 1px;
+}
 .gen-toggle {
   display: flex;
   gap: 12px;
-  margin-bottom: 14px;
 }
 .gen-btn {
   width: 44px;
