@@ -105,6 +105,32 @@ h1, h2, .pixel-font {
 .btn-secondary:hover { color: var(--accent); }
 .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* Generation toggle (title screen) */
+.gen-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.gen-btn {
+  padding: 8px 20px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  background: #2a2a2a;
+  color: #ccc;
+  border: 2px solid #444;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+.gen-btn:hover { color: #fff; border-color: #777; }
+.gen-btn--active {
+  background: #1a1a1a;
+  color: #fff;
+  border-color: #fff;
+  box-shadow: inset 2px 2px 4px rgba(0,0,0,0.6);
+  transform: translate(1px, 1px);
+}
+
 
 
 /* ---- Starter Screen ---- */

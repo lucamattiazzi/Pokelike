@@ -30,11 +30,14 @@
   <div class="game-logo">POKELIKE</div>
   <div class="game-subtitle">Pokemon Roguelike</div>
   <div style="color:var(--text-dim);font-size:9px;margin-bottom:6px;cursor:pointer;" onclick="openPatchNotesModal()">v1.4.5 — patch notes</div>
+  <div id="gen-toggle" class="gen-toggle">
+    <button class="gen-btn gen-btn--active" data-gen="1">Gen 1</button>
+    <button class="gen-btn" data-gen="2">Gen 2</button>
+  </div>
   <button id="btn-continue-run" class="btn-primary" style="display:none;margin-bottom:10px;">Continue Run</button>
   <button id="btn-continue-endless" class="btn-primary" style="display:none;margin-bottom:10px;">Continue Battle Tower</button>
   <button id="btn-new-run" class="btn-primary">Normal Mode</button>
   <button id="btn-hard-run" class="btn-primary" style="margin-top:6px;">Nuzlocke</button>
-  <button id="btn-gen2-run" class="btn-primary" style="margin-top:6px;">Gen 2 — Johto</button>
   <button id="btn-endless-run" class="btn-primary" style="margin-top:6px;">Battle Tower</button>
   <div style="display:flex;gap:8px;margin-top:8px;">
     <button onclick="openPokedexModal()" class="btn-secondary">📖 Pokédex</button>

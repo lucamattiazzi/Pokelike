@@ -67,10 +67,17 @@ async function initGame() {
   showScreen('title-screen');
   if (typeof initCloudSave === 'function') initCloudSave();
   if (typeof syncToCloud === 'function') syncToCloud();
-  document.getElementById('btn-new-run').onclick = () => startNewRun(false);
-  document.getElementById('btn-hard-run').onclick = () => startNewRun(true);
-  const gen2Btn = document.getElementById('btn-gen2-run');
-  if (gen2Btn) gen2Btn.onclick = () => startNewRun(false, true);
+  // Generation toggle — selection is read when Normal/Nuzlocke is clicked.
+  let selectedGen = 1;
+  document.querySelectorAll('#gen-toggle .gen-btn').forEach(btn => {
+    btn.onclick = () => {
+      selectedGen = Number(btn.dataset.gen) || 1;
+      document.querySelectorAll('#gen-toggle .gen-btn').forEach(b =>
+        b.classList.toggle('gen-btn--active', b === btn));
+    };
+  });
+  document.getElementById('btn-new-run').onclick  = () => startNewRun(false, selectedGen === 2);
+  document.getElementById('btn-hard-run').onclick = () => startNewRun(true,  selectedGen === 2);
 
   const endlessBtn = document.getElementById('btn-endless-run');
   if (endlessBtn) {
