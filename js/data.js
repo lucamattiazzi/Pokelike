@@ -634,7 +634,7 @@ const USABLE_ITEM_POOL = [
   { id: 'max_revive',  name: 'Max Revive',       desc: 'Fully revives a fainted Pokémon',              icon: '💊', usable: true },
   { id: 'rare_candy',  name: 'Rare Candy',        desc: 'Gives a Pokémon +3 levels',                   icon: '🍬', usable: true },
   { id: 'moon_stone',  name: 'Moon Stone',        desc: 'Force evolves a Pokémon regardless of level',  icon: '🌙', usable: true },
-  { id: 'tm',          name: 'TM',                desc: "Upgrades a Pokémon's move tier by 1",          icon: '💿', usable: true },
+  { id: 'tm_normal',   name: 'TM',                desc: "Upgrades a Pokémon's move tier by 1",          icon: '💿', usable: true },
   { id: 'escape_rope', name: 'Escape Rope',       desc: 'Survive a non-boss loss with 1 HP instead of game over', icon: '🪢', usable: true },
 ];
 

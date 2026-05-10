@@ -1298,7 +1298,7 @@ function doItemNode(node) {
   const usableAvailable = USABLE_ITEM_POOL.filter(it => {
     if (it.id === 'max_revive') return canUseMaxRevive;
     if (it.id === 'moon_stone')  return canUseEvoStone;
-    if (it.id === 'tm')          return canUseTm;
+    if (it.id === 'tm_normal')          return canUseTm;
     return true;
   });
 
@@ -1467,7 +1467,7 @@ function openUsableItemModal(item, bagIdx) {
       const evo = EVOLUTIONS[p.speciesId];
       return !!(evo && evo.into !== p.speciesId);
     }
-    if (item.id === 'tm') return p.currentHp > 0 && (p.moveTier ?? 1) < 2;
+    if (item.id === 'tm_normal') return p.currentHp > 0 && (p.moveTier ?? 1) < 2;
     return true;
   };
 
@@ -1531,7 +1531,7 @@ function openUsableItemModal(item, bagIdx) {
         renderItemBadges(state.items);
         await applyEvolution(pokemon);
 
-      } else if (item.id === 'tm') {
+      } else if (item.id === 'tm_normal') {
         pokemon.moveTier = Math.min(2, (pokemon.moveTier ?? 1) + 1);
         const newMove = getBestMove(pokemon.types || ['Normal'], pokemon.baseStats, pokemon.speciesId, pokemon.moveTier, pokemon.heldItem);
         showMapNotification(`${pokemon.nickname || pokemon.name} learned ${newMove.name}!`);
