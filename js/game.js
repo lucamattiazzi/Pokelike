@@ -46,12 +46,6 @@ function loadRun() {
     state.currentNode = saved.currentNodeId ? (state.map?.nodes?.[saved.currentNodeId] || null) : null;
     delete state.currentNodeId;
     delete state.rngSeed;
-    // Gen 2 XP migration: warm growth-rate cache, then backfill missing p.xp.
-    if (state.gen2Mode && Array.isArray(state.team) && state.team.length) {
-      Promise.all(state.team.map(p => fetchPokemonSpecies(p.speciesId)))
-        .then(() => { for (const p of state.team) if (p.xp == null) initPlayerXp(p); })
-        .catch(() => {});
-    }
     return true;
   } catch { return false; }
 }
@@ -404,7 +398,6 @@ async function selectStarter(pokemon) {
   markPokedexCaught(pokemon.speciesId, pokemon.name, pokemon.types, normalUrl);
   if (pokemon.isShiny) markShinyDexCaught(pokemon.speciesId, pokemon.name, pokemon.types, pokemon.spriteUrl);
   loadBuffsIntoPokemon(pokemon);
-  initPlayerXp(pokemon);
   state.team = [pokemon];
   state.starterSpeciesId = pokemon.speciesId;
   recordUsedStarter(pokemon.speciesId);
@@ -447,11 +440,9 @@ function showMapScreen() {
   const mapInfo = document.getElementById('map-info');
   if (mapInfo) {
     if (state.gen2Mode) {
-      const isFinal = state.currentMap === 17;
+      const isFinal = state.currentMap === 9;
       const isElite = state.currentMap === 8;
-      const leader = (isFinal || isElite) ? null : (state.currentMap < 8
-        ? JOHTO_GYM_LEADERS[state.currentMap]
-        : KANTO_GYM_LEADERS[state.currentMap - 9]);
+      const leader = (isFinal || isElite) ? null : JOHTO_GYM_LEADERS[state.currentMap];
       mapInfo.innerHTML = isFinal
         ? `<span>Mt. Silver — Red</span>`
         : isElite
@@ -468,21 +459,13 @@ function showMapScreen() {
   const BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/';
   let badgeHtml;
   if (state.gen2Mode) {
-    const johtoBadges = Array.from({ length: 8 }, (_, i) => {
+    badgeHtml = Array.from({ length: 8 }, (_, i) => {
       const earned = i < state.badges;
       const label = JOHTO_GYM_LEADERS[i].badge;
       return earned
         ? `<img src="${BASE}${i + 9}.png" alt="${label}" title="${label}" class="badge-icon-img">`
         : `<span class="badge-icon-empty" title="${label}"></span>`;
     }).join('');
-    const kantoBadges = Array.from({ length: 8 }, (_, i) => {
-      const earned = (i + 8) < state.badges;
-      const label = KANTO_GYM_LEADERS[i].badge;
-      return earned
-        ? `<img src="${BASE}${i + 1}.png" alt="${label}" title="${label}" class="badge-icon-img">`
-        : `<span class="badge-icon-empty" title="${label}"></span>`;
-    }).join('');
-    badgeHtml = johtoBadges + kantoBadges;
   } else {
     badgeHtml = Array.from({ length: 8 }, (_, i) => {
       const earned = i < state.badges;
@@ -504,13 +487,10 @@ function showMapScreen() {
   let bgUrl;
   if (state.gen2Mode) {
     if (state.currentMap < 9) {
-      // Johto routes 1-9 (last covers Lance / Mt. Silver at map 8)
+      // Johto routes 1-9 (route 9 covers Elite Four at map 8)
       bgUrl = `ui/mapsGen2/${state.currentMap + 1}.png`;
-    } else if (state.currentMap < 17) {
-      // Kanto leaders reuse the normal-mode Kanto backgrounds (Brock = map1)
-      bgUrl = `ui/mapsNormalMode/map${state.currentMap - 8}.png`;
     } else {
-      // Elite Four / Champion finale
+      // Mt. Silver — Red final
       bgUrl = `ui/mapsNormalMode/map9.png`;
     }
   } else {
@@ -758,18 +738,9 @@ async function doBattleNode(node) {
 
 async function doBossNode(node) {
   if (state.gen2Mode) {
-    if (state.currentMap === 17) { await doRed(); return; }
-    if (state.currentMap === 8)  { await doGen2Elite4(); return; }
-    const leader = state.currentMap < 8
-      ? JOHTO_GYM_LEADERS[state.currentMap]
-      : KANTO_GYM_LEADERS[state.currentMap - 9];
-    // Warm species cache so getBaseExperience/getGrowthRate are accurate
-    // post-battle. Fire-and-forget — battles run for several seconds, plenty
-    // of time for these to resolve before the XP award reads the cache.
-    leader.team.forEach(p => {
-      fetchPokemonById(p.speciesId);
-      fetchPokemonSpecies(p.speciesId);
-    });
+    if (state.currentMap === 9) { await doRed(); return; }
+    if (state.currentMap === 8) { await doGen2Elite4(); return; }
+    const leader = JOHTO_GYM_LEADERS[state.currentMap];
     const enemyTeam = leader.team.map(p => ({
       ...createInstance(p, p.level, false, leader.moveTier ?? 1),
       heldItem: p.heldItem || null,
@@ -837,10 +808,6 @@ async function doElite4() {
 
 async function doRed() {
   const boss = RED_FINAL;
-  boss.team.forEach(p => {
-    fetchPokemonById(p.speciesId);
-    fetchPokemonSpecies(p.speciesId);
-  });
   const enemyTeam = boss.team.map(p => ({
     ...createInstance(p, p.level, false, 2),
     heldItem: p.heldItem || null,
@@ -860,16 +827,12 @@ async function doRed() {
 async function doSilverNode(node) {
   // Encounter index is keyed off the current map so skipping earlier Silver
   // fights doesn't make a later one trivial.
-  const SILVER_ENC_BY_MAP = { 1: 0, 3: 1, 5: 2, 7: 3, 10: 4, 13: 5, 15: 6 };
+  const SILVER_ENC_BY_MAP = { 1: 0, 3: 1, 5: 2, 7: 3 };
   const encounterIdx = Math.min(
     SILVER_ENC_BY_MAP[state.currentMap] ?? (state.silverBeaten || 0),
     SILVER_ENCOUNTERS.length - 1,
   );
   const silverData = SILVER_ENCOUNTERS[encounterIdx];
-  silverData.team.forEach(p => {
-    fetchPokemonById(p.speciesId);
-    fetchPokemonSpecies(p.speciesId);
-  });
   const enemyTeam = silverData.team.map(p => ({
     ...createInstance(p, p.level, false, 2),
     heldItem: p.heldItem || null,
@@ -880,21 +843,22 @@ async function doSilverNode(node) {
     // form for fight 1, first evo for fights 2-3, final evo from fight 4 on.
     const starterStage = encounterIdx < 1 ? 0 : encounterIdx < 3 ? 1 : 2;
     const starterSpecies = starterLine[starterStage];
-    fetchPokemonById(starterSpecies.speciesId);
-    fetchPokemonSpecies(starterSpecies.speciesId);
     const lastIdx = enemyTeam.length - 1;
     enemyTeam[lastIdx] = { ...createInstance(starterSpecies, enemyTeam[lastIdx].level, false, 2), heldItem: starterSpecies.heldItem || null };
   }
   showScreen('battle-screen');
   document.getElementById('battle-title').textContent = 'Silver wants to battle!';
   document.getElementById('battle-subtitle').textContent = 'Rival Battle — Double XP';
-  // Tell the per-KO XP system to double Silver's yield for this fight only.
-  state._silverFight = true;
   const won = await new Promise(resolve => {
     runBattleScreen(enemyTeam, true, () => resolve(true), () => resolve(false), 'silver');
   });
-  state._silverFight = false;
   if (!won) { showGameOver(); return; }
+  // Silver Double XP: +4 levels to the entire team after the win.
+  for (const p of state.team) {
+    p.level = Math.min(100, p.level + 4);
+    p.maxHp = calcHp(p.baseStats.hp, p.level);
+    if (p.currentHp < p.maxHp) p.currentHp = p.maxHp;
+  }
   state.silverBeaten = (state.silverBeaten || 0) + 1;
   advanceFromNode(state.map, node.id);
   showMapScreen();
@@ -912,15 +876,59 @@ function showEliteTransition(defeatedName, nextIndex, bossArray = ELITE_4) {
   });
 }
 
+// Prep screen shown between Elite 4 / Champion battles. Shows the next
+// opponent's roster, lets the player drag-reorder their team and use items,
+// then proceeds on Continue.
+function showElitePrepScreen({ title, subtitle, nextBoss }) {
+  return new Promise(resolve => {
+    document.getElementById('elite-prep-title').textContent = title;
+    document.getElementById('elite-prep-sub').textContent = subtitle;
+
+    const enemyEl = document.getElementById('elite-prep-enemy-team');
+    enemyEl.innerHTML = nextBoss.team.map(p => {
+      const sprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.speciesId}.png`;
+      const types  = (p.types || []).map(t => `<span class="type-badge type-${t.toLowerCase()}" style="font-size:5px;padding:1px 2px;">${t}</span>`).join('');
+      const item   = p.heldItem ? `<div style="font-size:7px;color:var(--text-dim);margin-top:2px;">${itemIconHtml(p.heldItem, 12)}</div>` : '';
+      return `<div class="elite-prep-enemy-slot">
+        <img src="${sprite}" alt="${p.name}" onerror="this.style.display='none'">
+        <div class="name">${p.name}</div>
+        <div class="lv">Lv ${p.level}</div>
+        <div class="types">${types}</div>
+        ${item}
+      </div>`;
+    }).join('');
+
+    const teamEl  = document.getElementById('elite-prep-player-team');
+    const itemsEl = document.getElementById('elite-prep-items');
+    const refresh = () => {
+      renderTeamBar(state.team, teamEl, false, true);
+      renderItemBadges(state.items, itemsEl, refresh);
+    };
+    refresh();
+
+    showScreen('elite-prep-screen');
+
+    const btn = document.getElementById('btn-elite-prep-continue');
+    const onContinue = () => {
+      btn.removeEventListener('click', onContinue);
+      resolve();
+    };
+    btn.addEventListener('click', onContinue);
+  });
+}
+
 async function doGen2Elite4() {
   const bosses = GEN2_ELITE_4;
   state.eliteIndex = 0;
   for (let i = 0; i < bosses.length; i++) {
     state.eliteIndex = i;
     const boss = bosses[i];
-    boss.team.forEach(p => {
-      fetchPokemonById(p.speciesId);
-      fetchPokemonSpecies(p.speciesId);
+    // Prep screen before each Elite battle (including the first).
+    const prevName = i === 0 ? null : bosses[i - 1].name;
+    await showElitePrepScreen({
+      title: prevName ? `${prevName} defeated!` : 'The Elite Four await!',
+      subtitle: `Next: ${boss.name} (${boss.type}) — Battle ${i + 1}/${bosses.length}`,
+      nextBoss: boss,
     });
     const enemyTeam = boss.team.map(p => ({ ...createInstance(p, p.level, false, 2), heldItem: p.heldItem || null }));
     showScreen('battle-screen');
@@ -931,11 +939,16 @@ async function doGen2Elite4() {
       runBattleScreen(enemyTeam, true, () => resolve(true), () => resolve(false), boss.name);
     });
     if (!won) { showGameOver(); return; }
-    if (i < bosses.length - 1) await showEliteTransition(boss.name, i + 1, bosses);
   }
   const eliteAch = unlockAchievement('elite_four');
   if (eliteAch) showAchievementToast(eliteAch);
   state.eliteIndex = 0;
+  // Lance defeated — prep for Red.
+  await showElitePrepScreen({
+    title: 'Lance defeated!',
+    subtitle: '1 more challenge awaits — The Champion: Red',
+    nextBoss: RED_FINAL,
+  });
   startMap(9);
 }
 
@@ -1158,7 +1171,6 @@ function catchPokemon(pokemon, node) {
   checkDexAchievements();
   if (state.team.length < 6) {
     loadBuffsIntoPokemon(pokemon);
-    initPlayerXp(pokemon);
     state.team.push(pokemon);
     if (state.team.length > state.maxTeamSize) state.maxTeamSize = state.team.length;
     state.savedCatch = null;
@@ -1206,7 +1218,6 @@ function showSwapScreen(newPoke, node) {
     addBtn.addEventListener('click', () => {
       cleanup();
       loadBuffsIntoPokemon(newPoke);
-      initPlayerXp(newPoke);
       state.team.push(newPoke);
       if (state.team.length > state.maxTeamSize) state.maxTeamSize = state.team.length;
       state.savedCatch = null;
@@ -1235,7 +1246,6 @@ function showSwapScreen(newPoke, node) {
       const released = state.team[idx];
       if (released.heldItem) state.items.push(released.heldItem);
       loadBuffsIntoPokemon(newPoke);
-      initPlayerXp(newPoke);
       state.team.splice(idx, 1, newPoke);
       state.savedCatch = null;
       state.savedQuestionResolve = null;
@@ -1301,17 +1311,19 @@ function doItemNode(node) {
   );
 
   // Usable items: filter out ones that can't be applied to current team
-  const canUseMaxRevive = state.team.some(p => p.currentHp <= 0);
-  const canUseEvoStone  = state.team.some(p => {
+  const canUseMaxRevive   = state.team.some(p => p.currentHp <= 0);
+  const canUseFullRestore = state.team.some(p => p.currentHp > 0 && p.currentHp < p.maxHp);
+  const canUseEvoStone    = state.team.some(p => {
     if (p.speciesId === 133) return true;
     const evo = EVOLUTIONS[p.speciesId];
     return evo && evo.into !== p.speciesId;
   });
-  const canUseTm        = state.team.some(p => (p.moveTier ?? 1) < 2);
+  const canUseTm          = state.team.some(p => (p.moveTier ?? 1) < 2);
   const usableAvailable = USABLE_ITEM_POOL.filter(it => {
-    if (it.id === 'max_revive') return canUseMaxRevive;
-    if (it.id === 'moon_stone')  return canUseEvoStone;
-    if (it.id === 'tm_normal')          return canUseTm;
+    if (it.id === 'max_revive')   return canUseMaxRevive;
+    if (it.id === 'full_restore') return canUseFullRestore;
+    if (it.id === 'moon_stone')   return canUseEvoStone;
+    if (it.id === 'tm_normal')    return canUseTm;
     return true;
   });
 
@@ -1463,7 +1475,7 @@ function openItemEquipModal(item, { fromBagIdx = -1, fromPokemonIdx = -1, onComp
 
 }
 
-function openUsableItemModal(item, bagIdx) {
+function openUsableItemModal(item, bagIdx, afterUse = null) {
   // Escape Rope auto-triggers from runBattleScreen on a non-boss loss; clicking
   // it manually just informs the player so they don't accidentally consume it.
   if (item.id === 'escape_rope') {
@@ -1473,7 +1485,8 @@ function openUsableItemModal(item, bagIdx) {
   document.getElementById('usable-item-modal')?.remove();
 
   const canTarget = p => {
-    if (item.id === 'max_revive') return p.currentHp <= 0;
+    if (item.id === 'max_revive')   return p.currentHp <= 0;
+    if (item.id === 'full_restore') return p.currentHp > 0 && p.currentHp < p.maxHp;
     if (item.id === 'moon_stone') {
       if (p.currentHp <= 0) return false;
       if (p.speciesId === 133) return true;
@@ -1530,11 +1543,16 @@ function openUsableItemModal(item, bagIdx) {
         renderItemBadges(state.items);
         renderTeamBar(state.team);
 
+      } else if (item.id === 'full_restore') {
+        pokemon.currentHp = pokemon.maxHp;
+        showMapNotification(`${pokemon.nickname || pokemon.name} was fully restored!`);
+        renderItemBadges(state.items);
+        renderTeamBar(state.team);
+
       } else if (item.id === 'rare_candy') {
         for (let i = 0; i < 3; i++) {
           if (pokemon.level < 100) pokemon.level++;
         }
-        pokemon.xp = Math.max(pokemon.xp ?? 0, xpForLevel(pokemon.level, getGrowthRate(pokemon.speciesId)));
         showMapNotification(`${pokemon.nickname || pokemon.name} grew to Lv ${pokemon.level}!`);
         renderItemBadges(state.items);
         renderTeamBar(state.team);
@@ -1552,6 +1570,7 @@ function openUsableItemModal(item, bagIdx) {
         renderTeamBar(state.team);
 
       }
+      if (afterUse) afterUse();
     });
   });
 }
@@ -1657,9 +1676,7 @@ async function doTrainerNode(node) {
   if (activePool) {
     // Dedupe pool, filter out evolved forms the battle level can't reach, then shuffle
     const eligible = [...new Set(activePool)]
-      .filter(id => minLevelForSpecies(id) <= level)
-      // Aerodactyl: Kanto-only (map 9+) in gen 2
-      .filter(id => !(id === 142 && state.gen2Mode && state.currentMap < 9));
+      .filter(id => minLevelForSpecies(id) <= level);
     const pool = eligible.length ? eligible : [...new Set(activePool)]; // fallback: use full pool
     const shuffled = pool.sort(() => rng() - 0.5);
     const ids = Array.from({ length: teamSize }, (_, i) => resolveEvoForLevel(shuffled[i % shuffled.length], level));
@@ -1675,11 +1692,6 @@ async function doTrainerNode(node) {
   }
 
   if (!speciesList.length) { advanceFromNode(state.map, node.id); showMapScreen(); return; }
-  // Warm species cache for gen 2 XP curves — fire-and-forget; battle runs
-  // long enough for these to land before the post-battle XP award.
-  if (state.gen2Mode) {
-    speciesList.forEach(sp => fetchPokemonSpecies(sp.id ?? sp.speciesId));
-  }
   const ENDLESS_ENEMY_ITEM_POOL = [
     { id: 'choice_band',  name: 'Choice Band',  icon: '🎀' },
     { id: 'choice_specs', name: 'Choice Specs', icon: '👓' },
@@ -1912,7 +1924,6 @@ async function doShinyNode(node) {
     checkDexAchievements();
     if (state.team.length < 6) {
       loadBuffsIntoPokemon(shiny);
-      initPlayerXp(shiny);
       state.team.push(shiny);
       if (state.team.length > state.maxTeamSize) state.maxTeamSize = state.team.length;
       advanceFromNode(state.map, node.id);
@@ -1949,9 +1960,6 @@ function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, ene
     renderTrainerIcons(state.trainer, enemyName || null, showPlayer);
 
     const pTeamCopy = state.team.map(p => ({ ...p }));
-    // Capture pre-battle maxHp so we can compute damage taken in the sim,
-    // even after gen 2 mid-battle level-ups bump maxHp on state.team.
-    const origMaxHp = state.team.map(p => p.maxHp);
     // enemyTeam HP init (runBattle will deep-copy, but we need initial state for animation)
     const eTeamInit = enemyTeam.map(p => ({
       ...p,
@@ -2000,34 +2008,12 @@ function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, ene
     renderBattleField(resultP, resultE);
 
     if (playerWon) {
-      if (state.gen2Mode) {
-        // Per-KO XP and level-ups already applied during animation. Sync HP via
-        // damage delta so post-level-up maxHp is preserved.
-        for (let i = 0; i < state.team.length; i++) {
-          if (!resultP[i]) continue;
-          if (resultP[i].currentHp <= 0) {
-            state.team[i].currentHp = 0;
-          } else {
-            const damage = origMaxHp[i] - resultP[i].currentHp;
-            state.team[i].currentHp = Math.max(0, state.team[i].maxHp - damage);
-          }
-        }
-        // Re-render with leveled-up state.team so HP bars reflect new maxHp
-        renderBattleField(state.team, resultE);
-      } else {
-        // Sync battle-result HP onto state team, then apply level gains
-        for (let i = 0; i < state.team.length; i++) {
-          if (resultP[i]) state.team[i].currentHp = resultP[i].currentHp;
-        }
+      // Sync battle-result HP onto state team, then apply level gains
+      for (let i = 0; i < state.team.length; i++) {
+        if (resultP[i]) state.team[i].currentHp = resultP[i].currentHp;
       }
       const maxEnemyLevel = Math.max(...resultE.map(p => p.level));
-      let levelUps;
-      if (state.gen2Mode) {
-        // Already awarded per-KO during animation
-        levelUps = [];
-      } else {
-        levelUps = applyLevelGain(state.team, state.nuzlockeMode ? [] : state.items, playerParticipants, maxEnemyLevel, state.nuzlockeMode, baseGainOverride, state.isEndlessMode ? Infinity : 100);
-      }
+      const levelUps = applyLevelGain(state.team, state.nuzlockeMode ? [] : state.items, playerParticipants, maxEnemyLevel, state.nuzlockeMode, baseGainOverride, state.isEndlessMode ? Infinity : 100);
       const skipAll = autoSkip || manuallySkipped;
       battleSpeedMultiplier = skipAll ? SKIP_SPEED : 1;
       skipBtn.textContent = 'Skip';
@@ -2119,13 +2105,12 @@ function showBadgeScreen(leader) {
   showScreen('badge-screen');
   document.getElementById('badge-msg').textContent = `You earned the ${leader.badge}!`;
   document.getElementById('badge-leader').textContent = '';
-  const totalBadges = state.gen2Mode ? 16 : 8;
-  document.getElementById('badge-count-display').textContent = `Badges: ${state.badges}/${totalBadges}`;
+  document.getElementById('badge-count-display').textContent = `Badges: ${state.badges}/8`;
   const badgeImg = document.getElementById('badge-icon-img');
   if (badgeImg) {
     if (state.gen2Mode) {
-      const badgeNum = state.badges <= 8 ? state.badges + 8 : state.badges - 8;
-      badgeImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/${badgeNum}.png`;
+      // Johto sprites are at indices 9-16
+      badgeImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/${state.badges + 8}.png`;
     } else {
       badgeImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/${state.badges}.png`;
     }
@@ -2141,11 +2126,9 @@ function showBadgeScreen(leader) {
   };
   const advance = () => {
     document.removeEventListener('keydown', onKey);
-    const lastLeaderMap = state.gen2Mode ? 16 : 7;
-    const finalMapIndex = state.gen2Mode ? 17 : 8;
-    if (state.currentMap >= lastLeaderMap) {
+    if (state.currentMap >= 7) {
       state.eliteIndex = 0;
-      startMap(finalMapIndex);
+      startMap(8);
     } else {
       startMap(state.currentMap + 1);
     }
@@ -2514,7 +2497,6 @@ async function applyEndlessBugTrait() {
     if (p.currentHp > 0) {
       const oldLevel = p.level;
       p.level = p.level + bugBonus;
-      p.xp = Math.max(p.xp ?? 0, xpForLevel(p.level, getGrowthRate(p.speciesId)));
       const hpBuff = p.statBuffs?.hp ?? 0;
       const buffMult = 1 + 0.1 * hpBuff;
       p.maxHp = Math.floor(calcHp(p.baseStats.hp, p.level) * buffMult);

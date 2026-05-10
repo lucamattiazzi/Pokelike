@@ -45,7 +45,7 @@ function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
   const CONTENT_SIZES = [3, 4, 3, 4, 3, 2]; // layers 2–7
   // Silver shows up as an optional node on these gen2 maps. Players who want
   // the bonus XP can route through him; others can take a different path.
-  const hasSilverNode = gen2Mode && [1, 3, 5, 7, 10, 13, 15].includes(mapIndex);
+  const hasSilverNode = gen2Mode && [1, 3, 5, 7].includes(mapIndex);
   const contentCount  = CONTENT_SIZES.length;
   const bossLayerIdx  = 2 + CONTENT_SIZES.length;
   const bossId        = `n${bossLayerIdx}_0`;
@@ -666,7 +666,7 @@ function getSilverHoverLabel() {
   }
   // Encounter scales to the current map slot, not the win count, so skipping
   // earlier Silver fights doesn't trivialize a later one.
-  const SILVER_ENC_BY_MAP = { 1: 0, 3: 1, 5: 2, 7: 3, 10: 4, 13: 5, 15: 6 };
+  const SILVER_ENC_BY_MAP = { 1: 0, 3: 1, 5: 2, 7: 3 };
   const mapIdx     = (typeof state !== 'undefined') ? state.currentMap : 1;
   const idx        = SILVER_ENC_BY_MAP[mapIdx] ?? 0;
   const data       = SILVER_ENCOUNTERS[Math.min(idx, SILVER_ENCOUNTERS.length - 1)];

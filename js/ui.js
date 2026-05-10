@@ -82,19 +82,6 @@ function renderHpBar(current, max) {
           <span class="hp-text">${Math.max(0,current)}/${max}</span>`;
 }
 
-function renderXpBar(xp, level, growth = 'medium_fast') {
-  if (level >= 100) return `<div class="xp-bar-bg"><div class="xp-bar-fill" style="width:100%"></div></div>`;
-  const floor   = xpForLevel(level, growth);
-  const ceiling = xpForLevel(level + 1, growth);
-  const span    = Math.max(1, ceiling - floor);
-  const pct     = Math.min(1, Math.max(0, ((xp ?? floor) - floor) / span));
-  // Use the fractional percent directly. Math.floor would render any sub-1%
-  // progress as 0% — a visible bug when over-leveled, where each battle's
-  // share can be a tiny fraction of the next-level threshold.
-  const width = pct >= 1 ? 100 : Math.max(0, pct * 100);
-  return `<div class="xp-bar-bg"><div class="xp-bar-fill" style="width:${width}%"></div></div>`;
-}
-
 function renderPokemonCard(pokemon, onClick, selected, dexCaught = false, hofStarterBadge = false) {
   const pct = pokemon.currentHp / pokemon.maxHp;
   const typeHtml = (pokemon.types || ['???']).map(t =>
@@ -246,8 +233,8 @@ function getMoveForPokemon(pokemon) {
 let _dragIdx = null;
 let _teamHoverCardDismissListener = null;
 
-function renderTeamBar(team, el, showTypes = false) {
-  const isMain = !el;
+function renderTeamBar(team, el, showTypes = false, forceReorder = false) {
+  const isMain = forceReorder || !el;
   if (!el) el = document.getElementById('team-bar');
   if (!el) return;
   el.innerHTML = '';
@@ -343,7 +330,7 @@ function renderTeamBar(team, el, showTypes = false) {
             if (_dragIdx !== null && targetIdx !== -1 && targetIdx !== _dragIdx) {
               [team[_dragIdx], team[targetIdx]] = [team[targetIdx], team[_dragIdx]];
               cleanup();
-              renderTeamBar(team);
+              renderTeamBar(team, forceReorder ? el : undefined, showTypes, forceReorder);
               return;
             }
           }
@@ -360,8 +347,8 @@ function renderTeamBar(team, el, showTypes = false) {
   });
 }
 
-function renderItemBadges(items) {
-  const el = document.getElementById('item-bar');
+function renderItemBadges(items, el, afterUse = null) {
+  if (!el) el = document.getElementById('item-bar');
   if (!el) return;
   el.innerHTML = '';
   if (items.length === 0) {
@@ -378,11 +365,15 @@ function renderItemBadges(items) {
 
     span.addEventListener('click', () => {
       if (it.usable) {
-        openUsableItemModal(it, idx);
+        openUsableItemModal(it, idx, afterUse);
       } else {
         openItemEquipModal(it, {
           fromBagIdx: idx,
-          onComplete: () => { renderItemBadges(state.items); renderTeamBar(state.team); },
+          onComplete: () => {
+            renderItemBadges(state.items);
+            renderTeamBar(state.team);
+            if (afterUse) afterUse();
+          },
         });
       }
     });
@@ -400,22 +391,10 @@ function renderBattleField(pTeam, eTeam) {
   const eActiveIdx = eTeam.findIndex(p => p.currentHp > 0);
 
   if (pEl) {
-    const showXp = typeof state !== 'undefined' && state.gen2Mode;
     pEl.innerHTML = pTeam.map((p, i) => {
       const fainted = p.currentHp <= 0;
       const active  = i === pActiveIdx;
-      let hpBlock;
-      if (showXp) {
-        const hpPct   = Math.min(1, Math.max(0, p.currentHp / p.maxHp));
-        const hpColor = hpBarColor(hpPct);
-        const hpBar   = `<div class="hp-bar-bg"><div class="hp-bar-fill" style="width:${Math.floor(hpPct*100)}%;background:${hpColor}"><div class="hp-bar-shadow"></div></div></div>`;
-        const xpBar   = renderXpBar(p.xp, p.level, getGrowthRate(p.speciesId));
-        const hpText  = `<span class="hp-text">${Math.max(0,p.currentHp)}/${p.maxHp}</span>`;
-        // Wrap HP+XP into a single stack so they sit flush; HP text follows below.
-        hpBlock = `<div class="hp-xp-stack">${hpBar}${xpBar}</div>${hpText}`;
-      } else {
-        hpBlock = renderHpBar(p.currentHp, p.maxHp);
-      }
+      const hpBlock = renderHpBar(p.currentHp, p.maxHp);
       return `<div class="battle-pokemon ${fainted?'fainted':''} ${active?'active-pokemon':''}" data-idx="${i}">
         <div class="battle-poke-name">${p.nickname||p.name} Lv${p.level}</div>
         <div class="poke-hp">${hpBlock}</div>
@@ -2735,39 +2714,6 @@ async function animateBattleVisually(detailedLog, pTeamInit, eTeamInit) {
       addLogEntry(`${event.name} fainted!`, 'log-faint');
       await sleep(300);
 
-    } else if (event.type === 'xp_award') {
-      // Per-KO XP — only fired in gen 2 sims; no-op otherwise
-      if (typeof state !== 'undefined' && state.gen2Mode && event.livingIdxs.length > 0) {
-        const xpMult      = state._silverFight ? 2 : 1; // Silver fight: double XP
-        const yieldAmt    = xpYield(getBaseExperience(event.enemySpeciesId), event.enemyLevel) * xpMult;
-        const oldMaxHps   = event.livingIdxs.map(idx => state.team[idx].maxHp);
-        const dispCurHps  = event.livingIdxs.map(idx => pHp[idx].current);
-        const dispMaxHps  = event.livingIdxs.map(idx => pHp[idx].max);
-        const levelUps    = applyXpGain(state.team, event.livingIdxs, yieldAmt, 100, getGrowthRate, getBaseExperience);
-        // Apply level-up boosts to the animation HP tracker additively so the
-        // damaged proportion is preserved on the new (larger) scale.
-        for (let k = 0; k < event.livingIdxs.length; k++) {
-          const idx    = event.livingIdxs[k];
-          const newMax = state.team[idx].maxHp;
-          const delta  = newMax - oldMaxHps[k];
-          if (delta > 0) {
-            pBoost[idx]   += delta;
-            pHp[idx].max    = newMax;
-            pHp[idx].current = dispCurHps[k] + delta;
-            // Rewrite the level-up entry so the HP-bar grow animation starts
-            // from the damaged-and-displayed HP, not state.team's pre-battle
-            // value (which doesn't reflect mid-battle damage).
-            const lu = levelUps.find(e => e.idx === idx);
-            if (lu) {
-              lu.preHp     = dispCurHps[k];
-              lu.preMaxHp  = dispMaxHps[k];
-              lu.pokemon   = { ...lu.pokemon, currentHp: pHp[idx].current, maxHp: pHp[idx].max };
-            }
-          }
-        }
-        await animateLevelUp(levelUps);
-      }
-
     } else if (event.type === 'send_out') {
       const sideId = event.side === 'player' ? 'player-side' : 'enemy-side';
       // Clear previous active highlight on this side
@@ -3278,37 +3224,18 @@ async function checkAndEvolveTeam() {
 async function animateLevelUp(levelUps) {
   const pEl = document.getElementById('player-side');
   if (!pEl || levelUps.length === 0) return;
-  const sleep = ms => new Promise(r => setTimeout(r, ms / battleSpeedMultiplier));
 
   await Promise.all(levelUps.map(async (entry) => {
-    const { idx, pokemon, oldLevel, newLevel, oldXp, newXp, preHp, preMaxHp, segments, growth } = entry;
+    const { idx, pokemon, oldLevel, newLevel, preHp } = entry;
     const el = pEl.querySelector(`.battle-pokemon[data-idx="${idx}"]`);
     if (!el) return;
 
-    // ---- XP bar segments (gen 2) ----
-    const xpFill = el.querySelector('.xp-bar-fill');
-    const useXp  = xpFill && oldXp !== undefined && newXp !== undefined;
-    const FILL_MS  = 750;   // matches CSS transition (0.75s ease-out)
-    const FLASH_MS = 700;   // covers the level-up pulse animation length
-    const setFillPct = pct => { if (xpFill) xpFill.style.width = `${Math.max(0, Math.min(100, pct))}%`; };
-    const snapFillTo = pct => {
-      if (!xpFill) return;
-      const prev = xpFill.style.transition;
-      xpFill.style.transition = 'none';
-      setFillPct(pct);
-      void xpFill.offsetWidth; // force reflow so the snap takes effect before re-enabling
-      xpFill.style.transition = prev;
-    };
+    const FLASH_MS = 700;
     const setLevelLabel = lvl => {
       const nameEl = el.querySelector('.battle-poke-name');
       if (nameEl) nameEl.textContent = `${pokemon.nickname || pokemon.name} Lv${lvl}`;
     };
     const flashLevelText = async (lvl) => {
-      // Scale the CSS animation duration via custom properties so the bounce,
-      // flash, burst, and floating text all complete together — even in skip
-      // mode. The JS sleep below uses a small extra buffer so the CSS
-      // animation has fully finished before we strip the .level-up class
-      // (otherwise the sprite would freeze mid-jump).
       const animMs     = Math.round(FLASH_MS / battleSpeedMultiplier);
       const animTextMs = Math.round(900       / battleSpeedMultiplier);
       el.style.setProperty('--levelup-dur',      `${animMs}ms`);
@@ -3318,8 +3245,6 @@ async function animateLevelUp(levelUps) {
       lvText.className = 'level-up-text';
       lvText.textContent = `Lv ${lvl}!`;
       el.appendChild(lvText);
-      // Raw setTimeout (not the speed-scaled sleep) — we already scaled the
-      // CSS duration; this wait is in real ms with a tiny buffer.
       await new Promise(r => setTimeout(r, animMs + 40));
       el.classList.remove('level-up');
       lvText.remove();
@@ -3327,55 +3252,6 @@ async function animateLevelUp(levelUps) {
       el.style.removeProperty('--levelup-text-dur');
     };
 
-    if (useXp && (segments?.length || oldXp !== newXp)) {
-      let curXp = oldXp;
-      let curLvl = oldLevel;
-      for (const seg of segments || []) {
-        const span = Math.max(1, seg.xpCeiling - seg.xpFloor);
-        const fromPct = ((curXp - seg.xpFloor) / span) * 100;
-        // Set start position without animating (so we don't see a backwards jump).
-        snapFillTo(fromPct);
-        // Smooth fill to 100%.
-        setFillPct(100);
-        await sleep(FILL_MS);
-        // Snap to 0 and bump the level label, then start the flash.
-        // The next segment's fill (or the final partial fill) overlaps with
-        // the rest of the flash so we don't get a dead pause.
-        curLvl = seg.level;
-        snapFillTo(0);
-        setLevelLabel(curLvl);
-        const flashPromise = flashLevelText(curLvl);
-        curXp = seg.xpCeiling;
-        // If there are more segments, kick off the next fill in parallel
-        // with the flash; otherwise wait briefly then continue to final fill.
-        await sleep(120);
-        // Wait for the flash to finish before the next iteration so banners
-        // don't pile up on top of each other.
-        await flashPromise;
-      }
-      // Final partial fill toward newXp at the new level threshold.
-      const finalFloor   = xpForLevel(curLvl, growth || 'medium_fast');
-      const finalCeiling = xpForLevel(curLvl + 1, growth || 'medium_fast');
-      const finalSpan    = Math.max(1, finalCeiling - finalFloor);
-      const finalPct     = Math.min(100, Math.max(0, ((newXp - finalFloor) / finalSpan) * 100));
-      // Force a layout flush so the transition fires. In the level-up path
-      // the loop's snapFillTo already flushes layout each iteration; in the
-      // no-level-up path setFillPct would otherwise change width in the same
-      // frame as the initial render and the browser would skip the transition.
-      if (xpFill) void xpFill.offsetWidth;
-      setFillPct(finalPct);
-      await sleep(FILL_MS);
-
-      // After all level-up flashes, smoothly grow the HP bar to its new max.
-      // We interpolate both currentHp AND maxHp so the "X/Y" text doesn't
-      // snap to the new max before the bar visually fills.
-      if (newLevel > oldLevel && pokemon.currentHp > 0 && preMaxHp != null && pokemon.maxHp > preMaxHp) {
-        await animateHpBarFull(el, preHp ?? 0, preMaxHp, pokemon.currentHp, pokemon.maxHp, 500);
-      }
-      return;
-    }
-
-    // Legacy / non-XP path: flash banner per level reached, no XP-bar driving.
     if (pokemon.currentHp > 0 && pokemon.currentHp > (preHp ?? 0)) {
       await animateHpBar(el, preHp ?? 0, pokemon.currentHp, pokemon.maxHp, 400);
     }

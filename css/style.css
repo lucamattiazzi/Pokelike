@@ -515,33 +515,6 @@ h1, h2, .pixel-font {
 .hp-text { font-size: 11px; color: var(--text-dim); }
 .poke-hp { width: 100%; display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
 
-/* XP bar — gen 2 only, attached flush under the HP bar (80% the HP bar's width, centered) */
-.hp-xp-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0;
-}
-.hp-xp-stack .hp-bar-bg {
-  align-self: stretch;
-}
-.xp-bar-bg {
-  width: 80%;
-  align-self: center;
-  height: 3px;
-  background: #1a1a2a;
-  outline: 2px solid #000;
-  box-shadow: 2px 2px 0 0 #000;
-  overflow: hidden;
-  box-sizing: border-box;
-  margin-top: 1px;
-}
-.xp-bar-fill {
-  height: 100%;
-  background: #5390f7;
-  transition: width 0.75s cubic-bezier(0.25, 1, 0.5, 1);
-}
-
 /* ---- Team / Item Bars ---- */
 .hud-bars,
 .map-panels {
@@ -1067,6 +1040,35 @@ h1, h2, .pixel-font {
 }
 #transition-msg { font-family: 'Press Start 2P', monospace; font-size: clamp(10px,2.5vw,16px); color: var(--green); }
 #transition-sub { color: var(--text-dim); font-size: 14px; }
+
+/* ---- Elite Prep Screen ---- */
+#elite-prep-screen {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: radial-gradient(circle, var(--bg3) 0%, var(--bg) 70%);
+  overflow-y: auto;
+}
+#elite-prep-title { font-family: 'Press Start 2P', monospace; font-size: clamp(10px,2.2vw,14px); color: var(--green); text-align: center; }
+#elite-prep-sub   { color: var(--text-dim); font-size: 12px; text-align: center; margin-bottom: 4px; }
+.elite-prep-section { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 4px; }
+.elite-prep-section-label { font-family: 'Press Start 2P', monospace; font-size: 8px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+#elite-prep-enemy-team {
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+  background: rgba(0,0,0,0.35); border: 2px solid #000; padding: 8px;
+}
+.elite-prep-enemy-slot {
+  display: flex; flex-direction: column; align-items: center;
+  background: rgba(255,255,255,0.04); padding: 4px 6px; min-width: 64px;
+}
+.elite-prep-enemy-slot img { width: 48px; height: 48px; image-rendering: pixelated; }
+.elite-prep-enemy-slot .name { font-size: 9px; color: var(--text); margin-top: 2px; }
+.elite-prep-enemy-slot .lv   { font-size: 8px; color: var(--text-dim); }
+.elite-prep-enemy-slot .types { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; margin-top: 2px; }
+#elite-prep-player-team { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+#elite-prep-items { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; min-height: 22px; }
+#btn-elite-prep-continue { margin-top: 8px; }
 
 /* ---- Game Over Screen ---- */
 #gameover-screen {
