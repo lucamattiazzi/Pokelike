@@ -2738,7 +2738,8 @@ async function animateBattleVisually(detailedLog, pTeamInit, eTeamInit) {
     } else if (event.type === 'xp_award') {
       // Per-KO XP — only fired in gen 2 sims; no-op otherwise
       if (typeof state !== 'undefined' && state.gen2Mode && event.livingIdxs.length > 0) {
-        const yieldAmt    = xpYield(getBaseExperience(event.enemySpeciesId), event.enemyLevel);
+        const xpMult      = state._silverFight ? 2 : 1; // Silver fight: double XP
+        const yieldAmt    = xpYield(getBaseExperience(event.enemySpeciesId), event.enemyLevel) * xpMult;
         const oldMaxHps   = event.livingIdxs.map(idx => state.team[idx].maxHp);
         const dispCurHps  = event.livingIdxs.map(idx => pHp[idx].current);
         const dispMaxHps  = event.livingIdxs.map(idx => pHp[idx].max);

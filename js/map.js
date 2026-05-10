@@ -43,9 +43,10 @@ function weightedRandom(weights) {
 function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
   // Layer sizes: start(1), catch/battle(2), content, boss(1)
   const CONTENT_SIZES = [3, 4, 3, 4, 3, 2]; // layers 2–7
-  // In gen2Mode on Silver maps, Silver replaces the last content layer (no extra depth added)
+  // Silver shows up as an optional node on these gen2 maps. Players who want
+  // the bonus XP can route through him; others can take a different path.
   const hasSilverNode = gen2Mode && [1, 3, 5, 7, 10, 13, 15].includes(mapIndex);
-  const contentCount  = hasSilverNode ? CONTENT_SIZES.length - 1 : CONTENT_SIZES.length;
+  const contentCount  = CONTENT_SIZES.length;
   const bossLayerIdx  = 2 + CONTENT_SIZES.length;
   const bossId        = `n${bossLayerIdx}_0`;
 
@@ -155,10 +156,23 @@ function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
     layers.push(layer);
   }
 
-  // Silver node replaces the last content layer slot (gen2Mode only on select maps)
+  // Silver node: place him as an optional alternative inside one of the
+  // content layers (skip layer 1 which is fixed, and the last content layer
+  // which keeps the Pokecenter guarantee). Players can route around him.
   if (hasSilverNode) {
-    const silverLayerIdx = 2 + contentCount;
-    layers.push([makeNode(`n${silverLayerIdx}_0`, NODE_TYPES.SILVER, silverLayerIdx, 0)]);
+    const minCi = 1;                         // layer 3+
+    const maxCi = contentCount - 2;          // skip last content layer
+    const silverCi = minCi + Math.floor(rng() * Math.max(1, maxCi - minCi + 1));
+    const silverLayer = layers[silverCi + 2];
+    if (silverLayer && silverLayer.length > 0) {
+      // Avoid replacing a forced Pokecenter
+      const candidates = silverLayer
+        .map((n, i) => n.type !== NODE_TYPES.POKECENTER ? i : -1)
+        .filter(i => i >= 0);
+      const slotIdx = candidates[Math.floor(rng() * candidates.length)] ?? 0;
+      silverLayer[slotIdx].type = NODE_TYPES.SILVER;
+      delete silverLayer[slotIdx].trainerSprite; // strip leftover trainer sprite if any
+    }
   }
 
   // Boss layer
@@ -648,23 +662,28 @@ function getNodeIcon(node) {
 
 function getSilverHoverLabel() {
   if (typeof SILVER_ENCOUNTERS === 'undefined') {
-    return 'Rival Silver — Win for +2 levels to all Pokémon!';
+    return 'Rival Silver — Optional · Double XP';
   }
-  const beaten     = (typeof state !== 'undefined' && state.silverBeaten) || 0;
-  const idx        = Math.min(beaten, SILVER_ENCOUNTERS.length - 1);
-  const data       = SILVER_ENCOUNTERS[idx];
+  // Encounter scales to the current map slot, not the win count, so skipping
+  // earlier Silver fights doesn't trivialize a later one.
+  const SILVER_ENC_BY_MAP = { 1: 0, 3: 1, 5: 2, 7: 3, 10: 4, 13: 5, 15: 6 };
+  const mapIdx     = (typeof state !== 'undefined') ? state.currentMap : 1;
+  const idx        = SILVER_ENC_BY_MAP[mapIdx] ?? 0;
+  const data       = SILVER_ENCOUNTERS[Math.min(idx, SILVER_ENCOUNTERS.length - 1)];
   const team       = data.team.slice();
   const starterId  = typeof state !== 'undefined' ? state.starterSpeciesId : null;
   const starterArr = starterId && typeof SILVER_STARTER_LINES !== 'undefined' ? SILVER_STARTER_LINES[starterId] : null;
   if (starterArr && team.length) {
-    const stage  = idx < 2 ? 1 : 2;
+    const stage  = idx < 1 ? 0 : idx < 3 ? 1 : 2;
     const last   = team[team.length - 1];
     team[team.length - 1] = { ...starterArr[stage], level: last.level };
   }
   const teamHtml = team.map(p =>
     `<div style="color:#ccc;font-size:9px;">${p.name} <span style="color:#aaa;">Lv${p.level}</span></div>`
   ).join('');
-  return `<div style="font-weight:bold;margin-bottom:4px;">Rival Silver</div>${teamHtml}`;
+  return `<div style="font-weight:bold;margin-bottom:2px;">Rival Silver</div>` +
+         `<div style="color:#ffd76b;font-size:9px;margin-bottom:4px;">Optional · Double XP</div>` +
+         teamHtml;
 }
 
 function getNodeLabel(node) {

@@ -845,7 +845,13 @@ async function doRed() {
 }
 
 async function doSilverNode(node) {
-  const encounterIdx = Math.min(state.silverBeaten || 0, SILVER_ENCOUNTERS.length - 1);
+  // Encounter index is keyed off the current map so skipping earlier Silver
+  // fights doesn't make a later one trivial.
+  const SILVER_ENC_BY_MAP = { 1: 0, 3: 1, 5: 2, 7: 3, 10: 4, 13: 5, 15: 6 };
+  const encounterIdx = Math.min(
+    SILVER_ENC_BY_MAP[state.currentMap] ?? (state.silverBeaten || 0),
+    SILVER_ENCOUNTERS.length - 1,
+  );
   const silverData = SILVER_ENCOUNTERS[encounterIdx];
   silverData.team.forEach(p => {
     fetchPokemonById(p.speciesId);
@@ -868,17 +874,14 @@ async function doSilverNode(node) {
   }
   showScreen('battle-screen');
   document.getElementById('battle-title').textContent = 'Silver wants to battle!';
-  document.getElementById('battle-subtitle').textContent = 'Rival Battle — Win for +3 levels to all!';
+  document.getElementById('battle-subtitle').textContent = 'Rival Battle — Optional · Double XP';
+  // Tell the per-KO XP system to double Silver's yield for this fight only.
+  state._silverFight = true;
   const won = await new Promise(resolve => {
     runBattleScreen(enemyTeam, true, () => resolve(true), () => resolve(false), 'silver');
   });
+  state._silverFight = false;
   if (!won) { showGameOver(); return; }
-  for (const p of state.team) {
-    p.level = Math.min(100, p.level + 2);
-    p.xp = Math.max(p.xp ?? 0, xpForLevel(p.level, getGrowthRate(p.speciesId)));
-    p.maxHp = calcHp(p.baseStats.hp, p.level);
-    if (p.currentHp < p.maxHp) p.currentHp = p.maxHp;
-  }
   state.silverBeaten = (state.silverBeaten || 0) + 1;
   advanceFromNode(state.map, node.id);
   showMapScreen();
