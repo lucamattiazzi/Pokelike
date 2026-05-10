@@ -123,19 +123,20 @@ h1, h2, .pixel-font {
   gap: 12px;
 }
 .gen-btn {
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: 'Press Start 2P', monospace;
-  font-size: 14px;
+  font-size: 11px;
   background: #1a1a1a;
   color: #555;
   border: 2px solid #3a3a3a;
   cursor: pointer;
   transition: all 0.15s;
   letter-spacing: 0;
+  padding: 0;
 }
 .gen-btn:hover { color: #bbb; border-color: #666; }
 .gen-btn[data-gen="1"].gen-btn--active {
