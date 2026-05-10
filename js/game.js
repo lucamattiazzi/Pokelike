@@ -1724,8 +1724,8 @@ function doMoveTutorNode(node) {
   const rows = state.team.map((p, i) => {
     const tier = p.moveTier ?? 1;
     const maxed = tier >= 2;
-    const currentMove = getBestMove(p.types || ['Normal'], p.baseStats, p.speciesId, tier);
-    const nextMove = !maxed ? getBestMove(p.types || ['Normal'], p.baseStats, p.speciesId, tier + 1) : null;
+    const currentMove = getBestMove(p.types || ['Normal'], p.baseStats, p.speciesId, tier, p.heldItem);
+    const nextMove = !maxed ? getBestMove(p.types || ['Normal'], p.baseStats, p.speciesId, tier + 1, p.heldItem) : null;
     const tierLabel = ['Tier 1', 'Tier 2', 'Mastered'][tier];
     return `<div class="equip-pokemon-row" style="${maxed ? 'opacity:0.45;' : ''}">
       <img src="${p.spriteUrl}" class="equip-poke-sprite" onerror="this.style.display='none'">
@@ -1767,7 +1767,7 @@ function doMoveTutorNode(node) {
       const idx = parseInt(btn.dataset.tutor);
       const pokemon = state.team[idx];
       pokemon.moveTier = Math.min(2, (pokemon.moveTier ?? 1) + 1);
-      const newMove = getBestMove(pokemon.types || ['Normal'], pokemon.baseStats, pokemon.speciesId, pokemon.moveTier);
+      const newMove = getBestMove(pokemon.types || ['Normal'], pokemon.baseStats, pokemon.speciesId, pokemon.moveTier, pokemon.heldItem);
       modal.remove();
       advanceFromNode(state.map, node.id);
       showMapScreen();

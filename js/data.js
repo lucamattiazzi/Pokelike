@@ -156,11 +156,23 @@ function getMoveТierForMap(mapIndex) {
   return mapIndex <= 2 ? 0 : 1;
 }
 
-function getBestMove(types, baseStats, speciesId, moveTier = 1) {
+function getBestMove(types, baseStats, speciesId, moveTier = 1, heldItem = null) {
   if (speciesId === 129) return { name: 'Splash',   power: 0, type: 'Normal', isSpecial: false, noDamage: true };
   if (speciesId === 63)  return { name: 'Teleport', power: 0, type: 'Normal', isSpecial: false, noDamage: true };
   const isSpecial = (baseStats?.special || 0) >= (baseStats?.atk || 0);
   const tier = Math.max(0, Math.min(2, moveTier ?? 1));
+  // Metronome: dual-type holder uses an attack of the same tier from its OTHER
+  // type — the one the default picker would skip (e.g. Normal in Normal/X, or
+  // the second type in non-Normal pairs).
+  if (heldItem?.id === 'metronome' && types && types.length >= 2) {
+    const defaultIdx = (types[0].toLowerCase() === 'normal' && types.length > 1) ? 1 : 0;
+    const otherIdx   = defaultIdx === 0 ? 1 : 0;
+    const cap = types[otherIdx].charAt(0).toUpperCase() + types[otherIdx].slice(1).toLowerCase();
+    if (MOVE_POOL[cap]) {
+      const move = isSpecial ? MOVE_POOL[cap].special[tier] : MOVE_POOL[cap].physical[tier];
+      return { ...move, type: cap, isSpecial };
+    }
+  }
   if ([74, 75, 76, 95].includes(speciesId)) {
     const move = MOVE_POOL['Rock'][isSpecial ? 'special' : 'physical'][tier];
     return { ...move, type: 'Rock', isSpecial };
@@ -578,10 +590,10 @@ const ITEM_POOL = [
   { id: 'lucky_egg',          name: 'Lucky Egg',          desc: '30% chance: holder gains +1 extra level after each battle',        icon: '🥚', minMap: 4 },
   { id: 'life_orb',           name: 'Life Orb',           desc: '+30% damage; holder loses 10% max HP per hit',                       icon: '🔮' },
   { id: 'choice_band',        name: 'Choice Band',        desc: '+40% physical damage, -20% DEF',                                     icon: '🎀' },
-  { id: 'choice_specs',       name: 'Choice Specs',       desc: '+40% special damage, -20% Sp.Def',                                   icon: '👓' },
-  { id: 'muscle_band',         name: 'Muscle Band',        desc: '+50% ATK & DEF if 4+ Pokémon on your team are physical attackers', icon: '💪' },
+  { id: 'choice_specs',       name: 'Choice Specs',       desc: '+30% special damage',                                                icon: '👓' },
+  { id: 'muscle_band',         name: 'Muscle Band',        desc: '+30% physical damage',                                              icon: '💪' },
   { id: 'wise_glasses',       name: 'Wise Glasses',       desc: '+50% Sp.Atk & Sp.Def if 4+ Pokémon on your team are special attackers', icon: '🔍' },
-  { id: 'metronome',          name: 'Metronome',          desc: '+50% damage if 4+ Pokémon on your team share a type with the attacker', icon: '🎵' },
+  { id: 'metronome',          name: 'Metronome',          desc: 'Dual-type holder uses an attack of the same tier from its OTHER type', icon: '🎵' },
   { id: 'scope_lens',         name: 'Scope Lens',         desc: '20% crit chance (+50% damage on crit)',                              icon: '🔭' },
   { id: 'rocky_helmet',       name: 'Rocky Helmet',       desc: 'Attacker takes 12% of their max HP on each hit',                     icon: '⛑️' },
   { id: 'shell_bell',         name: 'Shell Bell',         desc: 'Heal 15% of damage dealt',                                           icon: '🐚' },
@@ -605,11 +617,10 @@ const ITEM_POOL = [
   { id: 'choice_scarf',       name: 'Choice Scarf',       desc: '+50% Speed',                                                         icon: '🧣' },
   // Battle effect items
   { id: 'leftovers',          name: 'Leftovers',          desc: 'Restore 10% max HP each round',                                      icon: '🍃' },
-  { id: 'expert_belt',        name: 'Expert Belt',        desc: '+30% damage on super effective hits',                                 icon: '🥊' },
-  { id: 'focus_band',         name: 'Focus Band',         desc: '20% chance to survive a KO with 1 HP',                               icon: '🩹' },
+  { id: 'expert_belt',        name: 'Expert Belt',        desc: '+100% damage on super effective hits',                                icon: '🥊' },
   { id: 'focus_sash',         name: 'Focus Sash',         desc: 'If at full HP, guaranteed to survive any hit with 1 HP',             icon: '🎗️' },
   { id: 'wide_lens',          name: 'Wide Lens',          desc: '+20% damage on all moves',                                            icon: '🔎' },
-  { id: 'air_balloon',        name: 'Air Balloon',        desc: 'Immune to Ground-type moves',                                         icon: '🎈' },
+  { id: 'quick_claw',         name: 'Quick Claw',         desc: '50% chance to attack first regardless of speed',                     icon: '🪝' },
 ];
 
 const USABLE_ITEM_POOL = [

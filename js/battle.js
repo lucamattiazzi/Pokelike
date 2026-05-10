@@ -56,25 +56,20 @@ function calcDamage(attacker, defender, move, items, defItems = []) {
 
   // Physical/special split items
   if (isSpecial) {
-    if (hasItem(items, 'choice_specs'))  damage = Math.floor(damage * 1.4);
-  } else {
-    if (hasItem(items, 'choice_band'))   damage = Math.floor(damage * 1.4);
-  }
-
-  // Adaptability Band: +50% if every Pokémon on the team shares a type
-  if (hasItem(items, 'metronome')) {
-    const team = typeof state !== 'undefined' ? state.team : [];
-    if (team.length > 0) {
-      const sharedType = (attacker.types || []).find(t => {
-        const count = team.filter(p => (p.types || []).some(pt => pt.toLowerCase() === t.toLowerCase())).length;
-        return count >= 4;
-      });
-      if (sharedType) damage = Math.floor(damage * 1.5);
+    if (hasItem(items, 'choice_specs')) damage = Math.floor(damage * 1.3);
+    if (hasItem(items, 'wise_glasses')) {
+      const team = typeof state !== 'undefined' ? state.team : [];
+      const allSpecial = team.length > 0 && team.filter(p => (p.baseStats?.special || 0) >= (p.baseStats?.atk || 0)).length >= 4;
+      // wise_glasses still keeps its team-wide def buff in getEffectiveStat;
+      // no extra damage multiplier here.
+      void allSpecial;
     }
+  } else {
+    if (hasItem(items, 'choice_band')) damage = Math.floor(damage * 1.4);
+    if (hasItem(items, 'muscle_band')) damage = Math.floor(damage * 1.3);
   }
 
-  if (hasItem(items, 'expert_belt') && typeEff >= 2) damage = Math.floor(damage * 1.3);
-  if (hasItem(defItems, 'air_balloon') && moveType.toLowerCase() === 'ground') damage = 0;
+  if (hasItem(items, 'expert_belt') && typeEff >= 2) damage = Math.floor(damage * 2.0);
 
   // Crit chance: 6.25% base, +20% with scope_lens or razor_claw
   let critChance = 0.0625;
@@ -98,17 +93,11 @@ function getEffectiveStat(pokemon, stat, items, stages = null) {
   if (buffCount > 0) val = Math.floor(val * (1 + 0.1 * buffCount));
 
   const team = typeof state !== 'undefined' ? state.team : [];
-  const physicalCount = team.filter(p => (p.baseStats?.atk || 0) > (p.baseStats?.special || 0)).length;
   const specialCount  = team.filter(p => (p.baseStats?.special || 0) >= (p.baseStats?.atk || 0)).length;
-  const allPhysical = team.length > 0 && physicalCount >= 4;
-  const allSpecial  = team.length > 0 && specialCount  >= 4;
+  const allSpecial    = team.length > 0 && specialCount >= 4;
 
-  if (stat === 'atk') {
-    if (hasItem(items, 'muscle_band') && allPhysical) val = Math.floor(val * 1.5);
-  }
   if (stat === 'def') {
     if (hasItem(items, 'eviolite') && canEvolve(pokemon.speciesId)) val = Math.floor(val * 1.5);
-    if (hasItem(items, 'muscle_band') && allPhysical) val = Math.floor(val * 1.5);
     if (hasItem(items, 'choice_band'))                   val = Math.floor(val * 0.8);
   }
   if (stat === 'special') {
@@ -118,7 +107,6 @@ function getEffectiveStat(pokemon, stat, items, stages = null) {
     if (hasItem(items, 'eviolite') && canEvolve(pokemon.speciesId)) val = Math.floor(val * 1.5);
     if (hasItem(items, 'assault_vest'))                  val = Math.floor(val * 1.5);
     if (hasItem(items, 'wise_glasses') && allSpecial)    val = Math.floor(val * 1.5);
-    if (hasItem(items, 'choice_specs'))                  val = Math.floor(val * 0.8);
   }
   if (stat === 'speed') {
     if (hasItem(items, 'choice_scarf')) val = Math.floor(val * 1.5);
@@ -218,11 +206,18 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
     const eSpeed = getEffectiveStat(eActive, 'speed', eActiveItems, eActive.stages);
 
     // If both active Pokemon can only use noDamage moves, force Struggle to break the stalemate
-    const pMove = getBestMove(pActive.types || ['Normal'], pActive.baseStats, pActive.speciesId, pActive.moveTier ?? 1);
-    const eMove = getBestMove(eActive.types || ['Normal'], eActive.baseStats, eActive.speciesId, eActive.moveTier ?? 1);
+    const pMove = getBestMove(pActive.types || ['Normal'], pActive.baseStats, pActive.speciesId, pActive.moveTier ?? 1, pActive.heldItem);
+    const eMove = getBestMove(eActive.types || ['Normal'], eActive.baseStats, eActive.speciesId, eActive.moveTier ?? 1, eActive.heldItem);
     const bothUseless = pMove.noDamage && eMove.noDamage;
 
-    const playerFirst = pSpeed >= eSpeed;
+    // Quick Claw: 50% chance to attack first regardless of speed. If both
+    // sides roll, fall back to normal speed comparison.
+    const pQuick = pActive.heldItem?.id === 'quick_claw' && rng() < 0.5;
+    const eQuick = eActive.heldItem?.id === 'quick_claw' && rng() < 0.5;
+    let playerFirst;
+    if (pQuick && !eQuick)      playerFirst = true;
+    else if (eQuick && !pQuick) playerFirst = false;
+    else                         playerFirst = pSpeed >= eSpeed;
     const turns = playerFirst
       ? [{ attacker: pActive, aIdx: pIdx, side: 'player', target: eActive, tIdx: eIdx, tSide: 'enemy' },
          { attacker: eActive, aIdx: eIdx, side: 'enemy',  target: pActive, tIdx: pIdx, tSide: 'player' }]
@@ -259,7 +254,7 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
         }
       }
 
-      let move = getBestMove(attacker.types || ['Normal'], attacker.baseStats, attacker.speciesId, attacker.moveTier ?? 1);
+      let move = getBestMove(attacker.types || ['Normal'], attacker.baseStats, attacker.speciesId, attacker.moveTier ?? 1, attacker.heldItem);
       // If both sides are stuck with useless moves, force Struggle on both
       if (bothUseless) {
         move = { name: 'Struggle', power: 50, type: 'Normal', isSpecial: false, typeless: true };
@@ -292,10 +287,6 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
       const targetPreHp = target.currentHp;
       target.currentHp = Math.max(0, target.currentHp - damage);
 
-      // Focus Band: 20% chance to survive a KO at 1 HP
-      if (target.currentHp === 0 && targetPreHp > 0 && tSide === 'player' && target.heldItem?.id === 'focus_band' && rng() < 0.2) {
-        target.currentHp = 1;
-      }
       // Focus Sash: guaranteed survive from full HP
       if (target.currentHp === 0 && targetPreHp === target.maxHp && tSide === 'player' && target.heldItem?.id === 'focus_sash') {
         target.currentHp = 1;

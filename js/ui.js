@@ -240,7 +240,7 @@ function hideTeamHoverCard() {
 }
 
 function getMoveForPokemon(pokemon) {
-  return getBestMove(pokemon.types || ['Normal'], pokemon.baseStats, pokemon.speciesId, pokemon.moveTier ?? 1);
+  return getBestMove(pokemon.types || ['Normal'], pokemon.baseStats, pokemon.speciesId, pokemon.moveTier ?? 1, pokemon.heldItem);
 }
 
 let _dragIdx = null;
