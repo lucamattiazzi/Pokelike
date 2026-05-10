@@ -612,6 +612,9 @@ const ITEM_POOL = [
   { id: 'poison_barb',        name: 'Poison Barb',        desc: '+50% Poison move damage',                                            icon: '☠️', minMap: 4 },
   { id: 'spell_tag',          name: 'Spell Tag',          desc: '+50% Ghost move damage',                                             icon: '👻', minMap: 4 },
   { id: 'silk_scarf',         name: 'Silk Scarf',         desc: '+50% Normal move damage',                                            icon: '🤍' },
+  { id: 'metal_coat',         name: 'Metal Coat',         desc: '+50% Steel move damage',                                             icon: '🔩', minMap: 4 },
+  { id: 'black_glasses',      name: 'Black Glasses',      desc: '+50% Dark move damage',                                              icon: '🕶️', minMap: 4 },
+  { id: 'pixie_plate',        name: 'Pixie Plate',        desc: '+50% Fairy move damage',                                             icon: '🧚', minMap: 4 },
   // Stat items
   { id: 'assault_vest',       name: 'Assault Vest',       desc: '+50% Sp.Def',                                                        icon: '🦺' },
   { id: 'choice_scarf',       name: 'Choice Scarf',       desc: '+50% Speed',                                                         icon: '🧣' },
@@ -621,12 +624,18 @@ const ITEM_POOL = [
   { id: 'focus_sash',         name: 'Focus Sash',         desc: 'If at full HP, guaranteed to survive any hit with 1 HP',             icon: '🎗️' },
   { id: 'wide_lens',          name: 'Wide Lens',          desc: '+20% damage on all moves',                                            icon: '🔎' },
   { id: 'quick_claw',         name: 'Quick Claw',         desc: '50% chance to attack first regardless of speed',                     icon: '🪝' },
+  { id: 'king_stone',         name: "King's Rock",         desc: '30% chance to flinch the target on a hit',                          icon: '👑' },
+  { id: 'lagging_tail',       name: 'Lagging Tail',       desc: 'Always moves last, but +100% move damage',                            icon: '🐌' },
+  { id: 'weakness_policy',    name: 'Weakness Policy',    desc: 'On super-effective hit: permanent +1 ATK / +1 Sp.Atk buff',           icon: '📜' },
+  { id: 'red_card',           name: 'Red Card',           desc: 'Take 50% less damage from super-effective hits',                      icon: '🟥' },
 ];
 
 const USABLE_ITEM_POOL = [
   { id: 'max_revive',  name: 'Max Revive',       desc: 'Fully revives a fainted Pokémon',              icon: '💊', usable: true },
   { id: 'rare_candy',  name: 'Rare Candy',        desc: 'Gives a Pokémon +3 levels',                   icon: '🍬', usable: true },
   { id: 'moon_stone',  name: 'Moon Stone',        desc: 'Force evolves a Pokémon regardless of level',  icon: '🌙', usable: true },
+  { id: 'tm',          name: 'TM',                desc: "Upgrades a Pokémon's move tier by 1",          icon: '💿', usable: true },
+  { id: 'escape_rope', name: 'Escape Rope',       desc: 'Survive a non-boss loss with 1 HP instead of game over', icon: '🪢', usable: true },
 ];
 
 const TYPE_ITEM_MAP = {
@@ -634,6 +643,7 @@ const TYPE_ITEM_MAP = {
   Grass: 'miracle_seed', Psychic: 'twisted_spoon', Fighting: 'black_belt',
   Ground: 'soft_sand', Bug: 'silver_powder', Rock: 'hard_stone', Dragon: 'dragon_fang',
   Poison: 'poison_barb', Ghost: 'spell_tag', Normal: 'silk_scarf',
+  Steel: 'metal_coat', Dark: 'black_glasses', Fairy: 'pixie_plate',
 };
 
 // Bust stale pokemon species cache entries missing the 'special' stat

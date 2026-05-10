@@ -1291,9 +1291,11 @@ function doItemNode(node) {
     const evo = EVOLUTIONS[p.speciesId];
     return evo && evo.into !== p.speciesId;
   });
+  const canUseTm        = state.team.some(p => (p.moveTier ?? 1) < 2);
   const usableAvailable = USABLE_ITEM_POOL.filter(it => {
     if (it.id === 'max_revive') return canUseMaxRevive;
     if (it.id === 'moon_stone')  return canUseEvoStone;
+    if (it.id === 'tm')          return canUseTm;
     return true;
   });
 
@@ -1446,6 +1448,12 @@ function openItemEquipModal(item, { fromBagIdx = -1, fromPokemonIdx = -1, onComp
 }
 
 function openUsableItemModal(item, bagIdx) {
+  // Escape Rope auto-triggers from runBattleScreen on a non-boss loss; clicking
+  // it manually just informs the player so they don't accidentally consume it.
+  if (item.id === 'escape_rope') {
+    showMapNotification('🪢 Escape Rope auto-uses on a non-boss loss to save your run.');
+    return;
+  }
   document.getElementById('usable-item-modal')?.remove();
 
   const canTarget = p => {
@@ -1456,6 +1464,7 @@ function openUsableItemModal(item, bagIdx) {
       const evo = EVOLUTIONS[p.speciesId];
       return !!(evo && evo.into !== p.speciesId);
     }
+    if (item.id === 'tm') return p.currentHp > 0 && (p.moveTier ?? 1) < 2;
     return true;
   };
 
@@ -1518,6 +1527,13 @@ function openUsableItemModal(item, bagIdx) {
       } else if (item.id === 'moon_stone') {
         renderItemBadges(state.items);
         await applyEvolution(pokemon);
+
+      } else if (item.id === 'tm') {
+        pokemon.moveTier = Math.min(2, (pokemon.moveTier ?? 1) + 1);
+        const newMove = getBestMove(pokemon.types || ['Normal'], pokemon.baseStats, pokemon.speciesId, pokemon.moveTier, pokemon.heldItem);
+        showMapNotification(`${pokemon.nickname || pokemon.name} learned ${newMove.name}!`);
+        renderItemBadges(state.items);
+        renderTeamBar(state.team);
 
       }
     });
@@ -1701,6 +1717,13 @@ async function doLegendaryNode(node) {
   if (subEl) subEl.textContent = `Lv ${legendary.level} — Defeat it to add it to your team!`;
 
   await runBattleScreen([legendary], false, async () => {
+    // Escape Rope was used — skip the capture flow but keep the run going.
+    if (state._escapedViaRope) {
+      state._escapedViaRope = false;
+      advanceFromNode(state.map, node.id);
+      showMapScreen();
+      return;
+    }
     // Win — offer to add legendary to team
     const normalUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${legendary.speciesId}.png`;
     markPokedexCaught(legendary.speciesId, legendary.name, legendary.types, normalUrl);
@@ -1892,6 +1915,8 @@ async function doShinyNode(node) {
 // ---- Battle Screen ----
 
 function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, enemyItems = [], baseGainOverride = null, showPlayerPortrait = null, traitsConfig = null) {
+  // Clear stale Escape Rope flag from a previous battle.
+  state._escapedViaRope = false;
   // In endless mode, always apply traits — compute them if not pre-computed by the caller
   if (state.isEndlessMode && traitsConfig === null) {
     const tiers = computeTraitTiers(state.team);
@@ -2030,9 +2055,41 @@ function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, ene
       }
     } else {
       skipBtn.style.display = 'none';
-      document.getElementById('btn-continue-battle').style.display = 'block';
-      document.getElementById('btn-continue-battle').textContent = 'Continue...';
-      document.getElementById('btn-continue-battle').onclick = () => {
+      const continueBtnEl = document.getElementById('btn-continue-battle');
+      continueBtnEl.style.display = 'block';
+      continueBtnEl.textContent = 'Continue...';
+
+      // Escape Rope: on non-boss loss, offer to consume a rope and revive the
+      // last fainted slot at 1 HP instead of game-over.
+      const ropeIdx = (!isBoss && !state.isEndlessMode)
+        ? state.items.findIndex(it => it.id === 'escape_rope')
+        : -1;
+      if (ropeIdx !== -1) {
+        const ropeBtn = document.createElement('button');
+        ropeBtn.className = 'btn-primary';
+        ropeBtn.textContent = '🪢 Use Escape Rope';
+        ropeBtn.style.cssText = 'margin-left:8px;';
+        ropeBtn.onclick = () => {
+          state.items.splice(ropeIdx, 1);
+          // Revive the last team slot to 1 HP (the one that fainted last).
+          const reviveIdx = (() => {
+            for (let i = state.team.length - 1; i >= 0; i--) {
+              if (state.team[i].currentHp <= 0) return i;
+            }
+            return state.team.length - 1;
+          })();
+          if (state.team[reviveIdx]) state.team[reviveIdx].currentHp = 1;
+          renderTeamBar(state.team);
+          renderItemBadges(state.items);
+          state._escapedViaRope = true;
+          ropeBtn.remove();
+          continueBtnEl.textContent = 'Continue';
+          continueBtnEl.onclick = () => { if (onWin) onWin(); resolve(true); };
+        };
+        continueBtnEl.parentElement?.insertBefore(ropeBtn, continueBtnEl.nextSibling);
+      }
+
+      continueBtnEl.onclick = () => {
         if (onLose) onLose();
         resolve(false);
       };

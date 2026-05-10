@@ -69,7 +69,10 @@ function calcDamage(attacker, defender, move, items, defItems = []) {
     if (hasItem(items, 'muscle_band')) damage = Math.floor(damage * 1.3);
   }
 
+  if (hasItem(items, 'lagging_tail')) damage = Math.floor(damage * 2.0);
   if (hasItem(items, 'expert_belt') && typeEff >= 2) damage = Math.floor(damage * 2.0);
+  // Red Card: defender takes half damage from super-effective hits
+  if (hasItem(defItems, 'red_card') && typeEff >= 2) damage = Math.floor(damage * 0.5);
 
   // Crit chance: 6.25% base, +20% with scope_lens or razor_claw
   let critChance = 0.0625;
@@ -214,10 +217,15 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
     // sides roll, fall back to normal speed comparison.
     const pQuick = pActive.heldItem?.id === 'quick_claw' && rng() < 0.5;
     const eQuick = eActive.heldItem?.id === 'quick_claw' && rng() < 0.5;
+    // Lagging Tail: holder always moves last. If both sides have it, it cancels.
+    const pLagging = pActive.heldItem?.id === 'lagging_tail';
+    const eLagging = eActive.heldItem?.id === 'lagging_tail';
     let playerFirst;
-    if (pQuick && !eQuick)      playerFirst = true;
-    else if (eQuick && !pQuick) playerFirst = false;
-    else                         playerFirst = pSpeed >= eSpeed;
+    if (pLagging && !eLagging)      playerFirst = false;
+    else if (eLagging && !pLagging) playerFirst = true;
+    else if (pQuick && !eQuick)     playerFirst = true;
+    else if (eQuick && !pQuick)     playerFirst = false;
+    else                             playerFirst = pSpeed >= eSpeed;
     const turns = playerFirst
       ? [{ attacker: pActive, aIdx: pIdx, side: 'player', target: eActive, tIdx: eIdx, tSide: 'enemy' },
          { attacker: eActive, aIdx: eIdx, side: 'enemy',  target: pActive, tIdx: pIdx, tSide: 'player' }]
@@ -226,6 +234,16 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
 
     for (const { attacker, aIdx, side, target, tIdx, tSide } of turns) {
       if (attacker.currentHp <= 0 || target.currentHp <= 0) continue;
+
+      // King's Rock flinch: skip attacker's turn if it was flinched this round
+      if (attacker.flinch) {
+        addLog(`${attacker.nickname || attacker.name} flinched!`, side === 'player' ? 'log-player' : 'log-enemy');
+        detailedLog.push({ type: 'status_tick', side, idx: aIdx,
+          name: attacker.nickname || attacker.name, status: 'flinch',
+          hpChange: 0, hpAfter: attacker.currentHp });
+        attacker.flinch = false;
+        continue;
+      }
 
       // Frozen pokemon skip their attack turn
       if (attacker.status === 'freeze') {
@@ -290,6 +308,26 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
       // Focus Sash: guaranteed survive from full HP
       if (target.currentHp === 0 && targetPreHp === target.maxHp && tSide === 'player' && target.heldItem?.id === 'focus_sash') {
         target.currentHp = 1;
+      }
+
+      // King's Rock: 30% chance to flinch the target on a hit (only if target is still alive)
+      if (target.currentHp > 0 && hasItem(attackerItems, 'king_stone') && rng() < 0.3) {
+        target.flinch = true;
+      }
+
+      // Weakness Policy: super-effective hit grants persistent +1 ATK / +1 Sp.Atk
+      // (Battle Tower stat-buffs system). Applies to both the in-battle copy
+      // and state.team for player slots so the buff carries over between fights.
+      if (target.currentHp > 0 && typeEff >= 2 && target.heldItem?.id === 'weakness_policy') {
+        target.statBuffs = target.statBuffs || {};
+        target.statBuffs.atk     = Math.min(10, (target.statBuffs.atk     ?? 0) + 1);
+        target.statBuffs.special = Math.min(10, (target.statBuffs.special ?? 0) + 1);
+        if (tSide === 'player' && typeof state !== 'undefined' && state.team[tIdx]) {
+          const live = state.team[tIdx];
+          live.statBuffs = live.statBuffs || {};
+          live.statBuffs.atk     = Math.min(10, (live.statBuffs.atk     ?? 0) + 1);
+          live.statBuffs.special = Math.min(10, (live.statBuffs.special ?? 0) + 1);
+        }
       }
 
       const aName = attacker.nickname || attacker.name;
