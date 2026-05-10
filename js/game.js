@@ -67,13 +67,19 @@ async function initGame() {
   showScreen('title-screen');
   if (typeof initCloudSave === 'function') initCloudSave();
   if (typeof syncToCloud === 'function') syncToCloud();
-  // Generation toggle — selection is read when Normal/Nuzlocke is clicked.
-  let selectedGen = 1;
+  // Generation toggle — selection is read when Normal/Nuzlocke is clicked
+  // and persists across reloads via localStorage.
+  let selectedGen = Number(localStorage.getItem('poke_selected_gen')) === 2 ? 2 : 1;
+  const syncGenButtons = () => {
+    document.querySelectorAll('#gen-toggle .gen-btn').forEach(b =>
+      b.classList.toggle('gen-btn--active', Number(b.dataset.gen) === selectedGen));
+  };
+  syncGenButtons();
   document.querySelectorAll('#gen-toggle .gen-btn').forEach(btn => {
     btn.onclick = () => {
       selectedGen = Number(btn.dataset.gen) || 1;
-      document.querySelectorAll('#gen-toggle .gen-btn').forEach(b =>
-        b.classList.toggle('gen-btn--active', b === btn));
+      localStorage.setItem('poke_selected_gen', String(selectedGen));
+      syncGenButtons();
     };
   });
   document.getElementById('btn-new-run').onclick  = () => startNewRun(false, selectedGen === 2);
