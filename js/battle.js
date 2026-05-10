@@ -311,7 +311,7 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
       }
 
       // King's Rock: 30% chance to flinch the target on a hit (only if target is still alive)
-      if (target.currentHp > 0 && hasItem(attackerItems, 'king_stone') && rng() < 0.3) {
+      if (target.currentHp > 0 && hasItem(attackerItems, 'kings_rock') && rng() < 0.3) {
         target.flinch = true;
       }
 

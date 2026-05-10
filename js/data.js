@@ -624,7 +624,7 @@ const ITEM_POOL = [
   { id: 'focus_sash',         name: 'Focus Sash',         desc: 'If at full HP, guaranteed to survive any hit with 1 HP',             icon: '🎗️' },
   { id: 'wide_lens',          name: 'Wide Lens',          desc: '+20% damage on all moves',                                            icon: '🔎' },
   { id: 'quick_claw',         name: 'Quick Claw',         desc: '50% chance to attack first regardless of speed',                     icon: '🪝' },
-  { id: 'king_stone',         name: "King's Rock",         desc: '30% chance to flinch the target on a hit',                          icon: '👑' },
+  { id: 'kings_rock',         name: "King's Rock",         desc: '30% chance to flinch the target on a hit',                          icon: '👑' },
   { id: 'lagging_tail',       name: 'Lagging Tail',       desc: 'Always moves last, but +100% move damage',                            icon: '🐌' },
   { id: 'adrenaline_orb',     name: 'Adrenaline Orb',     desc: 'When YOU land a SUPER-EFFECTIVE hit (×2+): +1 ATK / +1 Sp.Atk this battle', icon: '⚡' },
   { id: 'red_card',           name: 'Red Card',           desc: 'Take 50% less damage from super-effective hits',                      icon: '🟥' },
