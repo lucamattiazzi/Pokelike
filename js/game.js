@@ -688,9 +688,11 @@ function getLevelForNode(node) {
     const spread = Math.max(1, Math.round((maxL - minL) / 8));
     return Math.min(maxL, Math.max(minL, base + Math.floor(rng() * spread)));
   }
-  // Normal mode (original behaviour)
+  // Normal mode: spread levels evenly across layers 1..7 (highest non-boss layer).
+  // Old formula divided by 3 (gen2) / 5 (non-gen2), which front-loaded the curve
+  // and clustered the last 3-4 layers at the cap (e.g. 1,3,4,5,5,5 for a 1-5 map).
   const [minL, maxL] = (state.gen2Mode ? GEN2_MAP_LEVEL_RANGES : MAP_LEVEL_RANGES)[state.currentMap];
-  const t = Math.min(1, Math.max(0, (node.layer - 1) / (state.gen2Mode ? 3 : 5))); // gen2: 4 content layers, normal: 6
+  const t = Math.min(1, Math.max(0, (node.layer - 1) / 6));
   const base = Math.round(minL + t * (maxL - minL));
   const spread = Math.max(1, Math.round((maxL - minL) / 8));
   return Math.min(maxL, Math.max(minL, base + Math.floor(rng() * spread)));
