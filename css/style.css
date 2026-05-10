@@ -139,18 +139,8 @@ h1, h2, .pixel-font {
   padding: 0;
 }
 .gen-btn:hover { color: #bbb; border-color: #666; }
-.gen-btn[data-gen="1"].gen-btn--active {
-  color: #ff4d4d;
-  border-color: #ff4d4d;
-  box-shadow: 0 0 10px rgba(255, 77, 77, 0.55);
-  text-shadow: 0 0 6px rgba(255, 77, 77, 0.6);
-}
-.gen-btn[data-gen="2"].gen-btn--active {
-  color: #ffc833;
-  border-color: #ffc833;
-  box-shadow: 0 0 10px rgba(255, 200, 51, 0.55);
-  text-shadow: 0 0 6px rgba(255, 200, 51, 0.6);
-}
+.gen-btn[data-gen="1"].gen-btn--active { color: #ff4d4d; border-color: #ff4d4d; }
+.gen-btn[data-gen="2"].gen-btn--active { color: #ffc833; border-color: #ffc833; }
 
 
 
