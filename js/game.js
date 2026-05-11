@@ -819,8 +819,10 @@ async function doSilverNode(node) {
     SILVER_ENCOUNTERS.length - 1,
   );
   const silverData = SILVER_ENCOUNTERS[encounterIdx];
+  // Move tier scales with the current map so enc 0 isn't slammed with T2 moves.
+  const silverTier = getMoveТierForMap(state.currentMap);
   const enemyTeam = silverData.team.map(p => ({
-    ...createInstance(p, p.level, false, 2),
+    ...createInstance(p, p.level, false, silverTier),
     heldItem: p.heldItem || null,
   }));
   const starterLine = SILVER_STARTER_LINES[state.starterSpeciesId];
@@ -831,7 +833,7 @@ async function doSilverNode(node) {
     const evolvedId = resolveEvoForLevel(starterLine[0].speciesId, lvl);
     const stageIdx = Math.max(0, starterLine.findIndex(s => s.speciesId === evolvedId));
     const starterSpecies = starterLine[stageIdx];
-    enemyTeam[lastIdx] = { ...createInstance(starterSpecies, lvl, false, 2), heldItem: starterSpecies.heldItem || null };
+    enemyTeam[lastIdx] = { ...createInstance(starterSpecies, lvl, false, silverTier), heldItem: starterSpecies.heldItem || null };
   }
   showScreen('battle-screen');
   document.getElementById('battle-title').textContent = 'Silver wants to battle!';

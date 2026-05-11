@@ -161,18 +161,6 @@ function getBestMove(types, baseStats, speciesId, moveTier = 1, heldItem = null)
   if (speciesId === 63)  return { name: 'Teleport', power: 0, type: 'Normal', isSpecial: false, noDamage: true };
   const isSpecial = (baseStats?.special || 0) >= (baseStats?.atk || 0);
   const tier = Math.max(0, Math.min(2, moveTier ?? 1));
-  // Metronome: dual-type holder uses an attack of the same tier from its OTHER
-  // type — the one the default picker would skip (e.g. Normal in Normal/X, or
-  // the second type in non-Normal pairs).
-  if (heldItem?.id === 'metronome' && types && types.length >= 2) {
-    const defaultIdx = (types[0].toLowerCase() === 'normal' && types.length > 1) ? 1 : 0;
-    const otherIdx   = defaultIdx === 0 ? 1 : 0;
-    const cap = types[otherIdx].charAt(0).toUpperCase() + types[otherIdx].slice(1).toLowerCase();
-    if (MOVE_POOL[cap]) {
-      const move = isSpecial ? MOVE_POOL[cap].special[tier] : MOVE_POOL[cap].physical[tier];
-      return { ...move, type: cap, isSpecial };
-    }
-  }
   if ([74, 75, 76, 95].includes(speciesId)) {
     const move = MOVE_POOL['Rock'][isSpecial ? 'special' : 'physical'][tier];
     return { ...move, type: 'Rock', isSpecial };
@@ -426,33 +414,33 @@ const JOHTO_GYM_LEADERS = [
 const SILVER_ENCOUNTERS = [
   // Map 1 — enc 0: starter 1st evo replaces last slot; map max=20, Silver ace=18
   { team: [
-    { speciesId: 92,  name: 'Gastly',    types: ['Ghost','Poison'],  baseStats: { hp:30, atk:35, def:30, speed:80,  special:100 }, level: 13 },
-    { speciesId: 41,  name: 'Zubat',     types: ['Poison','Flying'], baseStats: { hp:40, atk:45, def:35, speed:55,  special:40  }, level: 16 },
-    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 16 },
+    { speciesId: 92,  name: 'Gastly',    types: ['Ghost','Poison'],  baseStats: { hp:30, atk:35, def:30, speed:80,  special:100 }, level: 15 },
+    { speciesId: 41,  name: 'Zubat',     types: ['Poison','Flying'], baseStats: { hp:40, atk:45, def:35, speed:55,  special:40  }, level: 17 },
+    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 17 },
   ]},
   // Map 3 — enc 1: starter evo replaces last slot; map max=40, Silver ace=38
   { team: [
-    { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45,  speed:95,  special:115 }, level: 34 },
-    { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85, atk:90, def:80,  speed:130, special:70  }, level: 34 },
-    { speciesId: 82,  name: 'Magneton',  types: ['Electric','Steel'],baseStats: { hp:50, atk:60, def:95,  speed:70,  special:120 }, level: 32 },
-    { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45,  speed:95,  special:115 }, level: 34 },
-    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43,  speed:65,  special:60  }, level: 38 },
+    { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45,  speed:95,  special:115 }, level: 35 },
+    { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85, atk:90, def:80,  speed:130, special:70  }, level: 35 },
+    { speciesId: 82,  name: 'Magneton',  types: ['Electric','Steel'],baseStats: { hp:50, atk:60, def:95,  speed:70,  special:120 }, level: 33 },
+    { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45,  speed:95,  special:115 }, level: 35 },
+    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43,  speed:65,  special:60  }, level: 39 },
   ]},
   // Map 5 — enc 2: starter evo replaces last slot; map max=60, Silver ace=58
   { team: [
-    { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85, atk:90, def:80, speed:130, special:70  }, level: 53 },
-    { speciesId: 462, name: 'Magnezone', types: ['Electric','Steel'],baseStats: { hp:70, atk:70, def:115,speed:60,  special:130 }, level: 56 },
-    { speciesId: 94,  name: 'Gengar',    types: ['Ghost','Poison'],  baseStats: { hp:60, atk:65, def:60, speed:110, special:130 }, level: 53 },
-    { speciesId: 461, name: 'Weavile',   types: ['Dark','Ice'],      baseStats: { hp:70, atk:120,def:65, speed:125, special:45  }, level: 56 },
-    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 58 },
+    { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85, atk:90, def:80, speed:130, special:70  }, level: 54 },
+    { speciesId: 462, name: 'Magnezone', types: ['Electric','Steel'],baseStats: { hp:70, atk:70, def:115,speed:60,  special:130 }, level: 57 },
+    { speciesId: 94,  name: 'Gengar',    types: ['Ghost','Poison'],  baseStats: { hp:60, atk:65, def:60, speed:110, special:130 }, level: 54 },
+    { speciesId: 461, name: 'Weavile',   types: ['Dark','Ice'],      baseStats: { hp:70, atk:120,def:65, speed:125, special:45  }, level: 57 },
+    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 59 },
   ]},
   // Map 7 — enc 3: starter evo replaces last slot; map max=80, Silver ace=78
   { team: [
-    { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85, atk:90, def:80, speed:130, special:70  }, level: 74 },
-    { speciesId: 462, name: 'Magnezone', types: ['Electric','Steel'],baseStats: { hp:70, atk:70, def:115,speed:60,  special:130 }, level: 72 },
-    { speciesId: 94,  name: 'Gengar',    types: ['Ghost','Poison'],  baseStats: { hp:60, atk:65, def:60, speed:110, special:130 }, level: 74 },
-    { speciesId: 461, name: 'Weavile',   types: ['Dark','Ice'],      baseStats: { hp:70, atk:120,def:65, speed:125, special:45  }, level: 76 },
-    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 78 },
+    { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85, atk:90, def:80, speed:130, special:70  }, level: 75 },
+    { speciesId: 462, name: 'Magnezone', types: ['Electric','Steel'],baseStats: { hp:70, atk:70, def:115,speed:60,  special:130 }, level: 73 },
+    { speciesId: 94,  name: 'Gengar',    types: ['Ghost','Poison'],  baseStats: { hp:60, atk:65, def:60, speed:110, special:130 }, level: 75 },
+    { speciesId: 461, name: 'Weavile',   types: ['Dark','Ice'],      baseStats: { hp:70, atk:120,def:65, speed:125, special:45  }, level: 77 },
+    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 79 },
   ]},
 ];
 
@@ -483,7 +471,7 @@ const ITEM_POOL = [
   { id: 'choice_band',        name: 'Choice Band',        desc: '+40% physical damage, -20% DEF',                                     icon: '🎀' },
   { id: 'choice_specs',       name: 'Choice Specs',       desc: '+30% special damage',                                                icon: '👓' },
   { id: 'muscle_band',         name: 'Muscle Band',        desc: '+30% physical damage',                                              icon: '💪' },
-  { id: 'metronome',          name: 'Metronome',          desc: 'Dual-type holder uses an attack of the same tier from its OTHER type', icon: '🎵' },
+  { id: 'metronome',          name: 'Metronome',          desc: '+25% damage on all moves',                                            icon: '🎵' },
   { id: 'scope_lens',         name: 'Scope Lens',         desc: '20% crit chance (+50% damage on crit)',                              icon: '🔭' },
   { id: 'rocky_helmet',       name: 'Rocky Helmet',       desc: 'Attacker takes 12% of their max HP on each hit',                     icon: '⛑️' },
   { id: 'shell_bell',         name: 'Shell Bell',         desc: 'Heal 15% of damage dealt',                                           icon: '🐚' },

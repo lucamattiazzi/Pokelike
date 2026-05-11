@@ -53,6 +53,7 @@ function calcDamage(attacker, defender, move, items, defItems = []) {
 
   if (hasItem(items, 'life_orb'))    damage = Math.floor(damage * 1.3);
   if (hasItem(items, 'wide_lens'))   damage = Math.floor(damage * 1.2);
+  if (hasItem(items, 'metronome'))   damage = Math.floor(damage * 1.25);
 
   // Physical/special split items
   if (isSpecial) {
