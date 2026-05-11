@@ -831,17 +831,13 @@ async function doSilverNode(node) {
   document.getElementById('battle-title').textContent = 'Silver wants to battle!';
   document.getElementById('battle-subtitle').textContent = 'Rival Battle — Double XP';
   const won = await new Promise(resolve => {
-    runBattleScreen(enemyTeam, true, () => resolve(true), () => resolve(false), 'silver');
+    // Silver gives +4 base (Double XP), to every team member regardless of
+    // whether they participated or fainted. Lucky egg etc. still apply.
+    runBattleScreen(enemyTeam, true, () => resolve(true), () => resolve(false), 'silver', [], 4, null, null, true);
   });
   if (!won) { showGameOver(); return; }
-  // Silver Double XP: +2 bonus levels on top of the normal +2 trainer gain
-  // (= 4 total = double), then a full heal.
-  for (const p of state.team) {
-    p.level = Math.min(100, p.level + 2);
-    const hpBuff = p.statBuffs?.hp ?? 0;
-    p.maxHp = Math.floor(calcHp(p.baseStats.hp, p.level) * (1 + 0.1 * hpBuff));
-    p.currentHp = p.maxHp;
-  }
+  // Full heal after the rival battle.
+  for (const p of state.team) p.currentHp = p.maxHp;
   state.silverBeaten = (state.silverBeaten || 0) + 1;
   advanceFromNode(state.map, node.id);
   showMapScreen();
@@ -1929,7 +1925,7 @@ async function doShinyNode(node) {
 
 // ---- Battle Screen ----
 
-function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, enemyItems = [], baseGainOverride = null, showPlayerPortrait = null, traitsConfig = null) {
+function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, enemyItems = [], baseGainOverride = null, showPlayerPortrait = null, traitsConfig = null, forceAllParticipants = false) {
   // Clear stale Escape Rope flag from a previous battle.
   state._escapedViaRope = false;
   // In endless mode, always apply traits — compute them if not pre-computed by the caller
@@ -2001,7 +1997,10 @@ function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, ene
         if (resultP[i]) state.team[i].currentHp = resultP[i].currentHp;
       }
       const maxEnemyLevel = Math.max(...resultE.map(p => p.level));
-      const levelUps = applyLevelGain(state.team, state.nuzlockeMode ? [] : state.items, playerParticipants, maxEnemyLevel, state.nuzlockeMode, baseGainOverride, state.isEndlessMode ? Infinity : 100);
+      const effectiveParticipants = forceAllParticipants
+        ? new Set(state.team.map((_, i) => i))
+        : playerParticipants;
+      const levelUps = applyLevelGain(state.team, state.nuzlockeMode ? [] : state.items, effectiveParticipants, maxEnemyLevel, state.nuzlockeMode, baseGainOverride, state.isEndlessMode ? Infinity : 100);
       const skipAll = autoSkip || manuallySkipped;
       battleSpeedMultiplier = skipAll ? SKIP_SPEED : 1;
       skipBtn.textContent = 'Skip';
