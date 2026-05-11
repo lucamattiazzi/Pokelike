@@ -819,12 +819,13 @@ async function doSilverNode(node) {
   }));
   const starterLine = SILVER_STARTER_LINES[state.starterSpeciesId];
   if (starterLine) {
-    // Track natural evolution thresholds against the encounter level: base
-    // form for fight 1, first evo for fights 2-3, final evo from fight 4 on.
-    const starterStage = encounterIdx < 1 ? 0 : encounterIdx < 3 ? 1 : 2;
-    const starterSpecies = starterLine[starterStage];
+    // Use natural evolution thresholds against the encounter level.
     const lastIdx = enemyTeam.length - 1;
-    enemyTeam[lastIdx] = { ...createInstance(starterSpecies, enemyTeam[lastIdx].level, false, 2), heldItem: starterSpecies.heldItem || null };
+    const lvl = enemyTeam[lastIdx].level;
+    const evolvedId = resolveEvoForLevel(starterLine[0].speciesId, lvl);
+    const stageIdx = Math.max(0, starterLine.findIndex(s => s.speciesId === evolvedId));
+    const starterSpecies = starterLine[stageIdx];
+    enemyTeam[lastIdx] = { ...createInstance(starterSpecies, lvl, false, 2), heldItem: starterSpecies.heldItem || null };
   }
   showScreen('battle-screen');
   document.getElementById('battle-title').textContent = 'Silver wants to battle!';
@@ -833,9 +834,10 @@ async function doSilverNode(node) {
     runBattleScreen(enemyTeam, true, () => resolve(true), () => resolve(false), 'silver');
   });
   if (!won) { showGameOver(); return; }
-  // Silver Double XP: +4 levels to the entire team and a full heal afterwards.
+  // Silver Double XP: +2 bonus levels on top of the normal +2 trainer gain
+  // (= 4 total = double), then a full heal.
   for (const p of state.team) {
-    p.level = Math.min(100, p.level + 4);
+    p.level = Math.min(100, p.level + 2);
     const hpBuff = p.statBuffs?.hp ?? 0;
     p.maxHp = Math.floor(calcHp(p.baseStats.hp, p.level) * (1 + 0.1 * hpBuff));
     p.currentHp = p.maxHp;
@@ -900,17 +902,22 @@ function showElitePrepScreen({ title, subtitle, nextBoss }) {
 
 async function doGen2Elite4() {
   const bosses = GEN2_ELITE_4;
+  const resumeFrom = state.eliteIndex;
   for (let i = state.eliteIndex; i < bosses.length; i++) {
     state.eliteIndex = i;
     saveRun();
     const boss = bosses[i];
-    // Prep screen before each Elite battle (including the first).
-    const prevName = i === 0 ? null : bosses[i - 1].name;
-    await showElitePrepScreen({
-      title: prevName ? `${prevName} defeated!` : 'The Elite Four await!',
-      subtitle: `Next: ${boss.name} (${boss.type}) — Battle ${i + 1}/${bosses.length}`,
-      nextBoss: boss,
-    });
+    // Prep screen before each Elite battle — but skip it on the resumed
+    // fight so reloading drops the player straight back into the battle.
+    const isResumedFight = i === resumeFrom && resumeFrom > 0;
+    if (!isResumedFight) {
+      const prevName = i === 0 ? null : bosses[i - 1].name;
+      await showElitePrepScreen({
+        title: prevName ? `${prevName} defeated!` : 'The Elite Four await!',
+        subtitle: `Next: ${boss.name} (${boss.type}) — Battle ${i + 1}/${bosses.length}`,
+        nextBoss: boss,
+      });
+    }
     const enemyTeam = boss.team.map(p => ({ ...createInstance(p, p.level, false, 2), heldItem: p.heldItem || null }));
     showScreen('battle-screen');
     document.getElementById('battle-title').textContent = `${boss.title}: ${boss.name}!`;

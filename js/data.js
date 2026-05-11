@@ -320,29 +320,29 @@ const ELITE_4 = [
 const GEN2_ELITE_4 = [
   { name: 'Will', title: 'Elite Four', type: 'Psychic',
     team: [
-      { speciesId: 178, name: 'Xatu',      types: ['Psychic','Flying'], baseStats: { hp:65,  atk:75,  def:70,  speed:95,  special:95  }, level: 84, heldItem: { id: 'wise_glasses',  name: 'Wise Glasses',  icon: '🔬' } },
-      { speciesId: 178, name: 'Xatu',      types: ['Psychic','Flying'], baseStats: { hp:65,  atk:75,  def:70,  speed:95,  special:95  }, level: 84, heldItem: { id: 'wise_glasses',  name: 'Wise Glasses',  icon: '🔬' } },
-      { speciesId: 80,  name: 'Slowbro',   types: ['Water','Psychic'],  baseStats: { hp:95,  atk:75,  def:110, speed:30,  special:100 }, level: 86, heldItem: { id: 'leftovers',     name: 'Leftovers',     icon: '🍃' } },
-      { speciesId: 124, name: 'Jynx',      types: ['Ice','Psychic'],    baseStats: { hp:65,  atk:50,  def:35,  speed:95,  special:95  }, level: 86, heldItem: { id: 'twisted_spoon', name: 'Twisted Spoon', icon: '🥄' } },
-      { speciesId: 103, name: 'Exeggutor', types: ['Grass','Psychic'],  baseStats: { hp:95,  atk:95,  def:85,  speed:55,  special:125 }, level: 88, heldItem: { id: 'life_orb',      name: 'Life Orb',      icon: '🔮' } },
+      { speciesId: 178, name: 'Xatu',      types: ['Psychic','Flying'], baseStats: { hp:65,  atk:75,  def:70,  speed:95,  special:95  }, level: 80, heldItem: { id: 'wise_glasses',  name: 'Wise Glasses',  icon: '🔬' } },
+      { speciesId: 178, name: 'Xatu',      types: ['Psychic','Flying'], baseStats: { hp:65,  atk:75,  def:70,  speed:95,  special:95  }, level: 80, heldItem: { id: 'wise_glasses',  name: 'Wise Glasses',  icon: '🔬' } },
+      { speciesId: 80,  name: 'Slowbro',   types: ['Water','Psychic'],  baseStats: { hp:95,  atk:75,  def:110, speed:30,  special:100 }, level: 82, heldItem: { id: 'leftovers',     name: 'Leftovers',     icon: '🍃' } },
+      { speciesId: 124, name: 'Jynx',      types: ['Ice','Psychic'],    baseStats: { hp:65,  atk:50,  def:35,  speed:95,  special:95  }, level: 82, heldItem: { id: 'twisted_spoon', name: 'Twisted Spoon', icon: '🥄' } },
+      { speciesId: 103, name: 'Exeggutor', types: ['Grass','Psychic'],  baseStats: { hp:95,  atk:95,  def:85,  speed:55,  special:125 }, level: 84, heldItem: { id: 'life_orb',      name: 'Life Orb',      icon: '🔮' } },
     ]
   },
   { name: 'Koga', title: 'Elite Four', type: 'Poison',
     team: [
-      { speciesId: 168, name: 'Ariados',   types: ['Bug','Poison'],    baseStats: { hp:70,  atk:90,  def:70,  speed:40,  special:60  }, level: 85, heldItem: { id: 'scope_lens',    name: 'Scope Lens',    icon: '🔭' } },
-      { speciesId: 49,  name: 'Venomoth',  types: ['Bug','Poison'],    baseStats: { hp:70,  atk:65,  def:60,  speed:90,  special:90  }, level: 86, heldItem: { id: 'wise_glasses',  name: 'Wise Glasses',  icon: '🔬' } },
-      { speciesId: 205, name: 'Forretress',types: ['Bug','Steel'],     baseStats: { hp:75,  atk:90,  def:140, speed:40,  special:60  }, level: 88, heldItem: { id: 'rocky_helmet',  name: 'Rocky Helmet',  icon: '⛑️' } },
-      { speciesId: 89,  name: 'Muk',       types: ['Poison'],          baseStats: { hp:105, atk:105, def:75,  speed:50,  special:65  }, level: 88, heldItem: { id: 'leftovers',     name: 'Leftovers',     icon: '🍃' } },
-      { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85,  atk:90,  def:80,  speed:130, special:70  }, level: 91, heldItem: { id: 'life_orb',      name: 'Life Orb',      icon: '🔮' } },
+      { speciesId: 168, name: 'Ariados',   types: ['Bug','Poison'],    baseStats: { hp:70,  atk:90,  def:70,  speed:40,  special:60  }, level: 84, heldItem: { id: 'scope_lens',    name: 'Scope Lens',    icon: '🔭' } },
+      { speciesId: 49,  name: 'Venomoth',  types: ['Bug','Poison'],    baseStats: { hp:70,  atk:65,  def:60,  speed:90,  special:90  }, level: 84, heldItem: { id: 'wise_glasses',  name: 'Wise Glasses',  icon: '🔬' } },
+      { speciesId: 205, name: 'Forretress',types: ['Bug','Steel'],     baseStats: { hp:75,  atk:90,  def:140, speed:40,  special:60  }, level: 84, heldItem: { id: 'rocky_helmet',  name: 'Rocky Helmet',  icon: '⛑️' } },
+      { speciesId: 89,  name: 'Muk',       types: ['Poison'],          baseStats: { hp:105, atk:105, def:75,  speed:50,  special:65  }, level: 84, heldItem: { id: 'leftovers',     name: 'Leftovers',     icon: '🍃' } },
+      { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85,  atk:90,  def:80,  speed:130, special:70  }, level: 88, heldItem: { id: 'life_orb',      name: 'Life Orb',      icon: '🔮' } },
     ]
   },
   { name: 'Bruno', title: 'Elite Four', type: 'Fighting',
     team: [
-      { speciesId: 237, name: 'Hitmontop', types: ['Fighting'],        baseStats: { hp:50,  atk:95,  def:95,  speed:70,  special:35  }, level: 86, heldItem: { id: 'choice_band',   name: 'Choice Band',   icon: '🎀' } },
-      { speciesId: 106, name: 'Hitmonlee', types: ['Fighting'],        baseStats: { hp:50,  atk:120, def:53,  speed:87,  special:35  }, level: 88, heldItem: { id: 'muscle_band',   name: 'Muscle Band',   icon: '💪' } },
-      { speciesId: 107, name: 'Hitmonchan',types: ['Fighting'],        baseStats: { hp:50,  atk:105, def:79,  speed:76,  special:35  }, level: 88, heldItem: { id: 'black_belt',    name: 'Black Belt',    icon: '🥋' } },
+      { speciesId: 237, name: 'Hitmontop', types: ['Fighting'],        baseStats: { hp:50,  atk:95,  def:95,  speed:70,  special:35  }, level: 90, heldItem: { id: 'choice_band',   name: 'Choice Band',   icon: '🎀' } },
+      { speciesId: 106, name: 'Hitmonlee', types: ['Fighting'],        baseStats: { hp:50,  atk:120, def:53,  speed:87,  special:35  }, level: 90, heldItem: { id: 'muscle_band',   name: 'Muscle Band',   icon: '💪' } },
+      { speciesId: 107, name: 'Hitmonchan',types: ['Fighting'],        baseStats: { hp:50,  atk:105, def:79,  speed:76,  special:35  }, level: 90, heldItem: { id: 'black_belt',    name: 'Black Belt',    icon: '🥋' } },
       { speciesId: 95,  name: 'Onix',      types: ['Rock','Ground'],   baseStats: { hp:35,  atk:45,  def:160, speed:70,  special:30  }, level: 90, heldItem: { id: 'rocky_helmet',  name: 'Rocky Helmet',  icon: '⛑️' } },
-      { speciesId: 68,  name: 'Machamp',   types: ['Fighting'],        baseStats: { hp:90,  atk:130, def:80,  speed:55,  special:65  }, level: 92, heldItem: { id: 'life_orb',      name: 'Life Orb',      icon: '🔮' } },
+      { speciesId: 68,  name: 'Machamp',   types: ['Fighting'],        baseStats: { hp:90,  atk:130, def:80,  speed:55,  special:65  }, level: 90, heldItem: { id: 'life_orb',      name: 'Life Orb',      icon: '🔮' } },
     ]
   },
   { name: 'Karen', title: 'Elite Four', type: 'Dark',
@@ -351,16 +351,16 @@ const GEN2_ELITE_4 = [
       { speciesId: 45,  name: 'Vileplume', types: ['Grass','Poison'],  baseStats: { hp:75,  atk:80,  def:85,  speed:50,  special:100 }, level: 88, heldItem: { id: 'wise_glasses',  name: 'Wise Glasses',  icon: '🔬' } },
       { speciesId: 94,  name: 'Gengar',    types: ['Ghost','Poison'],  baseStats: { hp:60,  atk:65,  def:60,  speed:110, special:130 }, level: 90, heldItem: { id: 'scope_lens',    name: 'Scope Lens',    icon: '🔭' } },
       { speciesId: 198, name: 'Murkrow',   types: ['Dark','Flying'],   baseStats: { hp:60,  atk:85,  def:42,  speed:91,  special:85  }, level: 90, heldItem: { id: 'choice_band',   name: 'Choice Band',   icon: '🎀' } },
-      { speciesId: 229, name: 'Houndoom',  types: ['Dark','Fire'],     baseStats: { hp:75,  atk:90,  def:50,  speed:95,  special:110 }, level: 93, heldItem: { id: 'choice_specs',  name: 'Choice Specs',  icon: '👓' } },
+      { speciesId: 229, name: 'Houndoom',  types: ['Dark','Fire'],     baseStats: { hp:75,  atk:90,  def:50,  speed:95,  special:110 }, level: 92, heldItem: { id: 'choice_specs',  name: 'Choice Specs',  icon: '👓' } },
     ]
   },
   { name: 'Lance', title: 'Champion', type: 'Dragon',
     team: [
       { speciesId: 130, name: 'Gyarados',  types: ['Water','Flying'],  baseStats: { hp:95,  atk:125, def:79,  speed:81,  special:60  }, level: 90, heldItem: { id: 'mystic_water',  name: 'Mystic Water',  icon: '💧' } },
-      { speciesId: 142, name: 'Aerodactyl',types: ['Rock','Flying'],   baseStats: { hp:80,  atk:105, def:65,  speed:130, special:60  }, level: 92, heldItem: { id: 'sharp_beak',    name: 'Sharp Beak',    icon: '🦅' } },
+      { speciesId: 142, name: 'Aerodactyl',types: ['Rock','Flying'],   baseStats: { hp:80,  atk:105, def:65,  speed:130, special:60  }, level: 91, heldItem: { id: 'sharp_beak',    name: 'Sharp Beak',    icon: '🦅' } },
+      { speciesId: 149, name: 'Dragonite', types: ['Dragon','Flying'], baseStats: { hp:91,  atk:134, def:95,  speed:80,  special:100 }, level: 92, heldItem: { id: 'dragon_fang',   name: 'Dragon Fang',   icon: '🐉' } },
       { speciesId: 149, name: 'Dragonite', types: ['Dragon','Flying'], baseStats: { hp:91,  atk:134, def:95,  speed:80,  special:100 }, level: 93, heldItem: { id: 'dragon_fang',   name: 'Dragon Fang',   icon: '🐉' } },
-      { speciesId: 149, name: 'Dragonite', types: ['Dragon','Flying'], baseStats: { hp:91,  atk:134, def:95,  speed:80,  special:100 }, level: 93, heldItem: { id: 'dragon_fang',   name: 'Dragon Fang',   icon: '🐉' } },
-      { speciesId: 149, name: 'Dragonite', types: ['Dragon','Flying'], baseStats: { hp:91,  atk:134, def:95,  speed:80,  special:100 }, level: 96, heldItem: { id: 'choice_band',   name: 'Choice Band',   icon: '🎀' } },
+      { speciesId: 149, name: 'Dragonite', types: ['Dragon','Flying'], baseStats: { hp:91,  atk:134, def:95,  speed:80,  special:100 }, level: 94, heldItem: { id: 'choice_band',   name: 'Choice Band',   icon: '🎀' } },
     ]
   },
 ];
@@ -374,9 +374,9 @@ const JOHTO_GYM_LEADERS = [
   },
   { name: 'Bugsy', badge: 'Hive Badge', type: 'Bug', moveTier: 0,
     team: [
-      { speciesId: 11,  name: 'Metapod',  types: ['Bug'],          baseStats: { hp:50,  atk:20,  def:55,  speed:30,  special:25  }, level: 20, heldItem: { id: 'eviolite',    name: 'Eviolite',    icon: '💎' } },
-      { speciesId: 14,  name: 'Kakuna',   types: ['Bug','Poison'], baseStats: { hp:45,  atk:25,  def:50,  speed:35,  special:25  }, level: 21, heldItem: { id: 'eviolite',    name: 'Eviolite',    icon: '💎' } },
-      { speciesId: 123, name: 'Scyther',  types: ['Bug','Flying'], baseStats: { hp:70,  atk:110, def:80,  speed:105, special:55  }, level: 22, heldItem: { id: 'choice_band', name: 'Choice Band', icon: '🎀' } },
+      { speciesId: 11,  name: 'Metapod',  types: ['Bug'],          baseStats: { hp:50,  atk:20,  def:55,  speed:30,  special:25  }, level: 19, heldItem: { id: 'eviolite',    name: 'Eviolite',    icon: '💎' } },
+      { speciesId: 14,  name: 'Kakuna',   types: ['Bug','Poison'], baseStats: { hp:45,  atk:25,  def:50,  speed:35,  special:25  }, level: 20, heldItem: { id: 'eviolite',    name: 'Eviolite',    icon: '💎' } },
+      { speciesId: 123, name: 'Scyther',  types: ['Bug','Flying'], baseStats: { hp:70,  atk:110, def:80,  speed:105, special:55  }, level: 21, heldItem: { id: 'choice_band', name: 'Choice Band', icon: '🎀' } },
     ]
   },
   { name: 'Whitney', badge: 'Plain Badge', type: 'Normal', moveTier: 0,
@@ -418,7 +418,7 @@ const JOHTO_GYM_LEADERS = [
       { speciesId: 130, name: 'Gyarados',  types: ['Water','Flying'], baseStats: { hp:95,  atk:125, def:79,  speed:81,  special:60  }, level: 80, heldItem: { id: 'mystic_water',  name: 'Mystic Water',  icon: '💧' } },
       { speciesId: 148, name: 'Dragonair', types: ['Dragon'],         baseStats: { hp:61,  atk:84,  def:65,  speed:70,  special:70  }, level: 80, heldItem: { id: 'dragon_fang',  name: 'Dragon Fang',  icon: '🐉' } },
       { speciesId: 148, name: 'Dragonair', types: ['Dragon'],         baseStats: { hp:61,  atk:84,  def:65,  speed:70,  special:70  }, level: 80, heldItem: { id: 'dragon_fang',  name: 'Dragon Fang',  icon: '🐉' } },
-      { speciesId: 230, name: 'Kingdra',   types: ['Water','Dragon'], baseStats: { hp:75,  atk:95,  def:95,  speed:85,  special:95  }, level: 85, heldItem: { id: 'choice_specs', name: 'Choice Specs', icon: '👓' } },
+      { speciesId: 230, name: 'Kingdra',   types: ['Water','Dragon'], baseStats: { hp:75,  atk:95,  def:95,  speed:85,  special:95  }, level: 80, heldItem: { id: 'choice_specs', name: 'Choice Specs', icon: '👓' } },
     ]
   },
 ];
@@ -430,28 +430,28 @@ const SILVER_ENCOUNTERS = [
     { speciesId: 41,  name: 'Zubat',     types: ['Poison','Flying'], baseStats: { hp:40, atk:45, def:35, speed:55,  special:40  }, level: 16 },
     { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 18 },
   ]},
-  // Map 3 — enc 1: starter 1st evo replaces last slot; map max=40, Silver ace=38
+  // Map 3 — enc 1: starter evo replaces last slot; map max=40, Silver ace=38
   { team: [
-    { speciesId: 92,  name: 'Gastly',    types: ['Ghost','Poison'],  baseStats: { hp:30, atk:35, def:30,  speed:80,  special:100 }, level: 34 },
-    { speciesId: 41,  name: 'Zubat',     types: ['Poison','Flying'], baseStats: { hp:40, atk:45, def:35,  speed:55,  special:40  }, level: 34 },
-    { speciesId: 81,  name: 'Magnemite', types: ['Electric','Steel'],baseStats: { hp:25, atk:35, def:70,  speed:45,  special:95  }, level: 32 },
+    { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45,  speed:95,  special:115 }, level: 34 },
+    { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85, atk:90, def:80,  speed:130, special:70  }, level: 34 },
+    { speciesId: 82,  name: 'Magneton',  types: ['Electric','Steel'],baseStats: { hp:50, atk:60, def:95,  speed:70,  special:120 }, level: 32 },
     { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45,  speed:95,  special:115 }, level: 34 },
     { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43,  speed:65,  special:60  }, level: 38 },
   ]},
-  // Map 5 — enc 2: starter final evo replaces last slot; map max=60, Silver ace=58
+  // Map 5 — enc 2: starter evo replaces last slot; map max=60, Silver ace=58
   { team: [
-    { speciesId: 42,  name: 'Golbat',    types: ['Poison','Flying'], baseStats: { hp:75, atk:80, def:70, speed:90,  special:75  }, level: 53, heldItem: { id: 'life_orb',      name: 'Life Orb',      icon: '🔮' } },
-    { speciesId: 81,  name: 'Magnemite', types: ['Electric','Steel'],baseStats: { hp:25, atk:35, def:70, speed:45,  special:95  }, level: 56, heldItem: { id: 'magnet',        name: 'Magnet',        icon: '🧲' } },
-    { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45, speed:95,  special:115 }, level: 53, heldItem: { id: 'spell_tag',     name: 'Spell Tag',     icon: '👻' } },
-    { speciesId: 215, name: 'Sneasel',   types: ['Dark','Ice'],      baseStats: { hp:55, atk:95, def:55, speed:115, special:55  }, level: 56, heldItem: { id: 'eviolite',      name: 'Eviolite',      icon: '💎' } },
+    { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85, atk:90, def:80, speed:130, special:70  }, level: 53, heldItem: { id: 'life_orb',      name: 'Life Orb',      icon: '🔮' } },
+    { speciesId: 462, name: 'Magnezone', types: ['Electric','Steel'],baseStats: { hp:70, atk:70, def:115,speed:60,  special:130 }, level: 56, heldItem: { id: 'magnet',        name: 'Magnet',        icon: '🧲' } },
+    { speciesId: 94,  name: 'Gengar',    types: ['Ghost','Poison'],  baseStats: { hp:60, atk:65, def:60, speed:110, special:130 }, level: 53, heldItem: { id: 'spell_tag',     name: 'Spell Tag',     icon: '👻' } },
+    { speciesId: 461, name: 'Weavile',   types: ['Dark','Ice'],      baseStats: { hp:70, atk:120,def:65, speed:125, special:45  }, level: 56, heldItem: { id: 'black_glasses', name: 'Black Glasses', icon: '🕶️' } },
     { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 58 },
   ]},
-  // Map 7 — enc 3: starter final evo replaces last slot; map max=80, Silver ace=78
+  // Map 7 — enc 3: starter evo replaces last slot; map max=80, Silver ace=78
   { team: [
-    { speciesId: 42,  name: 'Golbat',    types: ['Poison','Flying'], baseStats: { hp:75, atk:80, def:70, speed:90,  special:75  }, level: 74, heldItem: { id: 'life_orb',      name: 'Life Orb',      icon: '🔮' } },
-    { speciesId: 81,  name: 'Magnemite', types: ['Electric','Steel'],baseStats: { hp:25, atk:35, def:70, speed:45,  special:95  }, level: 72, heldItem: { id: 'magnet',        name: 'Magnet',        icon: '🧲' } },
-    { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45, speed:95,  special:115 }, level: 74, heldItem: { id: 'spell_tag',     name: 'Spell Tag',     icon: '👻' } },
-    { speciesId: 215, name: 'Sneasel',   types: ['Dark','Ice'],      baseStats: { hp:55, atk:95, def:55, speed:115, special:55  }, level: 76, heldItem: { id: 'choice_band',   name: 'Choice Band',   icon: '🎀' } },
+    { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85, atk:90, def:80, speed:130, special:70  }, level: 74, heldItem: { id: 'life_orb',      name: 'Life Orb',      icon: '🔮' } },
+    { speciesId: 462, name: 'Magnezone', types: ['Electric','Steel'],baseStats: { hp:70, atk:70, def:115,speed:60,  special:130 }, level: 72, heldItem: { id: 'magnet',        name: 'Magnet',        icon: '🧲' } },
+    { speciesId: 94,  name: 'Gengar',    types: ['Ghost','Poison'],  baseStats: { hp:60, atk:65, def:60, speed:110, special:130 }, level: 74, heldItem: { id: 'spell_tag',     name: 'Spell Tag',     icon: '👻' } },
+    { speciesId: 461, name: 'Weavile',   types: ['Dark','Ice'],      baseStats: { hp:70, atk:120,def:65, speed:125, special:45  }, level: 76, heldItem: { id: 'choice_band',   name: 'Choice Band',   icon: '🎀' } },
     { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 78 },
   ]},
 ];
