@@ -3224,41 +3224,28 @@ async function checkAndEvolveTeam() {
 async function animateLevelUp(levelUps) {
   const pEl = document.getElementById('player-side');
   if (!pEl || levelUps.length === 0) return;
+  const sleep = ms => new Promise(r => setTimeout(r, ms / battleSpeedMultiplier));
 
-  await Promise.all(levelUps.map(async (entry) => {
-    const { idx, pokemon, oldLevel, newLevel, preHp } = entry;
+  await Promise.all(levelUps.map(async ({ idx, pokemon, newLevel, preHp }) => {
     const el = pEl.querySelector(`.battle-pokemon[data-idx="${idx}"]`);
     if (!el) return;
 
-    const FLASH_MS = 700;
-    const setLevelLabel = lvl => {
-      const nameEl = el.querySelector('.battle-poke-name');
-      if (nameEl) nameEl.textContent = `${pokemon.nickname || pokemon.name} Lv${lvl}`;
-    };
-    const flashLevelText = async (lvl) => {
-      const animMs     = Math.round(FLASH_MS / battleSpeedMultiplier);
-      const animTextMs = Math.round(900       / battleSpeedMultiplier);
-      el.style.setProperty('--levelup-dur',      `${animMs}ms`);
-      el.style.setProperty('--levelup-text-dur', `${animTextMs}ms`);
-      el.classList.add('level-up');
-      const lvText = document.createElement('div');
-      lvText.className = 'level-up-text';
-      lvText.textContent = `Lv ${lvl}!`;
-      el.appendChild(lvText);
-      await new Promise(r => setTimeout(r, animMs + 40));
-      el.classList.remove('level-up');
-      lvText.remove();
-      el.style.removeProperty('--levelup-dur');
-      el.style.removeProperty('--levelup-text-dur');
-    };
+    if (pokemon.currentHp > 0 && pokemon.currentHp > preHp) {
+      await animateHpBar(el, preHp, pokemon.currentHp, pokemon.maxHp, 400);
+    }
 
-    if (pokemon.currentHp > 0 && pokemon.currentHp > (preHp ?? 0)) {
-      await animateHpBar(el, preHp ?? 0, pokemon.currentHp, pokemon.maxHp, 400);
-    }
-    if (newLevel > oldLevel) {
-      await flashLevelText(newLevel);
-      setLevelLabel(newLevel);
-    }
+    el.classList.add('level-up');
+    const lvText = document.createElement('div');
+    lvText.className = 'level-up-text';
+    lvText.textContent = `Lv ${newLevel}!`;
+    el.appendChild(lvText);
+
+    await sleep(900);
+    el.classList.remove('level-up');
+    lvText.remove();
+
+    const nameEl = el.querySelector('.battle-poke-name');
+    if (nameEl) nameEl.textContent = `${pokemon.nickname || pokemon.name} Lv${newLevel}`;
   }));
 }
 

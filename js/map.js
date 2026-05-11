@@ -30,6 +30,13 @@ const NODE_WEIGHTS = [
   { battle: 20, catch:  9, item: 14, trainer: 18, question:  9, pokecenter: 0,  move_tutor: 0, trade: 0, legendary: 0 },
 ];
 
+// Gen 2 uses a single flat distribution across all content layers. Sums to 100,
+// so each weight reads as a percentage. Forced pokecenter on the last layer and
+// Silver on map-4-middle (maps 1,3,5,7) still apply on top of these rolls.
+const GEN2_NODE_WEIGHTS = {
+  battle: 25, catch: 5, item: 10, trainer: 40, question: 10, pokecenter: 0, move_tutor: 5, trade: 5, legendary: 0,
+};
+
 function weightedRandom(weights) {
   const total = Object.values(weights).reduce((a, b) => a + b, 0);
   let r = rng() * total;
@@ -71,18 +78,12 @@ function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
 
   // Pick a weighted-random node type; ci = content layer index (0–5)
   const pickType = (ci) => {
-    const w = { ...NODE_WEIGHTS[Math.min(ci, NODE_WEIGHTS.length - 1)] };
+    const w = gen2Mode
+      ? { ...GEN2_NODE_WEIGHTS }
+      : { ...NODE_WEIGHTS[Math.min(ci, NODE_WEIGHTS.length - 1)] };
     if (mapIndex >= 5 && ci >= 2 && !(typeof state !== 'undefined' && state.isEndlessMode)) w.legendary = 2;
     if (nuzlockeMode) { w.catch = 0; w.trade = 0; }
     if (typeof state !== 'undefined' && state.isEndlessMode) { w.trade = 0; w.catch = Math.floor(w.catch / 2); }
-    if (gen2Mode) {
-      // Gen 2: bump combat/event nodes by 20%, halve catch nodes
-      // (the layer-1 catch is hardcoded above so it's unaffected)
-      w.battle   = Math.round(w.battle   * 1.2);
-      w.trainer  = Math.round(w.trainer  * 1.2);
-      w.question = Math.round(w.question * 1.2);
-      w.catch    = Math.floor(w.catch / 2);
-    }
     const type = weightedRandom(w);
     // Endless region 3: 1/6 catch nodes become legendary encounters
     if (type === NODE_TYPES.CATCH &&
@@ -156,22 +157,16 @@ function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
     layers.push(layer);
   }
 
-  // Silver node: place him as an optional alternative inside one of the
-  // content layers (skip layer 1 which is fixed, and the last content layer
-  // which keeps the Pokecenter guarantee). Players can route around him.
+  // Silver node: pinned to the center of the middle 3-node content layer.
+  // CONTENT_SIZES = [3,4,3,4,3,2] — the middle 3-node layer is content[2],
+  // which sits at absolute layer index 2 + 2 = 4. He's always the second
+  // node of those three, so he's impossible to miss (and routable around).
   if (hasSilverNode) {
-    const minCi = 1;                         // layer 3+
-    const maxCi = contentCount - 2;          // skip last content layer
-    const silverCi = minCi + Math.floor(rng() * Math.max(1, maxCi - minCi + 1));
-    const silverLayer = layers[silverCi + 2];
-    if (silverLayer && silverLayer.length > 0) {
-      // Avoid replacing a forced Pokecenter
-      const candidates = silverLayer
-        .map((n, i) => n.type !== NODE_TYPES.POKECENTER ? i : -1)
-        .filter(i => i >= 0);
-      const slotIdx = candidates[Math.floor(rng() * candidates.length)] ?? 0;
+    const silverLayer = layers[4]; // middle 3-node content layer
+    if (silverLayer && silverLayer.length === 3) {
+      const slotIdx = 1; // middle of 3
       silverLayer[slotIdx].type = NODE_TYPES.SILVER;
-      delete silverLayer[slotIdx].trainerSprite; // strip leftover trainer sprite if any
+      delete silverLayer[slotIdx].trainerSprite;
     }
   }
 
@@ -682,7 +677,8 @@ function getSilverHoverLabel() {
     `<div style="color:#ccc;font-size:9px;">${p.name} <span style="color:#aaa;">Lv${p.level}</span></div>`
   ).join('');
   return `<div style="font-weight:bold;margin-bottom:2px;">Rival Silver</div>` +
-         `<div style="color:#ffd76b;font-size:9px;margin-bottom:4px;">Double XP</div>` +
+         `<div style="color:#ffd76b;font-size:9px;">+4 Levels (Double XP)</div>` +
+         `<div style="color:#7ecf7e;font-size:9px;margin-bottom:4px;">Heals you after battle</div>` +
          teamHtml;
 }
 
@@ -699,7 +695,7 @@ function getNodeLabel(node) {
       ).join('');
       return `<div style="font-weight:bold;margin-bottom:4px;">${leader.name} — ${leader.type} Gym</div>${teamHtml}`;
     }
-    if (isGen2 && mi === 8) return '<div style="font-weight:bold;">Red — Mt. Silver</div>';
+    if (isGen2 && mi === 8) return '<div style="font-weight:bold;">Elite Four &amp; Lance</div>';
     if (typeof ELITE_4 !== 'undefined' && mi === 8) {
       return '<div style="font-weight:bold;">Elite Four &amp; Champion</div>';
     }
@@ -708,16 +704,16 @@ function getNodeLabel(node) {
   const isGen2Mode = typeof state !== 'undefined' && state.gen2Mode;
   const labels = {
     [NODE_TYPES.START]:      'Start',
-    [NODE_TYPES.BATTLE]:     isGen2Mode ? 'Wild Battle' : 'Wild Battle — +1 level',
+    [NODE_TYPES.BATTLE]:     'Wild Battle — +1 level',
     [NODE_TYPES.CATCH]:      'Catch Pokemon',
     [NODE_TYPES.ITEM]:       'Item',
     [NODE_TYPES.QUESTION]:   'Random Event',
     [NODE_TYPES.POKECENTER]: 'Pokemon Center',
     [NODE_TYPES.TRAINER]:    (node.trainerSprite && TRAINER_SPRITE_NAMES[node.trainerSprite])
       ? (isGen2Mode
-          ? `${TRAINER_SPRITE_NAMES[node.trainerSprite]} — ${TRAINER_SPECIALTIES_GEN2[node.trainerSprite] || TRAINER_SPECIALTIES[node.trainerSprite] || 'Various Pokemon'}`
+          ? `${TRAINER_SPRITE_NAMES[node.trainerSprite]} — +2 Levels — ${TRAINER_SPECIALTIES_GEN2[node.trainerSprite] || TRAINER_SPECIALTIES[node.trainerSprite] || 'Various Pokemon'}`
           : `${TRAINER_SPRITE_NAMES[node.trainerSprite]} — +2 Levels — ${TRAINER_SPECIALTIES[node.trainerSprite] || 'Various Pokemon'}`)
-      : (isGen2Mode ? 'Trainer Battle' : 'Trainer Battle — +2 Levels'),
+      : 'Trainer Battle — +2 Levels',
     [NODE_TYPES.LEGENDARY]:  'Legendary Pokemon',
     [NODE_TYPES.MOVE_TUTOR]: 'Move Tutor',
     [NODE_TYPES.TRADE]:      'Trade — swap a Pokémon for one 3 levels higher',

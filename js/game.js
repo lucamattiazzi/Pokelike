@@ -440,12 +440,9 @@ function showMapScreen() {
   const mapInfo = document.getElementById('map-info');
   if (mapInfo) {
     if (state.gen2Mode) {
-      const isFinal = state.currentMap === 9;
       const isElite = state.currentMap === 8;
-      const leader = (isFinal || isElite) ? null : JOHTO_GYM_LEADERS[state.currentMap];
-      mapInfo.innerHTML = isFinal
-        ? `<span>Mt. Silver — Red</span>`
-        : isElite
+      const leader = isElite ? null : JOHTO_GYM_LEADERS[state.currentMap];
+      mapInfo.innerHTML = isElite
         ? `<span>Map 9: Elite Four &amp; Lance</span>`
         : `<span>Map ${state.currentMap+1}: vs <b>${leader.name}</b> (${leader.type})</span>`;
     } else {
@@ -486,13 +483,8 @@ function showMapScreen() {
   const mapContainer = document.getElementById('map-container');
   let bgUrl;
   if (state.gen2Mode) {
-    if (state.currentMap < 9) {
-      // Johto routes 1-9 (route 9 covers Elite Four at map 8)
-      bgUrl = `ui/mapsGen2/${state.currentMap + 1}.png`;
-    } else {
-      // Mt. Silver — Red final
-      bgUrl = `ui/mapsNormalMode/map9.png`;
-    }
+    // Johto routes 1-9 (route 9 covers Elite Four at map 8)
+    bgUrl = `ui/mapsGen2/${state.currentMap + 1}.png`;
   } else {
     bgUrl = `ui/mapsNormalMode/map${state.currentMap + 1}.png`;
   }
@@ -681,10 +673,17 @@ function getLevelForNode(node) {
     const spread = Math.max(1, Math.round((maxL - minL) / 8));
     return Math.min(maxL, Math.max(minL, base + Math.floor(rng() * spread)));
   }
-  // Normal mode: spread levels evenly across layers 1..7 (highest non-boss layer).
-  // Old formula divided by 3 (gen2) / 5 (non-gen2), which front-loaded the curve
-  // and clustered the last 3-4 layers at the cap (e.g. 1,3,4,5,5,5 for a 1-5 map).
-  const [minL, maxL] = (state.gen2Mode ? GEN2_MAP_LEVEL_RANGES : MAP_LEVEL_RANGES)[state.currentMap];
+  // Gen 2: deterministic per-layer curve. Layers 1-7 use fixed offsets so each
+  // map reads cleanly as Lv mapMin..mapMin+9 (e.g. 1,2,3,5,6,8,9 in map 1, gym
+  // at 10). Boss layer 8 uses leader data, not this function.
+  if (state.gen2Mode) {
+    const [minL, maxL] = GEN2_MAP_LEVEL_RANGES[state.currentMap];
+    if (node.layer >= GEN2_LAYER_OFFSETS.length + 1) return maxL;
+    const layerIdx = Math.min(GEN2_LAYER_OFFSETS.length, Math.max(1, node.layer)) - 1;
+    return minL + GEN2_LAYER_OFFSETS[layerIdx];
+  }
+  // Non-gen2: spread levels evenly across layers 1..7 (highest non-boss layer).
+  const [minL, maxL] = MAP_LEVEL_RANGES[state.currentMap];
   const t = Math.min(1, Math.max(0, (node.layer - 1) / 6));
   const base = Math.round(minL + t * (maxL - minL));
   const spread = Math.max(1, Math.round((maxL - minL) / 8));
@@ -738,7 +737,6 @@ async function doBattleNode(node) {
 
 async function doBossNode(node) {
   if (state.gen2Mode) {
-    if (state.currentMap === 9) { await doRed(); return; }
     if (state.currentMap === 8) { await doGen2Elite4(); return; }
     const leader = JOHTO_GYM_LEADERS[state.currentMap];
     const enemyTeam = leader.team.map(p => ({
@@ -806,24 +804,6 @@ async function doElite4() {
   showWinScreen();
 }
 
-async function doRed() {
-  const boss = RED_FINAL;
-  const enemyTeam = boss.team.map(p => ({
-    ...createInstance(p, p.level, false, 2),
-    heldItem: p.heldItem || null,
-  }));
-  showScreen('battle-screen');
-  document.getElementById('battle-title').textContent = '...';
-  document.getElementById('battle-subtitle').textContent = 'Mt. Silver — The Silent Champion';
-  const won = await new Promise(resolve => {
-    runBattleScreen(enemyTeam, true, () => resolve(true), () => resolve(false), 'red');
-  });
-  if (!won) { showGameOver(); return; }
-  const ach = unlockAchievement('gen2_win');
-  if (ach) showAchievementToast(ach);
-  showWinScreen();
-}
-
 async function doSilverNode(node) {
   // Encounter index is keyed off the current map so skipping earlier Silver
   // fights doesn't make a later one trivial.
@@ -853,11 +833,12 @@ async function doSilverNode(node) {
     runBattleScreen(enemyTeam, true, () => resolve(true), () => resolve(false), 'silver');
   });
   if (!won) { showGameOver(); return; }
-  // Silver Double XP: +4 levels to the entire team after the win.
+  // Silver Double XP: +4 levels to the entire team and a full heal afterwards.
   for (const p of state.team) {
     p.level = Math.min(100, p.level + 4);
-    p.maxHp = calcHp(p.baseStats.hp, p.level);
-    if (p.currentHp < p.maxHp) p.currentHp = p.maxHp;
+    const hpBuff = p.statBuffs?.hp ?? 0;
+    p.maxHp = Math.floor(calcHp(p.baseStats.hp, p.level) * (1 + 0.1 * hpBuff));
+    p.currentHp = p.maxHp;
   }
   state.silverBeaten = (state.silverBeaten || 0) + 1;
   advanceFromNode(state.map, node.id);
@@ -942,14 +923,10 @@ async function doGen2Elite4() {
   }
   const eliteAch = unlockAchievement('elite_four');
   if (eliteAch) showAchievementToast(eliteAch);
+  const winAch = unlockAchievement('gen2_win');
+  if (winAch) showAchievementToast(winAch);
   state.eliteIndex = 0;
-  // Lance defeated — prep for Red.
-  await showElitePrepScreen({
-    title: 'Lance defeated!',
-    subtitle: '1 more challenge awaits — The Champion: Red',
-    nextBoss: RED_FINAL,
-  });
-  startMap(9);
+  showWinScreen();
 }
 
 
@@ -1654,7 +1631,7 @@ const TRAINER_BATTLE_CONFIG = {
                  gen2Pool: [56,63,66,79,96,102,106,107,116,147,177,196,201,202,203,214,236,238] },
   oldGuy:      { name: 'Old Man',       sprite: 'gentleman',
                  pool: null,
-                 gen2Pool: [16,21,37,41,58,77,84,126,128,142,161,163,198,209,218,225,227,234,241] },
+                 gen2Pool: [16,21,41,84,128,142,161,163,198,209,225,227,234,241] },
 };
 
 async function doTrainerNode(node) {
@@ -1859,7 +1836,11 @@ async function doTradeNode(node) {
     const idx = i;
     const doTrade = async () => {
       let pool = await getCatchChoices(getEncounterMapIndex(), 3, getCatchGenRange().maxGenId, !state.isEndlessMode, getCatchGenRange().minGenId);
-      const species = pool[Math.floor(rng() * pool.length)];
+      // Never offer the same species back. The bucket has dozens of options,
+      // so this filter essentially never empties; fall back if it somehow does.
+      const filtered = pool.filter(sp => (sp.id ?? sp.speciesId) !== mine.speciesId);
+      const choices = filtered.length > 0 ? filtered : pool;
+      const species = choices[Math.floor(rng() * choices.length)];
       if (!species) { advanceFromNode(state.map, node.id); showMapScreen(); return; }
       const offerLevel = Math.min(100, mine.level + 3);
       const offer = createInstance(species, offerLevel, rng() < (hasShinyCharm() ? 0.02 : 0.01), Math.max(getMoveТierForMap(state.currentMap), mine.moveTier ?? 0));

@@ -424,35 +424,35 @@ const JOHTO_GYM_LEADERS = [
 ];
 
 const SILVER_ENCOUNTERS = [
-  // Map 1 — enc 0: starter 1st evo replaces last slot; map max=20, Silver ace=22
+  // Map 1 — enc 0: starter 1st evo replaces last slot; map max=20, Silver ace=18
   { team: [
-    { speciesId: 92,  name: 'Gastly',    types: ['Ghost','Poison'],  baseStats: { hp:30, atk:35, def:30, speed:80,  special:100 }, level: 18 },
-    { speciesId: 41,  name: 'Zubat',     types: ['Poison','Flying'], baseStats: { hp:40, atk:45, def:35, speed:55,  special:40  }, level: 20 },
-    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 22 },
+    { speciesId: 92,  name: 'Gastly',    types: ['Ghost','Poison'],  baseStats: { hp:30, atk:35, def:30, speed:80,  special:100 }, level: 14 },
+    { speciesId: 41,  name: 'Zubat',     types: ['Poison','Flying'], baseStats: { hp:40, atk:45, def:35, speed:55,  special:40  }, level: 16 },
+    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 18 },
   ]},
-  // Map 3 — enc 1: starter 1st evo replaces last slot; map max=40, Silver ace=42
+  // Map 3 — enc 1: starter 1st evo replaces last slot; map max=40, Silver ace=38
   { team: [
-    { speciesId: 92,  name: 'Gastly',    types: ['Ghost','Poison'],  baseStats: { hp:30, atk:35, def:30,  speed:80,  special:100 }, level: 38 },
-    { speciesId: 41,  name: 'Zubat',     types: ['Poison','Flying'], baseStats: { hp:40, atk:45, def:35,  speed:55,  special:40  }, level: 38 },
-    { speciesId: 81,  name: 'Magnemite', types: ['Electric','Steel'],baseStats: { hp:25, atk:35, def:70,  speed:45,  special:95  }, level: 36 },
-    { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45,  speed:95,  special:115 }, level: 38 },
-    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43,  speed:65,  special:60  }, level: 42 },
+    { speciesId: 92,  name: 'Gastly',    types: ['Ghost','Poison'],  baseStats: { hp:30, atk:35, def:30,  speed:80,  special:100 }, level: 34 },
+    { speciesId: 41,  name: 'Zubat',     types: ['Poison','Flying'], baseStats: { hp:40, atk:45, def:35,  speed:55,  special:40  }, level: 34 },
+    { speciesId: 81,  name: 'Magnemite', types: ['Electric','Steel'],baseStats: { hp:25, atk:35, def:70,  speed:45,  special:95  }, level: 32 },
+    { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45,  speed:95,  special:115 }, level: 34 },
+    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43,  speed:65,  special:60  }, level: 38 },
   ]},
-  // Map 5 — enc 2: starter final evo replaces last slot; map max=60, Silver ace=62
+  // Map 5 — enc 2: starter final evo replaces last slot; map max=60, Silver ace=58
   { team: [
-    { speciesId: 42,  name: 'Golbat',    types: ['Poison','Flying'], baseStats: { hp:75, atk:80, def:70, speed:90,  special:75  }, level: 57, heldItem: { id: 'life_orb',      name: 'Life Orb',      icon: '🔮' } },
-    { speciesId: 81,  name: 'Magnemite', types: ['Electric','Steel'],baseStats: { hp:25, atk:35, def:70, speed:45,  special:95  }, level: 60, heldItem: { id: 'magnet',        name: 'Magnet',        icon: '🧲' } },
-    { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45, speed:95,  special:115 }, level: 57, heldItem: { id: 'spell_tag',     name: 'Spell Tag',     icon: '👻' } },
-    { speciesId: 215, name: 'Sneasel',   types: ['Dark','Ice'],      baseStats: { hp:55, atk:95, def:55, speed:115, special:55  }, level: 60, heldItem: { id: 'eviolite',      name: 'Eviolite',      icon: '💎' } },
-    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 62 },
+    { speciesId: 42,  name: 'Golbat',    types: ['Poison','Flying'], baseStats: { hp:75, atk:80, def:70, speed:90,  special:75  }, level: 53, heldItem: { id: 'life_orb',      name: 'Life Orb',      icon: '🔮' } },
+    { speciesId: 81,  name: 'Magnemite', types: ['Electric','Steel'],baseStats: { hp:25, atk:35, def:70, speed:45,  special:95  }, level: 56, heldItem: { id: 'magnet',        name: 'Magnet',        icon: '🧲' } },
+    { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45, speed:95,  special:115 }, level: 53, heldItem: { id: 'spell_tag',     name: 'Spell Tag',     icon: '👻' } },
+    { speciesId: 215, name: 'Sneasel',   types: ['Dark','Ice'],      baseStats: { hp:55, atk:95, def:55, speed:115, special:55  }, level: 56, heldItem: { id: 'eviolite',      name: 'Eviolite',      icon: '💎' } },
+    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 58 },
   ]},
-  // Map 7 — enc 3: starter final evo replaces last slot; map max=80, Silver ace=82
+  // Map 7 — enc 3: starter final evo replaces last slot; map max=80, Silver ace=78
   { team: [
-    { speciesId: 42,  name: 'Golbat',    types: ['Poison','Flying'], baseStats: { hp:75, atk:80, def:70, speed:90,  special:75  }, level: 78, heldItem: { id: 'life_orb',      name: 'Life Orb',      icon: '🔮' } },
-    { speciesId: 81,  name: 'Magnemite', types: ['Electric','Steel'],baseStats: { hp:25, atk:35, def:70, speed:45,  special:95  }, level: 76, heldItem: { id: 'magnet',        name: 'Magnet',        icon: '🧲' } },
-    { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45, speed:95,  special:115 }, level: 78, heldItem: { id: 'spell_tag',     name: 'Spell Tag',     icon: '👻' } },
-    { speciesId: 215, name: 'Sneasel',   types: ['Dark','Ice'],      baseStats: { hp:55, atk:95, def:55, speed:115, special:55  }, level: 80, heldItem: { id: 'choice_band',   name: 'Choice Band',   icon: '🎀' } },
-    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 82 },
+    { speciesId: 42,  name: 'Golbat',    types: ['Poison','Flying'], baseStats: { hp:75, atk:80, def:70, speed:90,  special:75  }, level: 74, heldItem: { id: 'life_orb',      name: 'Life Orb',      icon: '🔮' } },
+    { speciesId: 81,  name: 'Magnemite', types: ['Electric','Steel'],baseStats: { hp:25, atk:35, def:70, speed:45,  special:95  }, level: 72, heldItem: { id: 'magnet',        name: 'Magnet',        icon: '🧲' } },
+    { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45, speed:95,  special:115 }, level: 74, heldItem: { id: 'spell_tag',     name: 'Spell Tag',     icon: '👻' } },
+    { speciesId: 215, name: 'Sneasel',   types: ['Dark','Ice'],      baseStats: { hp:55, atk:95, def:55, speed:115, special:55  }, level: 76, heldItem: { id: 'choice_band',   name: 'Choice Band',   icon: '🎀' } },
+    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 78 },
   ]},
 ];
 
@@ -474,18 +474,6 @@ const SILVER_STARTER_LINES = {
     { speciesId: 153, name: 'Bayleef',    types: ['Grass'], baseStats: { hp:60, atk:62,  def:80,  speed:60,  special:63 }, heldItem: { id: 'miracle_seed', name: 'Miracle Seed', icon: '🌱' } },
     { speciesId: 154, name: 'Meganium',   types: ['Grass'], baseStats: { hp:80, atk:82,  def:100, speed:80,  special:83 }, heldItem: { id: 'miracle_seed', name: 'Miracle Seed', icon: '🌱' } },
   ],
-};
-
-const RED_FINAL = {
-  name: 'Red', title: 'The Champion', type: 'Mixed',
-  team: [
-    { speciesId: 131, name: 'Lapras',   types: ['Water','Ice'],    baseStats: { hp:130, atk:85,  def:80,  speed:60,  special:95  }, level: 100, heldItem: { id: 'mystic_water',  name: 'Mystic Water',  icon: '💧' } },
-    { speciesId: 143, name: 'Snorlax',  types: ['Normal'],         baseStats: { hp:160, atk:110, def:65,  speed:30,  special:65  }, level: 100, heldItem: { id: 'leftovers',     name: 'Leftovers',     icon: '🍃' } },
-    { speciesId: 3,   name: 'Venusaur', types: ['Grass','Poison'], baseStats: { hp:80,  atk:82,  def:83,  speed:80,  special:100 }, level: 100, heldItem: { id: 'miracle_seed',  name: 'Miracle Seed',  icon: '🌱' } },
-    { speciesId: 6,   name: 'Charizard',types: ['Fire','Flying'],  baseStats: { hp:78,  atk:84,  def:78,  speed:100, special:109 }, level: 100, heldItem: { id: 'charcoal',      name: 'Charcoal',      icon: '🔥' } },
-    { speciesId: 9,   name: 'Blastoise',types: ['Water'],          baseStats: { hp:79,  atk:83,  def:100, speed:78,  special:105 }, level: 100, heldItem: { id: 'choice_specs',  name: 'Choice Specs',  icon: '👓' } },
-    { speciesId: 25,  name: 'Pikachu',  types: ['Electric'],       baseStats: { hp:35,  atk:55,  def:40,  speed:90,  special:50  }, level: 100, heldItem: { id: 'magnet',        name: 'Magnet',        icon: '🧲' } },
-  ]
 };
 
 // Item pool
@@ -621,9 +609,13 @@ const GEN2_MAP_LEVEL_RANGES = [
   [51,  60],  // Map 5 — Jasmine
   [61,  70],  // Map 6 — Pryce
   [71,  80],  // Map 7 — Clair
-  [81,  90],  // Map 8 — Elite Four (Will/Koga/Bruno/Karen/Lance)
-  [91, 100],  // Map 9 — Red
+  [81,  90],  // Map 8 — Elite Four (Will/Koga/Bruno/Karen/Lance) — final
 ];
+
+// Gen 2 deterministic level offsets for layers 1..7 (boss layer 8 uses leader data).
+// Curve sits cleanly in mapMin..mapMin+9 with the gym at exactly mapMin+9.
+// Map 1 example: layers = 1,2,3,5,6,8,9 ; gym = 10. Map 2: 11,12,13,15,16,18,19 ; gym = 20.
+const GEN2_LAYER_OFFSETS = [0, 1, 2, 4, 5, 7, 8];
 
 const MAP_NAMES = [
   'Route 1', 'Mt Moon', 'Nugget Bridge', 'Rock Tunnel',
