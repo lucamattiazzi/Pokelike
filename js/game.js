@@ -691,7 +691,13 @@ function getLevelForNode(node) {
 }
 
 async function doBattleNode(node) {
-  const level = (!state.isEndlessMode && state.currentMap >= 1) ? getLevelForNode(node) - 1 : getLevelForNode(node);
+  // Gen 2: wild Pokemon scale below the node's level on a stair-step curve —
+  // -1 from map 2, -2 from map 4, -3 from map 6, -4 from map 8 onward.
+  // Other modes keep the legacy -1 from map 2 onward.
+  const reduction = state.gen2Mode
+    ? Math.min(4, Math.floor((state.currentMap + 1) / 2))
+    : (!state.isEndlessMode && state.currentMap >= 1 ? 1 : 0);
+  const level = Math.max(1, getLevelForNode(node) - reduction);
   let choices = await getCatchChoices(getEncounterMapIndex(), 3, getCatchGenRange().maxGenId, !state.isEndlessMode, getCatchGenRange().minGenId);
   const lvlFiltered = choices.filter(sp => minLevelForSpecies(sp.id ?? sp.speciesId) <= level);
   if (lvlFiltered.length > 0) choices = lvlFiltered;
@@ -1657,7 +1663,18 @@ async function doTrainerNode(node) {
     // Dedupe pool, filter out evolved forms the battle level can't reach, then shuffle
     const eligible = [...new Set(activePool)]
       .filter(id => minLevelForSpecies(id) <= level);
-    const pool = eligible.length ? eligible : [...new Set(activePool)]; // fallback: use full pool
+    const raw = eligible.length ? eligible : [...new Set(activePool)]; // fallback: use full pool
+    // Collapse evolution chains: at high level, e.g. Zubat/Golbat/Crobat all
+    // resolve to Crobat, which would let a trainer roll 3 of the same mon.
+    // Keep one pool entry per distinct evolved species.
+    const seenEvolved = new Set();
+    const pool = [];
+    for (const id of raw) {
+      const ev = resolveEvoForLevel(id, level);
+      if (seenEvolved.has(ev)) continue;
+      seenEvolved.add(ev);
+      pool.push(id);
+    }
     const shuffled = pool.sort(() => rng() - 0.5);
     const ids = Array.from({ length: teamSize }, (_, i) => resolveEvoForLevel(shuffled[i % shuffled.length], level));
     const fetched = await Promise.all(ids.map(id => fetchPokemonById(id)));
