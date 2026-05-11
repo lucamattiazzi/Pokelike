@@ -1672,23 +1672,7 @@ async function doTrainerNode(node) {
   }
 
   if (!speciesList.length) { advanceFromNode(state.map, node.id); showMapScreen(); return; }
-  const ENDLESS_ENEMY_ITEM_POOL = [
-    { id: 'choice_band',  name: 'Choice Band',  icon: '🎀' },
-    { id: 'choice_specs', name: 'Choice Specs', icon: '👓' },
-    { id: 'choice_scarf', name: 'Choice Scarf', icon: '🧣' },
-    { id: 'life_orb',     name: 'Life Orb',     icon: '🔮' },
-    { id: 'rocky_helmet', name: 'Rocky Helmet', icon: '⛑️' },
-    { id: 'leftovers',    name: 'Leftovers',    icon: '🍖' },
-    { id: 'shell_bell',   name: 'Shell Bell',   icon: '🔔' },
-    { id: 'assault_vest', name: 'Assault Vest', icon: '🦺' },
-    { id: 'scope_lens',   name: 'Scope Lens',   icon: '🔭' },
-  ];
-  const enemyTeam = speciesList.map(sp => {
-    const inst = createInstance(sp, level, false, moveTier);
-    if (state.isEndlessMode && rng() < 0.25)
-      inst.heldItem = ENDLESS_ENEMY_ITEM_POOL[Math.floor(rng() * ENDLESS_ENEMY_ITEM_POOL.length)];
-    return inst;
-  });
+  const enemyTeam = speciesList.map(sp => createInstance(sp, level, false, moveTier));
 
   const titleEl = document.getElementById('battle-title');
   const subEl   = document.getElementById('battle-subtitle');
