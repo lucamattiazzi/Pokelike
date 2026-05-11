@@ -894,7 +894,7 @@ const GEN1_BST_APPROX = {
     25,30,33,35,37,39,43,50,58,61,63,66,73,77,83,92,95,96,104,109,
     113,114,116,120,122,126,127,128,138,140,
     // Gen 2
-    166,168,180,188,190,193,222,239,240,
+    164,166,168,180,185,188,190,193,198,206,215,222,234,239,240,246,
     // Gen 3
     267,269,271,274,294,299,302,303,329,345,347,
     // Gen 4
@@ -909,7 +909,7 @@ const GEN1_BST_APPROX = {
     2,5,8,42,49,51,64,67,70,75,82,85,93,97,101,105,107,110,119,
     121,124,125,130,137,
     // Gen 2
-    153,156,159,162,176,184,185,192,195,198,202,206,207,215,219,247,
+    153,156,159,162,176,178,184,185,192,195,198,200,202,203,205,206,207,210,215,219,226,227,247,
     // Gen 3
     253,256,259,262,264,277,279,284,288,301,305,308,311,312,313,314,
     315,320,337,338,351,352,358,364,372,
@@ -923,7 +923,7 @@ const GEN1_BST_APPROX = {
     // Gen 1 (added 26/36 — need lv36, reachable at map 6+; 117 also here for more coverage)
     26,36,40,44,55,62,76,80,87,88,89,90,91,99,106,115,117,123,131,132,137,142,143,
     // Gen 2
-    164,176,178,200,203,205,207,210,211,215,221,224,226,227,234,237,
+    164,171,176,178,181,186,196,197,199,200,203,205,207,210,211,215,217,221,224,226,227,229,232,233,234,237,
     // Gen 3
     272,275,286,291,297,310,317,319,323,324,326,332,335,336,340,342,
     354,356,357,359,362,367,368,369,375,
@@ -1025,7 +1025,7 @@ async function getCatchChoices(mapIndex, count = 3, maxGenId = 151, excludeStart
   const filtered = bucket.filter(id => {
     if (LEGENDARY_IDS.includes(id) || id < minGenId || id > maxGenId || starterSet.has(id)) return false;
     // Larvitar line: gate to the back half of the run (Pryce onward) so Tyranitar isn't trivial.
-    if (larvitarLine.has(id) && typeof state !== 'undefined' && state.gen2Mode && state.currentMap < 6) return false;
+    if (larvitarLine.has(id) && typeof state !== 'undefined' && state.gen2Mode && state.currentMap < 2) return false;
     return true;
   });
   const shuffled = [...filtered];
