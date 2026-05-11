@@ -1616,13 +1616,13 @@ const TRAINER_BATTLE_CONFIG = {
                  gen2Pool: [74,75,76,95,194,195,208,220,221] },
   fisher:      { name: 'Fisherman',     sprite: 'fisherman',
                  pool: [54,55,60,61,62,72,73,86,87,90,91,98,99,116,117,118,119,129,130],
-                 gen2Pool: [170,171,183,184,186,194,195,211,222,223,224] },
+                 gen2Pool: [170,171,183,184,186,194,222,223,224] },
   Scientist:   { name: 'Scientist',     sprite: 'scientist',
                  pool: [81,82,88,89,92,93,94,100,101,137],
                  gen2Pool: [81,82,201,233,239] },
   teamRocket:  { name: 'Rocket Grunt',  sprite: 'teamrocket',
                  pool: [19,20,23,24,41,42,52,53,88,89,109,110],
-                 gen2Pool: [19,20,41,42,88,89,169,215,228,229] },
+                 gen2Pool: [19,20,41,42,52,88,89,169,228,229] },
   policeman:   { name: 'Officer',       sprite: 'policeman',
                  pool: [58,59],
                  gen2Pool: [58,59,228,229] },
@@ -1634,7 +1634,7 @@ const TRAINER_BATTLE_CONFIG = {
                  gen2Pool: [56,63,66,79,96,102,106,107,116,147,177,196,201,202,203,214,236,238] },
   oldGuy:      { name: 'Old Man',       sprite: 'gentleman',
                  pool: null,
-                 gen2Pool: [16,21,41,84,128,142,161,163,198,209,225,227,234,241] },
+                 gen2Pool: [16,21,41,84,128,161,163,198,209,225,227,234,241] },
 };
 
 async function doTrainerNode(node) {
