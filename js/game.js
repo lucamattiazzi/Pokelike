@@ -900,9 +900,9 @@ function showElitePrepScreen({ title, subtitle, nextBoss }) {
 
 async function doGen2Elite4() {
   const bosses = GEN2_ELITE_4;
-  state.eliteIndex = 0;
-  for (let i = 0; i < bosses.length; i++) {
+  for (let i = state.eliteIndex; i < bosses.length; i++) {
     state.eliteIndex = i;
+    saveRun();
     const boss = bosses[i];
     // Prep screen before each Elite battle (including the first).
     const prevName = i === 0 ? null : bosses[i - 1].name;
@@ -2054,14 +2054,10 @@ function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, ene
         ropeBtn.style.cssText = 'margin-left:8px;';
         ropeBtn.onclick = () => {
           state.items.splice(ropeIdx, 1);
-          // Revive the last team slot to 1 HP (the one that fainted last).
-          const reviveIdx = (() => {
-            for (let i = state.team.length - 1; i >= 0; i--) {
-              if (state.team[i].currentHp <= 0) return i;
-            }
-            return state.team.length - 1;
-          })();
-          if (state.team[reviveIdx]) state.team[reviveIdx].currentHp = 1;
+          // Whole team fainted; revive only the last slot at 1 HP.
+          for (const p of state.team) p.currentHp = 0;
+          const lastIdx = state.team.length - 1;
+          if (state.team[lastIdx]) state.team[lastIdx].currentHp = 1;
           renderTeamBar(state.team);
           renderItemBadges(state.items);
           state._escapedViaRope = true;
