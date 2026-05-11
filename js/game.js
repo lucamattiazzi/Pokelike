@@ -886,7 +886,7 @@ function showElitePrepScreen({ title, subtitle, nextBoss }) {
     const teamEl  = document.getElementById('elite-prep-player-team');
     const itemsEl = document.getElementById('elite-prep-items');
     const refresh = () => {
-      renderTeamBar(state.team, teamEl, false, true);
+      renderTeamBar(state.team, teamEl, false, true, refresh);
       renderItemBadges(state.items, itemsEl, refresh);
     };
     refresh();
@@ -1654,7 +1654,12 @@ async function doTrainerNode(node) {
   } else {
     teamSize = state.currentMap === 0 ? 1 : state.currentMap <= 2 ? 2 : 3;
   }
-  const level = getLevelForNode(node);
+  // Gen 2: random trainers run below the node level — -1 from map 2, -2 from
+  // map 3, -3 from map 5 onward. Gym leaders / Silver / Elite 4 unaffected.
+  const trainerReduction = state.gen2Mode
+    ? (state.currentMap >= 4 ? 3 : state.currentMap >= 2 ? 2 : state.currentMap >= 1 ? 1 : 0)
+    : 0;
+  const level = Math.max(1, getLevelForNode(node) - trainerReduction);
   const moveTier = getMoveТierForMap(state.currentMap);
 
   let speciesList;

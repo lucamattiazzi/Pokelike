@@ -134,7 +134,6 @@ const ALL_ITEMS = [
   { id: 'life_orb',     name: 'Life Orb (+30% dmg, -10% HP recoil)' },
   { id: 'wide_lens',    name: 'Wide Lens (+20% dmg)' },
   { id: 'muscle_band',  name: 'Muscle Band (+50% ATK/DEF if 4+ phys)' },
-  { id: 'wise_glasses', name: 'Wise Glasses (+50% SPA/SPD if 4+ spec)' },
   { id: 'metronome',    name: 'Metronome (+50% if 4+ share type)' },
   { id: 'scope_lens',   name: 'Scope Lens (20% crit rate)' },
   { id: 'expert_belt',  name: 'Expert Belt (+30% on SE hits)' },
@@ -360,7 +359,7 @@ function runBattleTest() {
 
   const n = parseInt(document.getElementById('trial-count').value) || 1;
 
-  // Set state.team so item team-checks work (muscle_band, wise_glasses, metronome)
+  // Set state.team so item team-checks work (muscle_band, metronome)
   state.team = [atkInst];
 
   const atkTraits = buildTraits('atk');

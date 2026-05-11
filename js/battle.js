@@ -57,13 +57,6 @@ function calcDamage(attacker, defender, move, items, defItems = []) {
   // Physical/special split items
   if (isSpecial) {
     if (hasItem(items, 'choice_specs')) damage = Math.floor(damage * 1.3);
-    if (hasItem(items, 'wise_glasses')) {
-      const team = typeof state !== 'undefined' ? state.team : [];
-      const allSpecial = team.length > 0 && team.filter(p => (p.baseStats?.special || 0) >= (p.baseStats?.atk || 0)).length >= 4;
-      // wise_glasses still keeps its team-wide def buff in getEffectiveStat;
-      // no extra damage multiplier here.
-      void allSpecial;
-    }
   } else {
     if (hasItem(items, 'choice_band')) damage = Math.floor(damage * 1.4);
     if (hasItem(items, 'muscle_band')) damage = Math.floor(damage * 1.3);
@@ -95,21 +88,13 @@ function getEffectiveStat(pokemon, stat, items, stages = null) {
   let val = Math.floor((rawStat || 50) * pokemon.level / 50) + 5;
   if (buffCount > 0) val = Math.floor(val * (1 + 0.1 * buffCount));
 
-  const team = typeof state !== 'undefined' ? state.team : [];
-  const specialCount  = team.filter(p => (p.baseStats?.special || 0) >= (p.baseStats?.atk || 0)).length;
-  const allSpecial    = team.length > 0 && specialCount >= 4;
-
   if (stat === 'def') {
     if (hasItem(items, 'eviolite') && canEvolve(pokemon.speciesId)) val = Math.floor(val * 1.5);
     if (hasItem(items, 'choice_band'))                   val = Math.floor(val * 0.8);
   }
-  if (stat === 'special') {
-    if (hasItem(items, 'wise_glasses') && allSpecial)    val = Math.floor(val * 1.5);
-  }
   if (stat === 'spdef') {
     if (hasItem(items, 'eviolite') && canEvolve(pokemon.speciesId)) val = Math.floor(val * 1.5);
     if (hasItem(items, 'assault_vest'))                  val = Math.floor(val * 1.5);
-    if (hasItem(items, 'wise_glasses') && allSpecial)    val = Math.floor(val * 1.5);
   }
   if (stat === 'speed') {
     if (hasItem(items, 'choice_scarf')) val = Math.floor(val * 1.5);

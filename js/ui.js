@@ -233,7 +233,7 @@ function getMoveForPokemon(pokemon) {
 let _dragIdx = null;
 let _teamHoverCardDismissListener = null;
 
-function renderTeamBar(team, el, showTypes = false, forceReorder = false) {
+function renderTeamBar(team, el, showTypes = false, forceReorder = false, afterEquipChange = null) {
   const isMain = forceReorder || !el;
   if (!el) el = document.getElementById('team-bar');
   if (!el) return;
@@ -279,7 +279,14 @@ function renderTeamBar(team, el, showTypes = false, forceReorder = false) {
         hideTeamHoverCard();
         openItemEquipModal(p.heldItem, {
           fromPokemonIdx: i,
-          onComplete: () => { renderItemBadges(state.items); renderTeamBar(state.team); },
+          onComplete: () => {
+            if (afterEquipChange) {
+              afterEquipChange();
+            } else {
+              renderItemBadges(state.items);
+              renderTeamBar(state.team);
+            }
+          },
         });
       });
     }
