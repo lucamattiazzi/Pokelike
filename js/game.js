@@ -1781,10 +1781,10 @@ const TRAINER_BATTLE_CONFIG = {
                  pool: [4,5,6,37,38,58,59,77,78,126,136],
                  gen2Pool: [37,38,58,59,126,136,228,229,240] },
 
-  // ── Nerd: pure Electric + Porygon line. Replaces Scientist in Gen 2. ──
-  nerd:        { name: 'Super Nerd',    sprite: 'scientist',
-                 pool: [25,26,81,82,100,101,125,135,137],
-                 gen2Pool: [25,26,81,82,100,101,125,135,137,170,171,179,180,181,233,239] },
+  // ── Super Nerd: pure Electric specialists. Replaces Scientist in Gen 2. ──
+  nerd:        { name: 'Super Nerd',    sprite: 'supernerd',
+                 pool: [25,26,81,82,100,101,125,135],
+                 gen2Pool: [25,26,81,82,100,101,125,135,170,171,179,180,181,239] },
 
   // ── Scientist: kept for Gen 1 mode only. ──
   Scientist:   { name: 'Scientist',     sprite: 'scientist',
@@ -1814,7 +1814,7 @@ const TRAINER_BATTLE_CONFIG = {
   // ── Ace Trainer: elite mixed-type fighters. Adds the new Gen 2 cross-gen evos. ──
   aceTrainer:  { name: 'Ace Trainer',   sprite: 'acetrainer',
                  pool: null,
-                 gen2Pool: [56,63,66,79,96,102,106,107,113,116,147,177,196,197,199,201,202,203,212,214,230,233,236,238,242] },
+                 gen2Pool: [56,63,66,79,96,102,106,107,113,116,137,147,177,196,197,199,201,202,203,212,214,230,233,236,238,242] },
 
   // ── Old Man / Gentleman: veteran Normal-types — bulky, well-established. ──
   // Strips the pure-Flying birds (moved to Bird Catcher) and keeps the
