@@ -2442,7 +2442,6 @@ async function startEndlessRun(stageNum = 1, forcedStarterId = null) {
 // Restart the current run with the same starter / mode / Battle Tower stage.
 function confirmResetRun() {
   if (!state || !state.starterSpeciesId) return;
-  if (!confirm('Restart this run with the same starter and mode? All current progress is lost.')) return;
   const starterId = state.starterSpeciesId;
   const nuz = !!state.nuzlockeMode;
   const gen2 = !!state.gen2Mode;
