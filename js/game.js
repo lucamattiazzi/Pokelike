@@ -1777,7 +1777,7 @@ const TRAINER_BATTLE_CONFIG = {
                  gen2Pool: [58,59,209,210,228,229] },
 
   // ── Fire trainer (Burglar): all-Fire arsonist. ──
-  fireSpitter: { name: 'Burglar',       sprite: 'burglar',
+  fireSpitter: { name: 'Firebreather',  sprite: 'burglar',
                  pool: [4,5,6,37,38,58,59,77,78,126,136],
                  gen2Pool: [37,38,58,59,126,136,228,229,240] },
 

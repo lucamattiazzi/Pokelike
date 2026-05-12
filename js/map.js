@@ -278,7 +278,7 @@ function getTrainerSpritePath(key, isGen2) {
 const TRAINER_SPRITE_NAMES = {
   aceTrainer:  'Ace Trainer',
   bugCatcher:  'Bug Catcher',
-  fireSpitter: 'Burglar',
+  fireSpitter: 'Firebreather',
   fisher:      'Fisherman',
   hiker:       'Hiker',
   oldGuy:      'Gentleman',
