@@ -1316,7 +1316,12 @@ function doItemNode(node) {
   });
 
   const available = [...heldAvailable, ...usableAvailable];
-  const shuffled = [...available].sort(() => rng() - 0.5);
+  // Fisher-Yates shuffle — sort(() => rng() - 0.5) is famously biased.
+  const shuffled = [...available];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
   const picks = shuffled.slice(0, 3);
 
   const el = document.getElementById('item-choices');
@@ -1682,7 +1687,11 @@ async function doTrainerNode(node) {
       seenEvolved.add(ev);
       pool.push(id);
     }
-    const shuffled = pool.sort(() => rng() - 0.5);
+    const shuffled = [...pool];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
     const ids = Array.from({ length: teamSize }, (_, i) => resolveEvoForLevel(shuffled[i % shuffled.length], level));
     const fetched = await Promise.all(ids.map(id => fetchPokemonById(id)));
     speciesList = fetched.filter(Boolean);

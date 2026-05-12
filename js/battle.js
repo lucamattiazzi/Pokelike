@@ -53,14 +53,13 @@ function calcDamage(attacker, defender, move, items, defItems = []) {
 
   if (hasItem(items, 'life_orb'))    damage = Math.floor(damage * 1.3);
   if (hasItem(items, 'wide_lens'))   damage = Math.floor(damage * 1.2);
-  if (hasItem(items, 'metronome'))   damage = Math.floor(damage * 1.25);
+  if (hasItem(items, 'metronome'))   damage = Math.floor(damage * 1.20);
 
   // Physical/special split items
   if (isSpecial) {
     if (hasItem(items, 'choice_specs')) damage = Math.floor(damage * 1.3);
   } else {
     if (hasItem(items, 'choice_band')) damage = Math.floor(damage * 1.4);
-    if (hasItem(items, 'muscle_band')) damage = Math.floor(damage * 1.3);
   }
 
   if (hasItem(items, 'lagging_tail')) damage = Math.floor(damage * 2.0);

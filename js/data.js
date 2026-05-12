@@ -161,6 +161,17 @@ function getBestMove(types, baseStats, speciesId, moveTier = 1, heldItem = null)
   if (speciesId === 63)  return { name: 'Teleport', power: 0, type: 'Normal', isSpecial: false, noDamage: true };
   const isSpecial = (baseStats?.special || 0) >= (baseStats?.atk || 0);
   const tier = Math.max(0, Math.min(2, moveTier ?? 1));
+  // Metronome: dual-type holder uses the OTHER type's attack (the one the
+  // default picker would skip). The +20% damage boost is applied in calcDamage.
+  if (heldItem?.id === 'metronome' && types && types.length >= 2) {
+    const defaultIdx = (types[0].toLowerCase() === 'normal') ? 1 : 0;
+    const otherIdx   = defaultIdx === 0 ? 1 : 0;
+    const cap = types[otherIdx].charAt(0).toUpperCase() + types[otherIdx].slice(1).toLowerCase();
+    if (MOVE_POOL[cap]) {
+      const move = isSpecial ? MOVE_POOL[cap].special[tier] : MOVE_POOL[cap].physical[tier];
+      return { ...move, type: cap, isSpecial };
+    }
+  }
   if ([74, 75, 76, 95].includes(speciesId)) {
     const move = MOVE_POOL['Rock'][isSpecial ? 'special' : 'physical'][tier];
     return { ...move, type: 'Rock', isSpecial };
@@ -268,7 +279,7 @@ const ELITE_4 = [
     team: [
       { speciesId: 95,  name: 'Onix',      types: ['Rock','Ground'], baseStats: { hp:35,atk:45,def:160,speed:70,special:30 }, level: 53, heldItem: { id: 'rocky_helmet', name: 'Rocky Helmet', icon: '⛑️' } },
       { speciesId: 107, name: 'Hitmonchan',types: ['Fighting'], baseStats: { hp:50,atk:105,def:79,speed:76,special:35 }, level: 55, heldItem: { id: 'black_belt', name: 'Black Belt', icon: '🥋' } },
-      { speciesId: 106, name: 'Hitmonlee', types: ['Fighting'], baseStats: { hp:50,atk:120,def:53,speed:87,special:35 }, level: 55, heldItem: { id: 'muscle_band', name: 'Muscle Band', icon: '💪' } },
+      { speciesId: 106, name: 'Hitmonlee', types: ['Fighting'], baseStats: { hp:50,atk:120,def:53,speed:87,special:35 }, level: 55, heldItem: { id: 'life_orb', name: 'Life Orb', icon: '🔮' } },
       { speciesId: 95,  name: 'Onix',      types: ['Rock','Ground'], baseStats: { hp:35,atk:45,def:160,speed:70,special:30 }, level: 54, heldItem: { id: 'hard_stone', name: 'Hard Stone', icon: '🪨' } },
       { speciesId: 68,  name: 'Machamp',   types: ['Fighting'], baseStats: { hp:90,atk:130,def:80,speed:55,special:65 }, level: 58, heldItem: { id: 'choice_band', name: 'Choice Band', icon: '🎀' } },
     ]
@@ -470,8 +481,7 @@ const ITEM_POOL = [
   { id: 'life_orb',           name: 'Life Orb',           desc: '+30% damage; holder loses 10% max HP per hit',                       icon: '🔮' },
   { id: 'choice_band',        name: 'Choice Band',        desc: '+40% physical damage, -20% DEF',                                     icon: '🎀' },
   { id: 'choice_specs',       name: 'Choice Specs',       desc: '+30% special damage',                                                icon: '👓' },
-  { id: 'muscle_band',         name: 'Muscle Band',        desc: '+30% physical damage',                                              icon: '💪' },
-  { id: 'metronome',          name: 'Metronome',          desc: '+25% damage on all moves',                                            icon: '🎵' },
+  { id: 'metronome',          name: 'Metronome',          desc: 'Dual-type holder uses its OTHER type for attacks; +20% damage on all moves', icon: '🎵' },
   { id: 'scope_lens',         name: 'Scope Lens',         desc: '20% crit chance (+50% damage on crit)',                              icon: '🔭' },
   { id: 'rocky_helmet',       name: 'Rocky Helmet',       desc: 'Attacker takes 12% of their max HP on each hit',                     icon: '⛑️' },
   { id: 'shell_bell',         name: 'Shell Bell',         desc: 'Heal 15% of damage dealt',                                           icon: '🐚' },
@@ -1192,7 +1202,7 @@ const EVOLUTIONS = {
   147:{ into: 148, level: 30, name: 'Dragonair' },
   148:{ into: 149, level: 55, name: 'Dragonite' },
   // Gen 1 -> Gen 2 cross-gen evolutions
-  42: { into: 169, level: 30, name: 'Crobat' },
+  42: { into: 169, level: 50, name: 'Crobat' },
   // Gen 2 starters
   152:{ into: 153, level: 16, name: 'Bayleef' },
   153:{ into: 154, level: 32, name: 'Meganium' },
