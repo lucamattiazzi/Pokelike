@@ -142,17 +142,34 @@ async function initGame() {
   }
 }
 
-async function startNewRun(nuzlockeMode = false, gen2Mode = false) {
+async function startNewRun(nuzlockeMode = false, gen2Mode = false, forcedStarterId = null) {
   clearEndlessState();
   const savedTrainer = localStorage.getItem('poke_trainer') || null;
   const seed = (Date.now() ^ (Math.random() * 0x100000000 | 0)) >>> 0;
   seedRng(seed);
   state = { currentMap: 0, currentNode: null, team: [], items: [], badges: 0, map: null, eliteIndex: 0, trainer: savedTrainer || 'boy', starterSpeciesId: null, maxTeamSize: 1, nuzlockeMode, gen2Mode, silverBeaten: 0, usedPokecenter: false, pickedUpItem: false, runSeed: seed };
+  if (forcedStarterId && savedTrainer) {
+    await pickForcedStarter(forcedStarterId);
+    return;
+  }
   if (savedTrainer) {
     await showStarterSelect();
   } else {
     await showTrainerSelect();
   }
+}
+
+// Skip the starter chooser by instancing the requested species directly. Used
+// by the reset-run button so the player gets the same starter back.
+async function pickForcedStarter(speciesId) {
+  const species = await fetchPokemonById(speciesId);
+  if (!species) {
+    await showStarterSelect();
+    return;
+  }
+  const isShiny = rng() < (hasShinyCharm() ? 0.02 : 0.01);
+  const inst = createInstance(species, 5, isShiny, 0);
+  await selectStarter(inst);
 }
 
 async function showTrainerSelect() {
@@ -213,7 +230,7 @@ async function showStarterSelect() {
         return `<div class="${rowClass}" data-species="${speciesAttr}" style="cursor:default;">
           <span class="type-badge type-${typeClass}" style="font-size:6px;padding:1px 3px;">${type}</span>
           <span class="region-stage-name">${isBigBoss ? '★ ' : ''}${name}</span>
-          <span class="region-stage-level">Lv${trainer.level}</span>
+          <span class="region-stage-level">Lv${trainer.displayLevel ?? trainer.level}</span>
         </div>`;
       }).join('');
       panel.innerHTML = header + `<div class="region-stage-list">${rows}</div>`;
@@ -274,7 +291,7 @@ async function showStarterSelect() {
     hofBox.className = 'pc-box';
     const hasEntries = hofSpecies.length > 0;
     const sortBtnsHtml = hasEntries
-      ? `<div class="hof-sort-btns"><button class="hof-sort-btn active" data-sort="stars">★ Stars</button><button class="hof-sort-btn" data-sort="type">Type</button><button class="hof-sort-btn" data-sort="id">#</button><span class="hof-sort-sep"></span><button class="hof-sort-btn hof-filter-shiny" data-filter="shiny">★ Shiny</button></div>`
+      ? `<div class="hof-sort-btns"><button class="hof-sort-btn active" data-sort="stars">★ Stars</button><button class="hof-sort-btn" data-sort="lastused">Last Used</button><button class="hof-sort-btn" data-sort="id">#</button><span class="hof-sort-sep"></span><button class="hof-sort-btn hof-filter-shiny" data-filter="shiny">★ Shiny</button></div>`
       : '';
     const hofTitle = hasEntries ? `HALL OF FAME PC (${hofX}/${hofY})` : 'HALL OF FAME PC';
     hofBox.innerHTML = `<div class="pc-box-titlebar${hasEntries ? ' with-sort' : ''}"><span>${hofTitle}</span>${sortBtnsHtml}</div><div class="pc-box-body"><div class="pc-box-grid" style="grid-template-columns:repeat(6,1fr);"></div></div>`;
@@ -341,10 +358,15 @@ async function showStarterSelect() {
     let showOnlyShiny = false;
     let currentSort = 'stars';
 
+    const lastUsedTimes = getLastUsedTimes();
     function sortHof(mode) {
       const pool = showOnlyShiny ? hofInstances.filter(i => i.isShiny) : [...hofInstances];
       if (mode === 'stars') pool.sort((a, b) => { const d = hofStarScore(b.speciesId) - hofStarScore(a.speciesId); return d !== 0 ? d : a.speciesId - b.speciesId; });
-      else if (mode === 'type') pool.sort((a, b) => { const ta = (a.types?.[0]||'').toLowerCase(), tb = (b.types?.[0]||'').toLowerCase(); return ta !== tb ? (ta < tb ? -1 : 1) : a.speciesId - b.speciesId; });
+      else if (mode === 'lastused') pool.sort((a, b) => {
+        const ra = getEvoLineRoot(a.speciesId), rb = getEvoLineRoot(b.speciesId);
+        const ta = lastUsedTimes[ra] ?? 0, tb = lastUsedTimes[rb] ?? 0;
+        return tb !== ta ? tb - ta : a.speciesId - b.speciesId;
+      });
       else pool.sort((a, b) => a.speciesId - b.speciesId);
       buildHofGrid(pool);
     }
@@ -401,6 +423,7 @@ async function selectStarter(pokemon) {
   state.team = [pokemon];
   state.starterSpeciesId = pokemon.speciesId;
   recordUsedStarter(pokemon.speciesId);
+  setLastUsedTime(getEvoLineRoot(pokemon.speciesId));
   state.maxTeamSize = 1;
   if (state.isEndlessMode) {
     startEndlessRegion();
@@ -638,10 +661,36 @@ function resolveQuestionMark() {
 
 // ---- Node Handlers ----
 
+// Each Battle Tower stage anchors to one generation. Stage 1 = Kanto (Gen 1),
+// stage 2 = Johto (Gen 2), etc. Encounters are restricted to that gen's range.
+const STAGE_GEN_RANGES = {
+  1: { minGenId: 1,   maxGenId: 151 },
+  2: { minGenId: 152, maxGenId: 251 },
+  3: { minGenId: 252, maxGenId: 386 },
+  4: { minGenId: 387, maxGenId: 493 },
+  5: { minGenId: 494, maxGenId: 649 },
+};
+function getStageGenRange(stage) {
+  return STAGE_GEN_RANGES[stage] || { minGenId: 1, maxGenId: 649 };
+}
 function getCatchGenRange() {
-  if (state.isEndlessMode) return { minGenId: 1, maxGenId: getEndlessMaxGenId(endlessState.stageNumber) };
+  if (state.isEndlessMode) return getStageGenRange(endlessState.stageNumber);
   if (state.gen2Mode) return { minGenId: 152, maxGenId: 251 };
   return { minGenId: 1, maxGenId: 151 };
+}
+
+// Reverse lookup: where does this Pokemon appear in the Battle Tower? Returns
+// { stage, stageName, gens } for every stage whose gen range contains the id,
+// or null if it's not findable in any stage.
+function getBattleTowerLocations(pokemonId) {
+  const out = [];
+  for (const [stageStr, range] of Object.entries(STAGE_GEN_RANGES)) {
+    const stage = Number(stageStr);
+    if (pokemonId >= range.minGenId && pokemonId <= range.maxGenId) {
+      out.push({ stage, stageName: getStageName(stage) });
+    }
+  }
+  return out;
 }
 
 // Maps a max level to an appropriate map index for BST bucket selection.
@@ -1040,7 +1089,7 @@ async function doCatchNode(node) {
     const myRoot = getEvoLineRoot(inst.speciesId);
     const hofStarterBadge = inst.isShiny
       ? (!caught && getUsedStarters().some(id => getEvoLineRoot(id) === myRoot))
-      : getHallOfFame().some(e => e.team?.some(p => getEvoLineRoot(p.speciesId) === myRoot));
+      : hofHasEvoLine(inst.speciesId);
     const wrapper = document.createElement('div');
     wrapper.innerHTML = renderPokemonCard(inst, true, false, caught, hofStarterBadge);
     const card = wrapper.querySelector('.poke-card');
@@ -1302,7 +1351,7 @@ function doItemNode(node) {
   const canUseMaxRevive   = state.team.some(p => p.currentHp <= 0);
   const canUseFullRestore = state.team.some(p => p.currentHp > 0 && p.currentHp < p.maxHp);
   const canUseEvoStone    = state.team.some(p => {
-    if (p.speciesId === 133) return true;
+    if (BRANCHING_EVOLUTIONS[p.speciesId]) return true;
     const evo = EVOLUTIONS[p.speciesId];
     return evo && evo.into !== p.speciesId;
   });
@@ -1388,7 +1437,6 @@ function openItemEquipModal(item, { fromBagIdx = -1, fromPokemonIdx = -1, onComp
         ${isSelf
           ? `<button class="equip-btn equip-btn-unequip" data-unequip="${i}">Unequip</button>`
           : `<button class="equip-btn${hasHeld ? ' equip-btn-swap' : ''}" data-idx="${i}">${btnLabel}</button>`}
-        ${hasHeld && !isSelf ? `<button class="equip-btn equip-btn-unequip" data-unequip="${i}" title="Unequip ${p.heldItem.name}">×</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -1482,7 +1530,7 @@ function openUsableItemModal(item, bagIdx, afterUse = null) {
     if (item.id === 'full_restore') return p.currentHp > 0 && p.currentHp < p.maxHp;
     if (item.id === 'moon_stone') {
       if (p.currentHp <= 0) return false;
-      if (p.speciesId === 133) return true;
+      if (BRANCHING_EVOLUTIONS[p.speciesId]) return true;
       const evo = EVOLUTIONS[p.speciesId];
       return !!(evo && evo.into !== p.speciesId);
     }
@@ -1569,6 +1617,9 @@ function openUsableItemModal(item, bagIdx, afterUse = null) {
 }
 
 async function applyEvolution(pokemon) {
+  // Eviolite blocks all evolutions — check before showing any branching popup.
+  if (pokemon.heldItem?.id === 'eviolite') return;
+
   let evo;
   const branchingChoices = BRANCHING_EVOLUTIONS[pokemon.speciesId];
   if (branchingChoices) {
@@ -1577,8 +1628,6 @@ async function applyEvolution(pokemon) {
     evo = EVOLUTIONS[pokemon.speciesId];
     if (!evo) return;
   }
-
-  if (pokemon.heldItem?.id === 'eviolite') return;
   await playEvoAnimation(pokemon, evo);
 
   const oldHpRatio = pokemon.currentHp / pokemon.maxHp;
@@ -1725,8 +1774,16 @@ async function doTrainerNode(node) {
 
 async function doLegendaryNode(node) {
   const teamLegendIds = state.team.map(p => p.speciesId);
-  const maxLegendId = state.isEndlessMode ? getEndlessMaxGenId(endlessState.stageNumber) : (state.gen2Mode ? 251 : 151);
-  const minLegendId = state.gen2Mode ? 152 : 1;
+  let minLegendId, maxLegendId;
+  if (state.isEndlessMode) {
+    const range = getStageGenRange(endlessState.stageNumber);
+    minLegendId = range.minGenId;
+    maxLegendId = range.maxGenId;
+  } else if (state.gen2Mode) {
+    minLegendId = 152; maxLegendId = 251;
+  } else {
+    minLegendId = 1; maxLegendId = 151;
+  }
   const available = LEGENDARY_IDS.filter(id => id >= minLegendId && id <= maxLegendId && !teamLegendIds.includes(id));
   if (available.length === 0) { advanceFromNode(state.map, node.id); showMapScreen(); return; }
   const legendId = available[Math.floor(rng() * available.length)];
@@ -1875,12 +1932,14 @@ async function doTradeNode(node) {
       advanceFromNode(state.map, node.id);
 
       // Show full-screen reveal
+      const offerCaught = !!(getPokedex()[offer.speciesId]?.caught);
+      const offerHofBadge = hofHasEvoLine(offer.speciesId);
       showScreen('shiny-screen');
       document.getElementById('shiny-content').innerHTML = `
         <div class="shiny-title">You received ${offer.name}!</div>
         <div style="color:var(--text-dim);font-size:10px;margin-bottom:8px;">
           ${released.nickname || released.name} was sent to the trainer.</div>
-        ${renderPokemonCard(offer, false, false, false)}
+        ${renderPokemonCard(offer, false, false, offerCaught, offerHofBadge)}
         <button id="btn-trade-continue" class="btn-primary" style="margin-top:12px;">Continue</button>
       `;
       document.getElementById('btn-trade-continue').onclick = () => showMapScreen();
@@ -1906,8 +1965,7 @@ async function doShinyNode(node) {
   loadBuffsIntoPokemon(shiny);
 
   const shinyCaught = !!(getShinyDex()[shiny.speciesId]);
-  const shinyRoot = getEvoLineRoot(shiny.speciesId);
-  const shinyStarterBadge = !shinyCaught && getHallOfFame().some(e => e.team?.some(p => getEvoLineRoot(p.speciesId) === shinyRoot));
+  const shinyStarterBadge = hofHasEvoLine(shiny.speciesId);
   showScreen('shiny-screen');
   document.getElementById('shiny-content').innerHTML = `
     <div class="shiny-title">✨ A Shiny Pokemon appeared!</div>
@@ -2158,7 +2216,7 @@ function showWinScreen() {
 
   // Track elite four wins
   const wins = incrementEliteWins();
-  saveHallOfFameEntry(state.team, wins, state.nuzlockeMode, false, null, state.starterSpeciesId);
+  saveHallOfFameEntry(state.team, wins, state.nuzlockeMode, false, null, state.starterSpeciesId, state.gen2Mode);
   const winsEl = document.getElementById('win-run-count');
   if (winsEl) winsEl.textContent = `Championship #${wins}`;
   if (wins === 10) {
@@ -2296,11 +2354,11 @@ const MAX_ACCESSIBLE_STAGE = 5;
 
 const STAGE_META = [
   null,
-  { label: 'Kanto',  gens: 'Gen 1',   color: '#e8503a' },
-  { label: 'Johto',  gens: 'Gen 1-2', color: '#c0a050' },
-  { label: 'Hoenn',  gens: 'Gen 1-3', color: '#60a878' },
-  { label: 'Sinnoh', gens: 'Gen 1-4', color: '#7878c8' },
-  { label: 'Unova',  gens: 'Gen 1-5', color: '#808080' },
+  { label: 'Kanto',  gens: 'Gen 1', color: '#e8503a' },
+  { label: 'Johto',  gens: 'Gen 2', color: '#c0a050' },
+  { label: 'Hoenn',  gens: 'Gen 3', color: '#60a878' },
+  { label: 'Sinnoh', gens: 'Gen 4', color: '#7878c8' },
+  { label: 'Unova',  gens: 'Gen 5', color: '#808080' },
 ];
 
 const STAGE_REGION_BG = [
@@ -2354,7 +2412,7 @@ function showEndlessStageSelect() {
   showScreen('endless-stage-select');
 }
 
-async function startEndlessRun(stageNum = 1) {
+async function startEndlessRun(stageNum = 1, forcedStarterId = null) {
   clearSavedRun();
   const seed = (Date.now() ^ (Math.random() * 0x100000000 | 0)) >>> 0;
   seedRng(seed);
@@ -2370,10 +2428,31 @@ async function startEndlessRun(stageNum = 1) {
     currentRegion: null, traitTiers: {},
   };
   clearEndlessState();
+  if (forcedStarterId && localStorage.getItem('poke_trainer')) {
+    await pickForcedStarter(forcedStarterId);
+    return;
+  }
   if (!localStorage.getItem('poke_trainer')) {
     await showTrainerSelect();
   } else {
     await showStarterSelect();
+  }
+}
+
+// Restart the current run with the same starter / mode / Battle Tower stage.
+function confirmResetRun() {
+  if (!state || !state.starterSpeciesId) return;
+  if (!confirm('Restart this run with the same starter and mode? All current progress is lost.')) return;
+  const starterId = state.starterSpeciesId;
+  const nuz = !!state.nuzlockeMode;
+  const gen2 = !!state.gen2Mode;
+  const isEndless = !!state.isEndlessMode;
+  const stage = endlessState?.stageNumber ?? 1;
+  clearSavedRun();
+  if (isEndless) {
+    startEndlessRun(stage, starterId);
+  } else {
+    startNewRun(nuz, gen2, starterId);
   }
 }
 
@@ -2591,7 +2670,7 @@ async function showStatBuffScreen() {
       ['hp',      'HP',  'stat-hp'],
       ['atk',     'ATK', 'stat-atk'],
       ['def',     'DEF', 'stat-def'],
-      ['speed',   'Spe', 'stat-spe'],
+      ['speed',   'SPE', 'stat-spe'],
       ['special', 'SP.A', 'stat-spa'],
       ['spdef',   'SP.D', 'stat-spd'],
     ];
@@ -2745,6 +2824,12 @@ function getEvoLineRoot(speciesId) {
   return id;
 }
 
+// Does the player's Hall of Fame contain any Pokémon from this evolution line?
+function hofHasEvoLine(speciesId) {
+  const root = getEvoLineRoot(speciesId);
+  return getHallOfFame().some(e => e.team?.some(p => getEvoLineRoot(p.speciesId) === root));
+}
+
 function loadBuffsIntoPokemon(p) {
   if (!state.isEndlessMode) return;
   const store = loadPersistentBuffs();
@@ -2790,6 +2875,7 @@ function applyStatBuff(pokemon, statKey) {
   const store = loadPersistentBuffs();
   store[getEvoLineRoot(pokemon.speciesId)] = { ...pokemon.statBuffs };
   savePersistentBuffs(store);
+  checkMaxStatAchievements(pokemon);
   saveRun();
   saveEndlessState();
   if (typeof syncToCloud === 'function') syncToCloud();

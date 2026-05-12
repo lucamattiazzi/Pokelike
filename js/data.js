@@ -1508,6 +1508,10 @@ const BRANCHING_EVOLUTIONS = {
     { into: 414, level: 20, name: 'Mothim',   types: ['Bug', 'Flying'] },
     { into: 413, level: 20, name: 'Wormadam', types: ['Bug', 'Grass']  },
   ],
+  366: [ // Clamperl
+    { into: 367, level: 40, name: 'Huntail',  types: ['Water'] },
+    { into: 368, level: 40, name: 'Gorebyss', types: ['Water'] },
+  ],
 };
 
 // ---- Achievements ----
@@ -1528,7 +1532,7 @@ const ACHIEVEMENTS = [
   { id: 'starter_4', name: 'Fire Champion',   desc: 'Choose Charmander as your starter and beat the game',                  icon: '🔥', category: 'normal' },
   { id: 'starter_7', name: 'Water Champion',  desc: 'Choose Squirtle as your starter and beat the game',                    icon: '🌊', category: 'normal' },
   { id: 'solo_run',    name: 'One is Enough',        desc: 'Beat the game while keeping only 1 Pokémon on your team',       icon: '⭐', category: 'normal' },
-  { id: 'nuzlocke_win',      name: 'True Master',    desc: 'Enable Nuzlocke Mode in Settings, then beat the game — if any Pokémon faints, it\'s gone for good', icon: '☠️', category: 'normal' },
+  { id: 'nuzlocke_win',      name: 'True Master',    desc: 'Beat the game in Nuzlocke Mode — every faint is permanent. No second chances.', icon: '☠️', category: 'normal' },
   { id: 'three_birds',       name: 'Bird Keeper',    desc: 'Beat the game with Articuno, Zapdos, and Moltres all on your team', icon: '🦅', category: 'normal' },
   { id: 'no_pokecenter',     name: 'No Rest for the Wicked', desc: 'Beat the game without stopping at a Pokémon Center',   icon: '🏃', category: 'normal' },
   { id: 'no_items',          name: 'Minimalist',     desc: 'Beat the game without picking up a single item',                icon: '🎒', category: 'normal' },
@@ -1675,13 +1679,26 @@ function recordUsedStarter(speciesId) {
   }
 }
 
-function saveHallOfFameEntry(team, runNumber, hardMode, endless = false, stageNumber = null, starterSpeciesId = null) {
+// "Last used" timestamp per evolution-line root — for sorting the Battle Tower
+// HoF PC so recently-picked Pokemon surface first.
+function getLastUsedTimes() {
+  try { return JSON.parse(localStorage.getItem('poke_last_used') || '{}'); }
+  catch { return {}; }
+}
+function setLastUsedTime(rootId, when = Date.now()) {
+  const map = getLastUsedTimes();
+  map[rootId] = when;
+  try { localStorage.setItem('poke_last_used', JSON.stringify(map)); } catch {}
+}
+
+function saveHallOfFameEntry(team, runNumber, hardMode, endless = false, stageNumber = null, starterSpeciesId = null, gen2Mode = false) {
   const entries = getHallOfFame();
   entries.push({
     savedAt: Date.now(),
     runNumber,
     hardMode: !!hardMode,
     endless: !!endless,
+    gen2Mode: !!gen2Mode,
     stageNumber: stageNumber ?? null,
     starterSpeciesId: starterSpeciesId ?? null,
     date: new Date().toLocaleDateString(),

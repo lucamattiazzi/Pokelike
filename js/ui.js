@@ -111,7 +111,7 @@ function renderPokemonCard(pokemon, onClick, selected, dexCaught = false, hofSta
       return [
         ['ATK', pokemon.baseStats.atk,     'stat-atk', 'atk'],
         ['SP.A', pokemon.baseStats.special ?? 0, 'stat-spa', 'special'],
-        ['Spe', pokemon.baseStats.speed,   'stat-spe', 'speed'],
+        ['SPE', pokemon.baseStats.speed,   'stat-spe', 'speed'],
         ['HP',  pokemon.baseStats.hp,      'stat-hp',  'hp'],
         ['DEF', pokemon.baseStats.def,     'stat-def', 'def'],
         ['SP.D', pokemon.baseStats.spdef ?? pokemon.baseStats.special ?? 0, 'stat-spd', 'spdef'],
@@ -2809,7 +2809,7 @@ async function animateBattleVisually(detailedLog, pTeamInit, eTeamInit) {
 function updateBattleStages(pokemonEl, stages) {
   const el = pokemonEl.querySelector('.battle-stages');
   if (!el) return;
-  const labels = { atk: 'ATK', def: 'DEF', speed: 'Spe', special: 'SP.A', spdef: 'SP.D' };
+  const labels = { atk: 'ATK', def: 'DEF', speed: 'SPE', special: 'SP.A', spdef: 'SP.D' };
   el.innerHTML = Object.entries(stages)
     .filter(([, v]) => v !== 0)
     .map(([stat, v]) => {
@@ -2824,7 +2824,7 @@ function animateStatChange(pokemonEl, stat, change) {
     const isUp = change > 0;
     const color = isUp ? '#5af055' : '#f05545';
     const arrow = isUp ? '▲' : '▼';
-    const statLabels = { atk: 'ATK', def: 'DEF', speed: 'Spe', special: 'SP.A', spdef: 'SP.D' };
+    const statLabels = { atk: 'ATK', def: 'DEF', speed: 'SPE', special: 'SP.A', spdef: 'SP.D' };
 
     const popup = document.createElement('div');
     popup.className = 'stat-change-popup';
@@ -2952,7 +2952,7 @@ function renderEndlessRegionPanel(region, currentMapIndex) {
     return `<div class="${rowClass}" data-species="${speciesAttr}" style="cursor:default;">
       <span style="display:inline-flex;gap:1px;align-items:center;">${typeBadges}</span>
       <span class="region-stage-name">${statusIcon}${isBigBoss ? '★ ' : ''}${name}</span>
-      <span class="region-stage-level">Lv${trainer.level}</span>
+      <span class="region-stage-level">Lv${trainer.displayLevel ?? trainer.level}</span>
     </div>`;
   }).join('');
 
@@ -3010,6 +3010,14 @@ function _fillTraitBarEl(elId, tiers) {
     const badge = document.createElement('span');
     badge.className = `trait-badge type-badge type-${type.toLowerCase()}`;
     badge.textContent = `${type} T${tier}`;
+    // Tooltip shows the current-tier description, with graceful fallback for
+    // custom overrides (e.g. Ghetsis Dragon T10, Steven Rock T5) that exceed
+    // the per-trait description array length.
+    const descs = TRAIT_DESCRIPTIONS?.[type];
+    if (descs && descs.length > 0) {
+      const idx = Math.min(tier, descs.length) - 1;
+      badge.title = descs[idx];
+    }
     el.appendChild(badge);
   }
 }
@@ -3183,6 +3191,9 @@ async function checkAndEvolveTeam() {
   for (const pokemon of state.team) {
     const wasFainted = pokemon.currentHp <= 0;
 
+    // Eviolite blocks all evolutions — check before showing any branching popup.
+    if (pokemon.heldItem?.id === 'eviolite') continue;
+
     let evo;
     const branchingChoices = BRANCHING_EVOLUTIONS[pokemon.speciesId];
     if (branchingChoices) {
@@ -3193,8 +3204,6 @@ async function checkAndEvolveTeam() {
       if (!evo || pokemon.level < evo.level) continue;
       if (pokemon.speciesId === evo.into) continue;
     }
-
-    if (pokemon.heldItem?.id === 'eviolite') continue;
     if (!skipAnim) await playEvoAnimation(pokemon, evo);
 
     const oldHpRatio = pokemon.currentHp / pokemon.maxHp;
@@ -3449,15 +3458,20 @@ function openPokedexModal(initialTab = 'normal') {
     const dex = getPokedex();
     const caughtCount = Array.from({length: 649}, (_, i) => i + 1).filter(id => dex[id]?.caught).length;
     const genCounts = buildGenCounts(dex, (d, id) => !!d[id]?.caught);
+    const towerStageFor = (typeof getBattleTowerLocations === 'function')
+      ? (id) => { const locs = getBattleTowerLocations(id); return locs.length ? locs.map(l => l.stageName).join(', ') : null; }
+      : () => null;
     const grid = Array.from({ length: 649 }, (_, i) => {
       const id = i + 1;
       const gc = genCounts[id];
       const header = GEN_HEADERS[id] ? `<div class="dex-gen-header">${GEN_HEADERS[id]}<span class="gen-count">${gc.caught}/${gc.total}</span></div>` : '';
       const e = dex[id];
+      const towerStage = towerStageFor(id);
+      const towerTitle = towerStage ? ` title="Battle Tower: ${towerStage}"` : '';
       if (e) {
         const types = (e.types || []).map(t =>
           `<span class="type-badge type-${t.toLowerCase()}">${t}</span>`).join('');
-        return header + `<div class="dex-card dex-caught">
+        return header + `<div class="dex-card dex-caught"${towerTitle}>
           <div class="dex-num">#${String(id).padStart(3,'0')}</div>
           <img src="${BASE + id + '.png'}" alt="${e.name}" class="dex-sprite"
                onerror="this.src='';this.style.display='none'">
@@ -3547,15 +3561,22 @@ function openPokedexModal(initialTab = 'normal') {
     const dexData = isShiny ? getShinyDex() : getPokedex();
     const isCaught = id => isShiny ? !!dexData[id] : !!dexData[id]?.caught;
 
-    const gen1Ids = [...ALL_CATCHABLE_IDS].filter(id => id <= 151);
+    // Count every species in the gen — including legendaries — so the % matches
+    // what completionists would expect to fill.
+    const allIds = [
+      ...[...ALL_CATCHABLE_IDS],
+      ...LEGENDARY_IDS.filter(id => id <= 649),
+    ];
+    const gen1Ids = allIds.filter(id => id <= 151);
     const gen1Total = gen1Ids.length;
     const gen1Count = gen1Ids.filter(isCaught).length;
     const gen1Pct = Math.floor(gen1Count / gen1Total * 100);
 
-    const allTotal = 649;
-    const allPct = Math.floor(count / allTotal * 100);
+    const allTotal = allIds.length;
+    const allCount = allIds.filter(isCaught).length;
+    const allPct = Math.floor(allCount / allTotal * 100);
 
-    document.getElementById('dex-count-label').textContent = `${count} / ${allTotal}`;
+    document.getElementById('dex-count-label').textContent = `${allCount} / ${allTotal}`;
     document.getElementById('dex-progress-bar').style.width = `${gen1Pct}%`;
     document.getElementById('dex-progress-label').textContent = `Gen 1 — ${gen1Pct}%`;
     document.getElementById('dex-progress-bar-all').style.width = `${allPct}%`;
@@ -4251,30 +4272,54 @@ function openHallOfFameModal() {
   modal.id = 'hof-modal';
   modal.style.cssText = 'position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;';
 
-  const entriesHtml = entries.length === 0
+  function entryMatchesFilter(e, filter) {
+    if (filter === 'all')      return true;
+    if (filter === 'normal')   return !e.endless && !e.hardMode && !e.gen2Mode;
+    if (filter === 'nuzlocke') return !e.endless && !!e.hardMode;
+    if (filter === 'tower')    return !!e.endless;
+    if (filter === 'gen2')     return !e.endless && !!e.gen2Mode;
+    return true;
+  }
+
+  const renderEntries = (filter) => entries.length === 0
     ? '<div style="color:var(--text-dim);text-align:center;padding:24px;font-size:11px;">No championships yet.<br>Defeat the Elite Four to be remembered!</div>'
-    : [...entries].reverse().map(e => {
-        const pokemonHtml = e.team.map(p => {
-          const itemHtml = p.heldItem
-            ? `<div style="display:flex;align-items:center;gap:2px;font-size:7px;color:var(--text-dim);">${itemIconHtml(p.heldItem, 12)}</div>`
-            : '';
-          return `
-          <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
-            <img src="${p.spriteUrl}" style="width:48px;height:48px;image-rendering:pixelated;${p.isShiny ? 'filter:drop-shadow(0 0 4px gold);' : ''}" title="${p.nickname || p.name}">
-            <div style="font-size:7px;color:${p.isShiny ? 'gold' : 'var(--text-dim)'};">${p.nickname || p.name}</div>
-            <div style="font-size:7px;color:var(--text-dim);">Lv.${p.level}</div>
-            ${itemHtml}
-          </div>`;
-        }).join('');
-        return `
-          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-              <span style="font-size:10px;color:gold;font-weight:bold;">${e.endless ? `Battle Tower: ${getStageName(e.stageNumber)}` : `Championship #${e.runNumber}`}${e.hardMode ? ' ☠️' : ''}</span>
-              <span style="font-size:9px;color:var(--text-dim);">${e.date}</span>
-            </div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;">${pokemonHtml}</div>
-          </div>`;
-      }).join('');
+    : (() => {
+        const filtered = [...entries].reverse().filter(e => entryMatchesFilter(e, filter));
+        if (filtered.length === 0) {
+          return '<div style="color:var(--text-dim);text-align:center;padding:24px;font-size:11px;">No runs match this filter.</div>';
+        }
+        return filtered.map(renderEntryHtml).join('');
+      })();
+
+  function renderEntryHtml(e) {
+    const pokemonHtml = e.team.map(p => {
+      const itemHtml = p.heldItem
+        ? `<div style="display:flex;align-items:center;gap:2px;font-size:7px;color:var(--text-dim);">${itemIconHtml(p.heldItem, 12)}</div>`
+        : '';
+      return `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+        <img src="${p.spriteUrl}" style="width:48px;height:48px;image-rendering:pixelated;${p.isShiny ? 'filter:drop-shadow(0 0 4px gold);' : ''}" title="${p.nickname || p.name}">
+        <div style="font-size:7px;color:${p.isShiny ? 'gold' : 'var(--text-dim)'};">${p.nickname || p.name}</div>
+        <div style="font-size:7px;color:var(--text-dim);">Lv.${p.level}</div>
+        ${itemHtml}
+      </div>`;
+    }).join('');
+    return `
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:10px;color:gold;font-weight:bold;">${e.endless ? `Battle Tower: ${getStageName(e.stageNumber)}` : `Championship #${e.runNumber}`}${e.hardMode ? ' ☠️' : ''}${e.gen2Mode ? ' ⅠⅠ' : ''}</span>
+          <span style="font-size:9px;color:var(--text-dim);">${e.date}</span>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">${pokemonHtml}</div>
+      </div>`;
+  }
+
+  const filterChipsHtml = entries.length > 0 ? `
+    <div id="hof-filter-bar" style="display:flex;gap:4px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--border);">
+      ${['all','normal','nuzlocke','tower','gen2'].map(f =>
+        `<button class="hof-filter-chip${f === 'all' ? ' active' : ''}" data-filter="${f}" style="font-family:'Press Start 2P',monospace;font-size:7px;padding:4px 6px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-dim);cursor:pointer;border-radius:4px;">${f === 'all' ? 'All' : f === 'normal' ? 'Normal' : f === 'nuzlocke' ? 'Nuzlocke' : f === 'tower' ? 'Battle Tower' : 'Gen 2'}</button>`
+      ).join('')}
+    </div>` : '';
 
   modal.innerHTML = `
     <div style="background:var(--bg-main);border:2px solid var(--border);border-radius:12px;width:90%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;">
@@ -4282,8 +4327,29 @@ function openHallOfFameModal() {
         <span style="font-family:'Press Start 2P',monospace;font-size:10px;color:gold;">Hall of Fame</span>
         <button style="background:none;border:none;color:var(--text-main);font-size:16px;cursor:pointer;line-height:1;" onclick="document.getElementById('hof-modal').remove()">✕</button>
       </div>
-      <div style="overflow-y:auto;padding:14px;font-family:'Press Start 2P',monospace;">${entriesHtml}</div>
+      ${filterChipsHtml}
+      <div id="hof-entries" style="overflow-y:auto;padding:14px;font-family:'Press Start 2P',monospace;flex:1;">${renderEntries('all')}</div>
     </div>`;
 
   document.body.appendChild(modal);
+
+  modal.querySelectorAll('.hof-filter-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      modal.querySelectorAll('.hof-filter-chip').forEach(b => {
+        b.classList.remove('active');
+        b.style.background = 'var(--bg-card)';
+        b.style.color = 'var(--text-dim)';
+      });
+      btn.classList.add('active');
+      btn.style.background = 'var(--accent)';
+      btn.style.color = '#181410';
+      document.getElementById('hof-entries').innerHTML = renderEntries(btn.dataset.filter);
+    });
+  });
+  // Highlight default 'all' chip
+  const defaultChip = modal.querySelector('.hof-filter-chip.active');
+  if (defaultChip) {
+    defaultChip.style.background = 'var(--accent)';
+    defaultChip.style.color = '#181410';
+  }
 }

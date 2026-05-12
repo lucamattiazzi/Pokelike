@@ -89,7 +89,9 @@ h1, h2, .pixel-font {
   transition: all 0.15s;
   text-transform: uppercase;
 }
-.btn-primary:hover { transform: translateY(-2px); }
+@media (hover: hover) {
+  .btn-primary:hover { transform: translateY(-2px); }
+}
 .btn-primary:active { transform: translateY(0); }
 .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
@@ -102,7 +104,9 @@ h1, h2, .pixel-font {
   cursor: pointer;
   transition: all 0.15s;
 }
-.btn-secondary:hover { color: var(--accent); }
+@media (hover: hover) {
+  .btn-secondary:hover { color: var(--accent); }
+}
 .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Generation toggle (title screen) — color-themed Roman numerals */
@@ -1149,8 +1153,10 @@ h1, h2, .pixel-font {
     flex: 0 0 auto;
     width: fit-content;
     align-self: start;
-    max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
     overflow-y: auto;
+    padding-bottom: 16px;
+    scroll-padding-bottom: 16px;
   }
 
   #map-container {
@@ -1167,8 +1173,10 @@ h1, h2, .pixel-font {
     flex: 0 0 auto;
     width: fit-content;
     align-self: start;
-    max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
     overflow-y: auto;
+    padding-bottom: 16px;
+    scroll-padding-bottom: 16px;
   }
 
   #endless-trait-panel {
@@ -1767,9 +1775,19 @@ h1, h2, .pixel-font {
   image-rendering: pixelated;
   display: block;
 }
-.btn-icon-sm:hover {
-  opacity: 1;
-  transform: scale(1.2);
+.btn-icon-sm.btn-icon-glyph {
+  width: 28px;
+  height: 28px;
+  color: var(--text);
+  font-size: 18px;
+  font-family: 'Press Start 2P', monospace;
+  line-height: 1;
+}
+@media (hover: hover) {
+  .btn-icon-sm:hover {
+    opacity: 1;
+    transform: scale(1.2);
+  }
 }
 
 /* ---- Pokedex Modal ---- */
@@ -2263,7 +2281,9 @@ h1, h2, .pixel-font {
   cursor: pointer;
   letter-spacing: 0.03em;
 }
-.btn-primary:hover  { box-shadow: 4px 4px 0 0 #181410; transform: none; }
+@media (hover: hover) {
+  .btn-primary:hover  { box-shadow: 4px 4px 0 0 #181410; transform: none; }
+}
 .btn-primary:active { box-shadow: 1px 1px 0 0 #181410; transform: translate(2px, 2px); }
 .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: 3px 3px 0 0 #181410; transform: none; }
 

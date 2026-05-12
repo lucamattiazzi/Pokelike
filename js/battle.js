@@ -322,8 +322,9 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
         attackerHpAfter: attacker.currentHp, targetHpAfter: target.currentHp,
       });
 
-      // whenAttacked hook — events pushed here appear after the attack event in the log
-      if (target.currentHp > 0 && traitsConfig?.whenAttacked) {
+      // whenAttacked hook — events pushed here appear after the attack event in the log.
+      // Called even on a KO so traits like Flying can retroactively revive/heal.
+      if (traitsConfig?.whenAttacked) {
         traitsConfig.whenAttacked(target, tIdx, tSide, attacker, aIdx, side, damage, detailedLog);
       }
 

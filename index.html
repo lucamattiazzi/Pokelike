@@ -62,6 +62,9 @@
   <div style="margin-top:6px;">
     <a href="privacy.html" style="color:var(--text-dim);font-size:8px;text-decoration:none;">Privacy Policy</a>
   </div>
+  <div style="margin-top:10px;max-width:340px;color:var(--text-dim);font-size:8px;opacity:0.6;line-height:1.4;text-align:center;padding:0 10px;">
+    Fan-made project. Not affiliated with, endorsed by, or sponsored by Nintendo, Game Freak, or The Pokémon Company. All Pokémon names and sprites are property of their respective owners.
+  </div>
 </div>
 
 <!-- ===== TRAINER SELECT ===== -->
@@ -105,6 +108,7 @@
       <button onclick="openPokedexModal()" class="btn-icon-sm" title="Pokédex"><img src="ui/pokedex.png" alt="Pokédex"></button>
       <button onclick="openAchievementsModal()" class="btn-icon-sm" title="Achievements"><img src="ui/achievements.png" alt="Achievements"></button>
       <button onclick="openSettingsModal()" class="btn-icon-sm" title="Settings"><img src="ui/settings.png" alt="Settings"></button>
+      <button onclick="confirmResetRun()" class="btn-icon-sm btn-icon-glyph" title="Restart run">↻</button>
     </div>
   </div>
 
@@ -113,6 +117,7 @@
     <button onclick="openPokedexModal()" class="btn-icon-sm" title="Pokédex"><img src="ui/pokedex.png" alt="Pokédex"></button>
     <button onclick="openAchievementsModal()" class="btn-icon-sm" title="Achievements"><img src="ui/achievements.png" alt="Achievements"></button>
     <button onclick="openSettingsModal()" class="btn-icon-sm" title="Settings"><img src="ui/settings.png" alt="Settings"></button>
+    <button onclick="confirmResetRun()" class="btn-icon-sm btn-icon-glyph" title="Restart run">↻</button>
   </div>
 
   <div class="map-panels">
@@ -186,9 +191,9 @@
 <!-- ===== SWAP SCREEN ===== -->
 <div id="swap-screen" class="screen">
   <h2>Team Full!</h2>
-  <div id="swap-incoming"></div>
   <p id="swap-prompt" class="swap-prompt"></p>
   <div id="swap-choices"></div>
+  <div id="swap-incoming"></div>
   <div style="text-align:center;margin-top:12px;">
     <button id="btn-cancel-swap" class="btn-secondary">Keep team as-is</button>
   </div>
