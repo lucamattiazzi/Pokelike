@@ -1752,7 +1752,7 @@ const TRAINER_BATTLE_CONFIG = {
   // Differs from Fisherman by leaning into Tentacruel, Slowbro/Slowking,
   // Cloyster, Starmie, Lapras, Mantine, Politoed — things you'd see from
   // the deck of a ship, not pulled in on a rod.
-  captain:     { name: 'Captain',       sprite: 'sailor',
+  captain:     { name: 'Sailor',        sprite: 'sailor',
                  pool: [8,9,72,73,80,90,91,121,131],
                  gen2Pool: [8,9,72,73,80,90,91,121,131,186,199,226] },
 
@@ -1760,7 +1760,7 @@ const TRAINER_BATTLE_CONFIG = {
   // Differs from Biker by mixing Dark (Houndour, Sneasel, Murkrow) and rats /
   // alley cats (Rattata, Meowth) with the classic Grimer/Muk. The Biker keeps
   // the pure-Poison sewer Pokémon.
-  teamRocket:  { name: 'Rocket Grunt',  sprite: 'teamrocket',
+  teamRocket:  { name: 'Team Rocket Grunt', sprite: 'teamrocket',
                  pool: [19,20,23,24,41,42,52,53,88,89],
                  gen2Pool: [19,20,41,42,52,53,88,89,169,198,215,228,229] },
 
@@ -1777,12 +1777,12 @@ const TRAINER_BATTLE_CONFIG = {
                  gen2Pool: [58,59,209,210,228,229] },
 
   // ── Fire trainer (Burglar): all-Fire arsonist. ──
-  fireSpitter: { name: 'Fire Trainer',  sprite: 'burglar',
+  fireSpitter: { name: 'Burglar',       sprite: 'burglar',
                  pool: [4,5,6,37,38,58,59,77,78,126,136],
                  gen2Pool: [37,38,58,59,126,136,228,229,240] },
 
   // ── Nerd: pure Electric + Porygon line. Replaces Scientist in Gen 2. ──
-  nerd:        { name: 'Nerd',          sprite: 'scientist',
+  nerd:        { name: 'Super Nerd',    sprite: 'scientist',
                  pool: [25,26,81,82,100,101,125,135,137],
                  gen2Pool: [25,26,81,82,100,101,125,135,137,170,171,179,180,181,233,239] },
 
@@ -1799,7 +1799,7 @@ const TRAINER_BATTLE_CONFIG = {
   // ── School Kid: beginner Normal-types — youngster's first team. ──
   // Differs from Old Man by leaning younger/smaller (Rattata, Eevee, Sentret,
   // Aipom, baby Pokémon) instead of the bulky veteran-Normal lineup.
-  schoolBoy:   { name: 'School Kid',    sprite: 'schoolkid',
+  schoolBoy:   { name: 'Schoolboy',     sprite: 'schoolkid',
                  pool: [19,20,133,143],
                  gen2Pool: [19,20,133,161,162,172,173,174,175,190,206] },
 
@@ -1820,7 +1820,7 @@ const TRAINER_BATTLE_CONFIG = {
   // Strips the pure-Flying birds (moved to Bird Catcher) and keeps the
   // grandfatherly mix of Tauros / Miltank / Granbull / Stantler / Furret /
   // Chansey-Blissey / Lickitung.
-  oldGuy:      { name: 'Old Man',       sprite: 'gentleman',
+  oldGuy:      { name: 'Gentleman',     sprite: 'gentleman',
                  pool: null,
                  gen2Pool: [53,108,113,128,161,162,190,206,209,210,234,241,242] },
 };

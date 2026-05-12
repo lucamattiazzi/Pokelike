@@ -278,19 +278,19 @@ function getTrainerSpritePath(key, isGen2) {
 const TRAINER_SPRITE_NAMES = {
   aceTrainer:  'Ace Trainer',
   bugCatcher:  'Bug Catcher',
-  fireSpitter: 'Fire Breather',
-  fisher:      'Fisher',
+  fireSpitter: 'Burglar',
+  fisher:      'Fisherman',
   hiker:       'Hiker',
-  oldGuy:      'Old Man',
-  policeman:   'Policeman',
+  oldGuy:      'Gentleman',
+  policeman:   'Officer',
   Scientist:   'Scientist',
   teamRocket:  'Team Rocket Grunt',
   birdCatcher: 'Bird Keeper',
   biker:       'Biker',
-  nerd:        'Nerd',
+  nerd:        'Super Nerd',
   medium:      'Medium',
-  schoolBoy:   'School Kid',
-  captain:     'Captain',
+  schoolBoy:   'Schoolboy',
+  captain:     'Sailor',
 };
 
 const TRAINER_SPECIALTIES = {
