@@ -1807,7 +1807,7 @@ const TRAINER_BATTLE_CONFIG = {
   // Differs from Old Man by being strictly flying / avian (Pidgey, Spearow,
   // Doduo, Farfetch'd, Hoothoot, Natu, Murkrow, Skarmory, Aerodactyl), while
   // Old Man keeps the bulky ground-bound Normal-types.
-  birdCatcher: { name: 'Bird Catcher',  sprite: 'birdkeeper',
+  birdCatcher: { name: 'Bird Keeper',   sprite: 'birdkeeper',
                  pool: [16,17,18,21,22,83,84,85,142],
                  gen2Pool: [16,17,18,21,22,83,84,85,142,163,164,177,178,198,225,227] },
 

@@ -285,7 +285,7 @@ const TRAINER_SPRITE_NAMES = {
   policeman:   'Policeman',
   Scientist:   'Scientist',
   teamRocket:  'Team Rocket Grunt',
-  birdCatcher: 'Bird Catcher',
+  birdCatcher: 'Bird Keeper',
   biker:       'Biker',
   nerd:        'Nerd',
   medium:      'Medium',
