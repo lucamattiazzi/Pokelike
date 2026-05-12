@@ -352,9 +352,10 @@ const KANTO_GYM_LEADER_SPRITES = [
 ];
 
 function getNodeSprite(node) {
+  const gen2 = typeof state !== 'undefined' && state.gen2Mode;
   const ICON_SPRITES = {
-    [NODE_TYPES.BATTLE]:    'sprites/grass.png',
-    [NODE_TYPES.CATCH]:     'sprites/catchPokemon.png',
+    [NODE_TYPES.BATTLE]:    gen2 ? 'sprites/gen2/grass.png'    : 'sprites/grass.png',
+    [NODE_TYPES.CATCH]:     gen2 ? 'sprites/gen2/pokeball.png' : 'sprites/catchPokemon.png',
     [NODE_TYPES.ITEM]:      'sprites/itemIcon.png',
     [NODE_TYPES.TRADE]:      'sprites/tradeIcon.png',
     [NODE_TYPES.LEGENDARY]:  'sprites/legendaryEncounter.png',
@@ -364,7 +365,6 @@ function getNodeSprite(node) {
   };
   if (ICON_SPRITES[node.type]) return ICON_SPRITES[node.type];
   if (node.type === NODE_TYPES.TRAINER) {
-    const gen2 = typeof state !== 'undefined' && state.gen2Mode;
     const key = node.trainerSprite || (() => {
       const keys = TRAINER_SPRITE_KEYS.filter(k => {
         if (!gen2 && GEN2_ONLY_TRAINER_KEYS.has(k)) return false;
