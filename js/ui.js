@@ -3459,7 +3459,12 @@ function openPokedexModal(initialTab = 'normal') {
     const caughtCount = Array.from({length: 649}, (_, i) => i + 1).filter(id => dex[id]?.caught).length;
     const genCounts = buildGenCounts(dex, (d, id) => !!d[id]?.caught);
     const towerStageFor = (typeof getBattleTowerLocations === 'function')
-      ? (id) => { const locs = getBattleTowerLocations(id); return locs.length ? locs.map(l => l.stageName).join(', ') : null; }
+      ? (id) => {
+          const locs = getBattleTowerLocations(id);
+          if (!locs.length) return null;
+          // Compact the list — show each unique location label.
+          return locs.map(l => l.label).join(' • ');
+        }
       : () => null;
     const grid = Array.from({ length: 649 }, (_, i) => {
       const id = i + 1;

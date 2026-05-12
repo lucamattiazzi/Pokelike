@@ -679,15 +679,75 @@ function getCatchGenRange() {
   return { minGenId: 1, maxGenId: 151 };
 }
 
-// Reverse lookup: where does this Pokemon appear in the Battle Tower? Returns
-// { stage, stageName, gens } for every stage whose gen range contains the id,
-// or null if it's not findable in any stage.
+// Build the set of forms a base-species ID can become at or below maxLevel,
+// walking both linear and branching evolutions. Used by the reverse lookup so
+// e.g. Pidgey + level 36 reports Pidgey/Pidgeotto/Pidgeot, and Eevee reports
+// all of its eeveelutions.
+function _reachableEvoForms(baseId, maxLevel) {
+  const seen = new Set([baseId]);
+  const stack = [baseId];
+  while (stack.length) {
+    const id = stack.pop();
+    const linear = EVOLUTIONS[id];
+    if (linear && linear.level <= maxLevel && !seen.has(linear.into)) {
+      seen.add(linear.into);
+      stack.push(linear.into);
+    }
+    const branches = BRANCHING_EVOLUTIONS[id];
+    if (branches) {
+      for (const b of branches) {
+        if (b.level <= maxLevel && !seen.has(b.into)) {
+          seen.add(b.into);
+          stack.push(b.into);
+        }
+      }
+    }
+  }
+  return seen;
+}
+
+function _bucketForBstMin(min) {
+  if (min >= 530) return GEN1_BST_APPROX.veryHigh;
+  if (min >= 460) return GEN1_BST_APPROX.high;
+  if (min >= 400) return GEN1_BST_APPROX.midHigh;
+  if (min >= 340) return GEN1_BST_APPROX.mid;
+  if (min >= 280) return GEN1_BST_APPROX.midLow;
+  return GEN1_BST_APPROX.low;
+}
+
+// Reverse lookup: every (stage, region, map) where this Pokemon — or any
+// member of its evolution line — can spawn in the Battle Tower. Some species
+// (e.g. Crobat) only appear by leveling up a base that spawns at low-tier
+// floors; the location of the base is what's reported in that case.
 function getBattleTowerLocations(pokemonId) {
+  // Build the full evolution line for this species. Walk down to the root and
+  // then forward through every reachable form (with no level cap) so the line
+  // covers babies, both branches of branching evos, and final forms.
+  const root = (typeof getEvoLineRoot === 'function') ? getEvoLineRoot(pokemonId) : pokemonId;
+  const lineForms = _reachableEvoForms(root, Infinity);
   const out = [];
-  for (const [stageStr, range] of Object.entries(STAGE_GEN_RANGES)) {
-    const stage = Number(stageStr);
-    if (pokemonId >= range.minGenId && pokemonId <= range.maxGenId) {
-      out.push({ stage, stageName: getStageName(stage) });
+  for (let stage = 1; stage <= 5; stage++) {
+    const stageRange = STAGE_GEN_RANGES[stage];
+    for (let region = 1; region <= 3; region++) {
+      for (let map = 0; map < 3; map++) {
+        const [minL, maxL] = getEndlessLevelRange(stage, region, map);
+        const mapIdx = levelToMapIndex(maxL);
+        const r = MAP_BST_RANGES[Math.min(mapIdx, MAP_BST_RANGES.length - 1)];
+        const bucket = _bucketForBstMin(r.min);
+        let matched = false;
+        for (const baseId of bucket) {
+          if (baseId < stageRange.minGenId || baseId > stageRange.maxGenId) continue;
+          if (lineForms.has(baseId)) { matched = true; break; }
+        }
+        if (matched) {
+          out.push({
+            stage, stageName: getStageName(stage),
+            region, map: map + 1,
+            minL, maxL,
+            label: `${getStageName(stage)} R${region}M${map + 1} (L${minL}-${maxL})`,
+          });
+        }
+      }
     }
   }
   return out;
