@@ -63,6 +63,9 @@ function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
     const availableKeys = TRAINER_SPRITE_KEYS.filter(k => {
       if (k === 'aceTrainer' && mapIndex >= 6) return false;
       if (k === 'policeman'  && mapIndex >= 4) return false;
+      // Gen 2-only sprites are hidden in Gen 1 mode (and vice versa).
+      if (!gen2Mode && GEN2_ONLY_TRAINER_KEYS.has(k)) return false;
+      if (gen2Mode  && GEN1_ONLY_TRAINER_KEYS.has(k)) return false;
       return true;
     });
     let h = 0;
@@ -233,7 +236,42 @@ function advanceFromNode(map, nodeId) {
 const TRAINER_SPRITE_KEYS = [
   'aceTrainer', 'bugCatcher', 'fireSpitter', 'fisher',
   'hiker', 'oldGuy', 'policeman', 'Scientist', 'teamRocket',
+  // Gen 2-only trainer sprites
+  'birdCatcher', 'biker', 'nerd', 'medium', 'schoolBoy', 'captain',
 ];
+
+// Gen 2-only sprites — hidden in Gen 1 mode so no broken images appear.
+const GEN2_ONLY_TRAINER_KEYS = new Set([
+  'birdCatcher', 'biker', 'nerd', 'medium', 'schoolBoy', 'captain',
+]);
+// Gen 1-only sprites — replaced in Gen 2 (Scientist becomes Nerd, etc).
+const GEN1_ONLY_TRAINER_KEYS = new Set(['Scientist']);
+
+// Gen 2 mode has re-skinned versions of most trainer sprites under sprites/gen2/.
+// A few share the trainer key (aceTrainer, bugCatcher, etc), two are renamed
+// (fireSpitter→fireBreather, oldGuy→oldMan), and the Gen 2-exclusive sprites
+// only live here.
+const GEN2_SPRITE_FILENAME = {
+  aceTrainer:  'aceTrainer',
+  bugCatcher:  'bugCatcher',
+  fireSpitter: 'fireBreather',
+  fisher:      'fisher',
+  oldGuy:      'oldMan',
+  teamRocket:  'teamRocket',
+  birdCatcher: 'birdCatcher',
+  biker:       'biker',
+  nerd:        'nerd',
+  medium:      'medium',
+  schoolBoy:   'schoolBoy',
+  captain:     'captain',
+};
+
+function getTrainerSpritePath(key, isGen2) {
+  if (isGen2 && GEN2_SPRITE_FILENAME[key]) {
+    return `sprites/gen2/${GEN2_SPRITE_FILENAME[key]}.png`;
+  }
+  return `sprites/${key}.png`;
+}
 
 const TRAINER_SPRITE_NAMES = {
   aceTrainer:  'Ace Trainer',
@@ -245,6 +283,12 @@ const TRAINER_SPRITE_NAMES = {
   policeman:   'Policeman',
   Scientist:   'Scientist',
   teamRocket:  'Team Rocket Grunt',
+  birdCatcher: 'Bird Catcher',
+  biker:       'Biker',
+  nerd:        'Nerd',
+  medium:      'Medium',
+  schoolBoy:   'School Kid',
+  captain:     'Captain',
 };
 
 const TRAINER_SPECIALTIES = {
@@ -257,11 +301,17 @@ const TRAINER_SPECIALTIES = {
   policeman:   'Fire Pokemon',
   Scientist:   'Electric/Poison Pokemon',
   teamRocket:  'Poison Pokemon',
+  birdCatcher: 'Flying Pokemon',
+  biker:       'Poison Pokemon',
+  nerd:        'Electric Pokemon',
+  medium:      'Ghost Pokemon',
+  schoolBoy:   'Normal Pokemon',
+  captain:     'Water Pokemon',
 };
 
 const TRAINER_SPECIALTIES_GEN2 = {
   aceTrainer:  'Dragon/Psychic/Fighting Pokemon',
-  oldGuy:      'Normal/Flying/Fire Pokemon',
+  oldGuy:      'Normal Pokemon',
 };
 
 const RANDOM_TRAINER_SPRITES = TRAINER_SPRITE_KEYS.map(k => `sprites/${k}.png`);
@@ -278,14 +328,14 @@ const GYM_LEADER_SPRITES = [
 ];
 
 const JOHTO_GYM_LEADER_SPRITES = [
-  'https://play.pokemonshowdown.com/sprites/trainers/falkner.png',
-  'https://play.pokemonshowdown.com/sprites/trainers/bugsy.png',
-  'https://play.pokemonshowdown.com/sprites/trainers/whitney.png',
-  'https://play.pokemonshowdown.com/sprites/trainers/morty.png',
-  'https://play.pokemonshowdown.com/sprites/trainers/chuck.png',
-  'https://play.pokemonshowdown.com/sprites/trainers/jasmine.png',
-  'https://play.pokemonshowdown.com/sprites/trainers/pryce.png',
-  'https://play.pokemonshowdown.com/sprites/trainers/clair.png',
+  'sprites/gen2/falkner.png',
+  'sprites/gen2/bugsy.png',
+  'sprites/gen2/whitney.png',
+  'sprites/gen2/morty.png',
+  'sprites/gen2/chuck.png',
+  'sprites/gen2/jasmine.png',
+  'sprites/gen2/pryce.png',
+  'sprites/gen2/clair.png',
 ];
 
 const KANTO_GYM_LEADER_SPRITES = [
@@ -312,12 +362,18 @@ function getNodeSprite(node) {
   };
   if (ICON_SPRITES[node.type]) return ICON_SPRITES[node.type];
   if (node.type === NODE_TYPES.TRAINER) {
+    const gen2 = typeof state !== 'undefined' && state.gen2Mode;
     const key = node.trainerSprite || (() => {
+      const keys = TRAINER_SPRITE_KEYS.filter(k => {
+        if (!gen2 && GEN2_ONLY_TRAINER_KEYS.has(k)) return false;
+        if (gen2  && GEN1_ONLY_TRAINER_KEYS.has(k)) return false;
+        return true;
+      });
       let h = 0;
       for (const c of node.id) h = (h * 31 + c.charCodeAt(0)) | 0;
-      return TRAINER_SPRITE_KEYS[Math.abs(h) % TRAINER_SPRITE_KEYS.length];
+      return keys[Math.abs(h) % keys.length];
     })();
-    return `sprites/${key}.png`;
+    return getTrainerSpritePath(key, gen2);
   }
   if (node.type === NODE_TYPES.BOSS) {
     if (typeof state !== 'undefined' && state.isEndlessMode) return 'sprites/misteryTrainer.png';
@@ -331,7 +387,7 @@ function getNodeSprite(node) {
     if (mi >= 0 && mi < GYM_LEADER_SPRITES.length) return GYM_LEADER_SPRITES[mi];
     return 'sprites/champ.png';
   }
-  if (node.type === NODE_TYPES.SILVER) return 'https://play.pokemonshowdown.com/sprites/trainers/silver.png';
+  if (node.type === NODE_TYPES.SILVER) return 'sprites/gen2/silver.png';
   return null;
 }
 

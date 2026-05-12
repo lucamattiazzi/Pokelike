@@ -801,13 +801,14 @@ async function doBossNode(node) {
     showScreen('battle-screen');
     document.getElementById('battle-title').textContent = `Gym Battle vs ${leader.name}!`;
     document.getElementById('battle-subtitle').textContent = `${leader.badge} is on the line!`;
+    const leaderSprite = `sprites/gen2/${leader.name.toLowerCase()}.png`;
     await runBattleScreen(enemyTeam, true, () => {
       state.badges++;
       advanceFromNode(state.map, node.id);
       showBadgeScreen(leader);
       const ach = unlockAchievement(`gym_${state.currentMap}`);
       if (ach) showAchievementToast(ach);
-    }, () => { showGameOver(); }, leader.name);
+    }, () => { showGameOver(); }, leaderSprite);
     return;
   }
 
@@ -890,7 +891,7 @@ async function doSilverNode(node) {
   const won = await new Promise(resolve => {
     // Silver gives +4 base (Double XP), to every team member regardless of
     // whether they participated or fainted. Lucky egg etc. still apply.
-    runBattleScreen(enemyTeam, true, () => resolve(true), () => resolve(false), 'silver', [], 4, null, null, true);
+    runBattleScreen(enemyTeam, true, () => resolve(true), () => resolve(false), 'sprites/gen2/silver.png', [], 4, null, null, true);
   });
   if (!won) { showGameOver(); return; }
   // Full heal after the rival battle.
@@ -976,8 +977,9 @@ async function doGen2Elite4() {
     document.getElementById('battle-title').textContent = `${boss.title}: ${boss.name}!`;
     document.getElementById('battle-subtitle').textContent =
       i < bosses.length - 1 ? `Elite Four — Battle ${i + 1}/${bosses.length - 1}` : 'Final Battle!';
+    const bossSprite = `sprites/gen2/${boss.name.toLowerCase()}.png`;
     const won = await new Promise(resolve => {
-      runBattleScreen(enemyTeam, true, () => resolve(true), () => resolve(false), boss.name);
+      runBattleScreen(enemyTeam, true, () => resolve(true), () => resolve(false), bossSprite);
     });
     if (!won) { showGameOver(); return; }
   }
@@ -1670,33 +1672,99 @@ function doPokeCenterNode(node) {
 // Species pools for each trainer archetype (Gen 1 IDs).
 // null = use the map's random BST pool instead.
 const TRAINER_BATTLE_CONFIG = {
+  // ── Bug Catcher: classic insect collector. Adds Scyther's Scizor evo line. ──
   bugCatcher:  { name: 'Bug Catcher',   sprite: 'bugcatcher',
                  pool: [10,11,12,13,14,15,46,47,48,49,123,127],
-                 gen2Pool: [165,166,167,168,193,204,205,213,214] },
+                 gen2Pool: [10,11,12,13,14,15,46,47,48,49,123,165,166,167,168,193,204,205,212,213,214] },
+
+  // ── Hiker: rocks/ground/mountain Pokémon. ──
   hiker:       { name: 'Hiker',         sprite: 'hiker',
                  pool: [27,28,50,51,66,67,68,74,75,76,95,111,112],
                  gen2Pool: [74,75,76,95,194,195,208,220,221] },
-  fisher:      { name: 'Fisherman',     sprite: 'fisherman',
-                 pool: [54,55,60,61,62,72,73,86,87,90,91,98,99,116,117,118,119,129,130],
-                 gen2Pool: [170,171,183,184,186,194,222,223,224] },
-  Scientist:   { name: 'Scientist',     sprite: 'scientist',
-                 pool: [81,82,88,89,92,93,94,100,101,137],
-                 gen2Pool: [81,82,201,233,239] },
+
+  // ── Fisherman: rod-and-line catchable fish — small, sport-fishing vibe. ──
+  // Differs from Captain by featuring rod-caught water Pokémon (Magikarp,
+  // Goldeen, Horsea, Marill, Remoraid, Krabby, Chinchou) instead of the
+  // ocean-going giants the Captain favors.
+  fisher:      { name: 'Fisherman',     sprite: 'sprites/fisher.png',
+                 pool: [54,55,60,61,98,99,116,117,118,119,129,130],
+                 gen2Pool: [98,99,116,117,118,119,129,130,170,171,183,184,194,211,222,223,224,230] },
+
+  // ── Captain: naval / open-ocean Water — big, intimidating sea creatures. ──
+  // Differs from Fisherman by leaning into Tentacruel, Slowbro/Slowking,
+  // Cloyster, Starmie, Lapras, Mantine, Politoed — things you'd see from
+  // the deck of a ship, not pulled in on a rod.
+  captain:     { name: 'Captain',       sprite: 'sprites/captain.png',
+                 pool: [8,9,72,73,80,90,91,121,131],
+                 gen2Pool: [8,9,72,73,80,90,91,121,131,186,199,226] },
+
+  // ── Team Rocket Grunt: criminal vibe — pests, scavengers, dark types. ──
+  // Differs from Biker by mixing Dark (Houndour, Sneasel, Murkrow) and rats /
+  // alley cats (Rattata, Meowth) with the classic Grimer/Muk. The Biker keeps
+  // the pure-Poison sewer Pokémon.
   teamRocket:  { name: 'Rocket Grunt',  sprite: 'teamrocket',
-                 pool: [19,20,23,24,41,42,52,53,88,89,109,110],
-                 gen2Pool: [19,20,41,42,52,88,89,169,228,229] },
+                 pool: [19,20,23,24,41,42,52,53,88,89],
+                 gen2Pool: [19,20,41,42,52,53,88,89,169,198,215,228,229] },
+
+  // ── Biker: pure Poison street thug. ──
+  // Differs from Team Rocket by being strictly Poison-type — no rats, no Dark
+  // types. Ekans / Koffing / Nidoran / Tentacool / Spinarak / Qwilfish.
+  biker:       { name: 'Biker',         sprite: 'sprites/biker.png',
+                 pool: [23,24,29,30,31,32,33,34,72,73,109,110],
+                 gen2Pool: [23,24,29,30,31,32,33,34,72,73,109,110,167,168,211] },
+
+  // ── Officer: police K9 unit — fire dogs + investigative themes. ──
   policeman:   { name: 'Officer',       sprite: 'policeman',
                  pool: [58,59],
-                 gen2Pool: [58,59,228,229] },
+                 gen2Pool: [58,59,209,210,228,229] },
+
+  // ── Fire trainer (Burglar): all-Fire arsonist. ──
   fireSpitter: { name: 'Fire Trainer',  sprite: 'burglar',
                  pool: [4,5,6,37,38,58,59,77,78,126,136],
                  gen2Pool: [37,38,58,59,126,136,228,229,240] },
+
+  // ── Nerd: pure Electric + Porygon line. Replaces Scientist in Gen 2. ──
+  nerd:        { name: 'Nerd',          sprite: 'sprites/nerd.png',
+                 pool: [25,26,81,82,100,101,125,135,137],
+                 gen2Pool: [25,26,81,82,100,101,125,135,137,170,171,179,180,181,233,239] },
+
+  // ── Scientist: kept for Gen 1 mode only. ──
+  Scientist:   { name: 'Scientist',     sprite: 'scientist',
+                 pool: [81,82,88,89,92,93,94,100,101,137],
+                 gen2Pool: [81,82,201,233,239] },
+
+  // ── Medium: pure Ghost (small pool intentional). ──
+  medium:      { name: 'Medium',        sprite: 'sprites/medium.png',
+                 pool: [92,93,94],
+                 gen2Pool: [92,93,94,200] },
+
+  // ── School Kid: beginner Normal-types — youngster's first team. ──
+  // Differs from Old Man by leaning younger/smaller (Rattata, Eevee, Sentret,
+  // Aipom, baby Pokémon) instead of the bulky veteran-Normal lineup.
+  schoolBoy:   { name: 'School Kid',    sprite: 'sprites/schoolBoy.png',
+                 pool: [19,20,133,143],
+                 gen2Pool: [19,20,133,161,162,172,173,174,175,190,206] },
+
+  // ── Bird Catcher: pure Flying — actual birds and raptors. ──
+  // Differs from Old Man by being strictly flying / avian (Pidgey, Spearow,
+  // Doduo, Farfetch'd, Hoothoot, Natu, Murkrow, Skarmory, Aerodactyl), while
+  // Old Man keeps the bulky ground-bound Normal-types.
+  birdCatcher: { name: 'Bird Catcher',  sprite: 'sprites/birdCatcher.png',
+                 pool: [16,17,18,21,22,83,84,85,142],
+                 gen2Pool: [16,17,18,21,22,83,84,85,142,163,164,177,178,198,225,227] },
+
+  // ── Ace Trainer: elite mixed-type fighters. Adds the new Gen 2 cross-gen evos. ──
   aceTrainer:  { name: 'Ace Trainer',   sprite: 'acetrainer',
                  pool: null,
-                 gen2Pool: [56,63,66,79,96,102,106,107,116,147,177,196,201,202,203,214,236,238] },
+                 gen2Pool: [56,63,66,79,96,102,106,107,113,116,147,177,196,197,199,201,202,203,212,214,230,233,236,238,242] },
+
+  // ── Old Man / Gentleman: veteran Normal-types — bulky, well-established. ──
+  // Strips the pure-Flying birds (moved to Bird Catcher) and keeps the
+  // grandfatherly mix of Tauros / Miltank / Granbull / Stantler / Furret /
+  // Chansey-Blissey / Lickitung.
   oldGuy:      { name: 'Old Man',       sprite: 'gentleman',
                  pool: null,
-                 gen2Pool: [16,21,41,84,128,161,163,198,209,225,227,234,241] },
+                 gen2Pool: [53,108,113,128,161,162,190,206,209,210,234,241,242] },
 };
 
 async function doTrainerNode(node) {
@@ -1761,8 +1829,14 @@ async function doTrainerNode(node) {
   if (titleEl) titleEl.textContent = `${config.name} wants to battle!`;
   if (subEl)   subEl.textContent   = `${enemyTeam.length} Pokémon — Lv ~${level}`;
 
+  // In Gen 2 mode use the gen2-folder battle portrait; otherwise the existing
+  // config.sprite (Showdown CDN slug for Gen 1).
+  const battleSprite = state.gen2Mode && typeof getTrainerSpritePath === 'function'
+    ? getTrainerSpritePath(key, true)
+    : config.sprite;
+
   const won = await new Promise(resolve => {
-    runBattleScreen(enemyTeam, false, () => resolve(true), () => resolve(false), config.sprite, [], 2, true);
+    runBattleScreen(enemyTeam, false, () => resolve(true), () => resolve(false), battleSprite, [], 2, true);
   });
   if (!won) { showGameOver(); return; }
   if (state.isEndlessMode) await applyEndlessBugTrait();

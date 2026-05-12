@@ -319,47 +319,47 @@ const ELITE_4 = [
 const GEN2_ELITE_4 = [
   { name: 'Will', title: 'Elite Four', type: 'Psychic',
     team: [
-      { speciesId: 178, name: 'Xatu',      types: ['Psychic','Flying'], baseStats: { hp:65,  atk:75,  def:70,  speed:95,  special:95  }, level: 80 },
-      { speciesId: 178, name: 'Xatu',      types: ['Psychic','Flying'], baseStats: { hp:65,  atk:75,  def:70,  speed:95,  special:95  }, level: 80 },
-      { speciesId: 80,  name: 'Slowbro',   types: ['Water','Psychic'],  baseStats: { hp:95,  atk:75,  def:110, speed:30,  special:100 }, level: 82 },
-      { speciesId: 124, name: 'Jynx',      types: ['Ice','Psychic'],    baseStats: { hp:65,  atk:50,  def:35,  speed:95,  special:95  }, level: 82 },
-      { speciesId: 103, name: 'Exeggutor', types: ['Grass','Psychic'],  baseStats: { hp:95,  atk:95,  def:85,  speed:55,  special:125 }, level: 84 },
+      { speciesId: 178, name: 'Xatu',      types: ['Psychic','Flying'], baseStats: { hp:65,  atk:75,  def:70,  speed:95,  special:95  }, level: 78 },
+      { speciesId: 178, name: 'Xatu',      types: ['Psychic','Flying'], baseStats: { hp:65,  atk:75,  def:70,  speed:95,  special:95  }, level: 78 },
+      { speciesId: 80,  name: 'Slowbro',   types: ['Water','Psychic'],  baseStats: { hp:95,  atk:75,  def:110, speed:30,  special:100 }, level: 80 },
+      { speciesId: 124, name: 'Jynx',      types: ['Ice','Psychic'],    baseStats: { hp:65,  atk:50,  def:35,  speed:95,  special:95  }, level: 80 },
+      { speciesId: 103, name: 'Exeggutor', types: ['Grass','Psychic'],  baseStats: { hp:95,  atk:95,  def:85,  speed:55,  special:125 }, level: 82 },
     ]
   },
   { name: 'Koga', title: 'Elite Four', type: 'Poison',
     team: [
-      { speciesId: 168, name: 'Ariados',   types: ['Bug','Poison'],    baseStats: { hp:70,  atk:90,  def:70,  speed:40,  special:60  }, level: 84 },
-      { speciesId: 49,  name: 'Venomoth',  types: ['Bug','Poison'],    baseStats: { hp:70,  atk:65,  def:60,  speed:90,  special:90  }, level: 84 },
-      { speciesId: 205, name: 'Forretress',types: ['Bug','Steel'],     baseStats: { hp:75,  atk:90,  def:140, speed:40,  special:60  }, level: 84 },
-      { speciesId: 89,  name: 'Muk',       types: ['Poison'],          baseStats: { hp:105, atk:105, def:75,  speed:50,  special:65  }, level: 84 },
-      { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85,  atk:90,  def:80,  speed:130, special:70  }, level: 88 },
+      { speciesId: 168, name: 'Ariados',   types: ['Bug','Poison'],    baseStats: { hp:70,  atk:90,  def:70,  speed:40,  special:60  }, level: 82 },
+      { speciesId: 49,  name: 'Venomoth',  types: ['Bug','Poison'],    baseStats: { hp:70,  atk:65,  def:60,  speed:90,  special:90  }, level: 82 },
+      { speciesId: 205, name: 'Forretress',types: ['Bug','Steel'],     baseStats: { hp:75,  atk:90,  def:140, speed:40,  special:60  }, level: 82 },
+      { speciesId: 89,  name: 'Muk',       types: ['Poison'],          baseStats: { hp:105, atk:105, def:75,  speed:50,  special:65  }, level: 82 },
+      { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85,  atk:90,  def:80,  speed:130, special:70  }, level: 86 },
     ]
   },
   { name: 'Bruno', title: 'Elite Four', type: 'Fighting',
     team: [
-      { speciesId: 237, name: 'Hitmontop', types: ['Fighting'],        baseStats: { hp:50,  atk:95,  def:95,  speed:70,  special:35  }, level: 90 },
-      { speciesId: 106, name: 'Hitmonlee', types: ['Fighting'],        baseStats: { hp:50,  atk:120, def:53,  speed:87,  special:35  }, level: 90 },
-      { speciesId: 107, name: 'Hitmonchan',types: ['Fighting'],        baseStats: { hp:50,  atk:105, def:79,  speed:76,  special:35  }, level: 90 },
-      { speciesId: 95,  name: 'Onix',      types: ['Rock','Ground'],   baseStats: { hp:35,  atk:45,  def:160, speed:70,  special:30  }, level: 90 },
-      { speciesId: 68,  name: 'Machamp',   types: ['Fighting'],        baseStats: { hp:90,  atk:130, def:80,  speed:55,  special:65  }, level: 90 },
+      { speciesId: 237, name: 'Hitmontop', types: ['Fighting'],        baseStats: { hp:50,  atk:95,  def:95,  speed:70,  special:35  }, level: 88 },
+      { speciesId: 106, name: 'Hitmonlee', types: ['Fighting'],        baseStats: { hp:50,  atk:120, def:53,  speed:87,  special:35  }, level: 88 },
+      { speciesId: 107, name: 'Hitmonchan',types: ['Fighting'],        baseStats: { hp:50,  atk:105, def:79,  speed:76,  special:35  }, level: 88 },
+      { speciesId: 95,  name: 'Onix',      types: ['Rock','Ground'],   baseStats: { hp:35,  atk:45,  def:160, speed:70,  special:30  }, level: 88 },
+      { speciesId: 68,  name: 'Machamp',   types: ['Fighting'],        baseStats: { hp:90,  atk:130, def:80,  speed:55,  special:65  }, level: 88 },
     ]
   },
   { name: 'Karen', title: 'Elite Four', type: 'Dark',
     team: [
-      { speciesId: 197, name: 'Umbreon',   types: ['Dark'],            baseStats: { hp:95,  atk:65,  def:110, speed:65,  special:60  }, level: 88 },
-      { speciesId: 45,  name: 'Vileplume', types: ['Grass','Poison'],  baseStats: { hp:75,  atk:80,  def:85,  speed:50,  special:100 }, level: 88 },
-      { speciesId: 94,  name: 'Gengar',    types: ['Ghost','Poison'],  baseStats: { hp:60,  atk:65,  def:60,  speed:110, special:130 }, level: 90 },
-      { speciesId: 198, name: 'Murkrow',   types: ['Dark','Flying'],   baseStats: { hp:60,  atk:85,  def:42,  speed:91,  special:85  }, level: 90 },
-      { speciesId: 229, name: 'Houndoom',  types: ['Dark','Fire'],     baseStats: { hp:75,  atk:90,  def:50,  speed:95,  special:110 }, level: 92 },
+      { speciesId: 197, name: 'Umbreon',   types: ['Dark'],            baseStats: { hp:95,  atk:65,  def:110, speed:65,  special:60  }, level: 86 },
+      { speciesId: 45,  name: 'Vileplume', types: ['Grass','Poison'],  baseStats: { hp:75,  atk:80,  def:85,  speed:50,  special:100 }, level: 86 },
+      { speciesId: 94,  name: 'Gengar',    types: ['Ghost','Poison'],  baseStats: { hp:60,  atk:65,  def:60,  speed:110, special:130 }, level: 88 },
+      { speciesId: 198, name: 'Murkrow',   types: ['Dark','Flying'],   baseStats: { hp:60,  atk:85,  def:42,  speed:91,  special:85  }, level: 88 },
+      { speciesId: 229, name: 'Houndoom',  types: ['Dark','Fire'],     baseStats: { hp:75,  atk:90,  def:50,  speed:95,  special:110 }, level: 90 },
     ]
   },
   { name: 'Lance', title: 'Champion', type: 'Dragon',
     team: [
-      { speciesId: 130, name: 'Gyarados',  types: ['Water','Flying'],  baseStats: { hp:95,  atk:125, def:79,  speed:81,  special:60  }, level: 90 },
-      { speciesId: 142, name: 'Aerodactyl',types: ['Rock','Flying'],   baseStats: { hp:80,  atk:105, def:65,  speed:130, special:60  }, level: 91 },
+      { speciesId: 130, name: 'Gyarados',  types: ['Water','Flying'],  baseStats: { hp:95,  atk:125, def:79,  speed:81,  special:60  }, level: 88 },
+      { speciesId: 142, name: 'Aerodactyl',types: ['Rock','Flying'],   baseStats: { hp:80,  atk:105, def:65,  speed:130, special:60  }, level: 89 },
+      { speciesId: 149, name: 'Dragonite', types: ['Dragon','Flying'], baseStats: { hp:91,  atk:134, def:95,  speed:80,  special:100 }, level: 90 },
+      { speciesId: 149, name: 'Dragonite', types: ['Dragon','Flying'], baseStats: { hp:91,  atk:134, def:95,  speed:80,  special:100 }, level: 91 },
       { speciesId: 149, name: 'Dragonite', types: ['Dragon','Flying'], baseStats: { hp:91,  atk:134, def:95,  speed:80,  special:100 }, level: 92 },
-      { speciesId: 149, name: 'Dragonite', types: ['Dragon','Flying'], baseStats: { hp:91,  atk:134, def:95,  speed:80,  special:100 }, level: 93 },
-      { speciesId: 149, name: 'Dragonite', types: ['Dragon','Flying'], baseStats: { hp:91,  atk:134, def:95,  speed:80,  special:100 }, level: 94 },
     ]
   },
 ];
@@ -995,6 +995,11 @@ async function getRandomLegendary(mapIndex, allowAllGens = false) {
   return fetchPokemonById(id);
 }
 
+// Gen 1 Pokemon that gained an evolution in Gen 2. Whitelisted in Gen 2 mode so
+// the player can actually reach Espeon / Slowking / Steelix / Blissey / Kingdra
+// / Scizor / Porygon2 / Bellossom / Crobat without time-traveling to a Gen 1 run.
+const GEN1_WITH_GEN2_EVO = new Set([41, 42, 44, 79, 95, 113, 117, 123, 133, 137]);
+
 // Get random pokemon from the right BST bucket for a given mapIndex.
 // maxGenId restricts to IDs <= that number (151 = Gen 1 only, 649 = all gens).
 async function getCatchChoices(mapIndex, count = 3, maxGenId = 151, excludeStarters = false, minGenId = 1) {
@@ -1020,9 +1025,13 @@ async function getCatchChoices(mapIndex, count = 3, maxGenId = 151, excludeStart
   const starterSet = new Set(starterIds);
   const larvitarLine = new Set([246, 247, 248]);
   const filtered = bucket.filter(id => {
-    if (LEGENDARY_IDS.includes(id) || id < minGenId || id > maxGenId || starterSet.has(id)) return false;
+    if (LEGENDARY_IDS.includes(id) || starterSet.has(id)) return false;
     // Larvitar line: gate to the back half of the run (Pryce onward) so Tyranitar isn't trivial.
     if (larvitarLine.has(id) && typeof state !== 'undefined' && state.gen2Mode && state.currentMap < 2) return false;
+    // Gen 1 Pokemon with Gen 2 evos bypass the strict gen range in Gen 2 mode,
+    // so players can still reach Eevee / Slowking / Steelix / Blissey / Kingdra etc.
+    if (isGen2 && GEN1_WITH_GEN2_EVO.has(id)) return true;
+    if (id < minGenId || id > maxGenId) return false;
     return true;
   });
   const shuffled = [...filtered];
