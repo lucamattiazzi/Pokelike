@@ -867,7 +867,7 @@ async function doBossNode(node) {
       showBadgeScreen(leader);
       const ach = unlockAchievement(`gym_${state.currentMap}`);
       if (ach) showAchievementToast(ach);
-    }, () => { showGameOver(); }, leader.name);
+    }, () => { showGameOver(); }, leader.name, [], 2);
     return;
   }
 
@@ -1774,7 +1774,7 @@ const TRAINER_BATTLE_CONFIG = {
   // ── Officer: police K9 unit — fire dogs + investigative themes. ──
   policeman:   { name: 'Officer',       sprite: 'policeman',
                  pool: [58,59],
-                 gen2Pool: [58,59,209,210,228,229] },
+                 gen2Pool: [58,59,228,229] },
 
   // ── Fire trainer (Burglar): all-Fire arsonist. ──
   fireSpitter: { name: 'Firebreather',  sprite: 'burglar',

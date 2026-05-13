@@ -432,7 +432,7 @@ const SILVER_ENCOUNTERS = [
   // Map 3 — enc 1: starter evo replaces last slot; map max=40, Silver ace=38
   { team: [
     { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45,  speed:95,  special:115 }, level: 35 },
-    { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85, atk:90, def:80,  speed:130, special:70  }, level: 35 },
+    { speciesId: 42,  name: 'Golbat',    types: ['Poison','Flying'], baseStats: { hp:75, atk:80, def:70,  speed:90,  special:75  }, level: 35 },
     { speciesId: 82,  name: 'Magneton',  types: ['Electric','Steel'],baseStats: { hp:50, atk:60, def:95,  speed:70,  special:120 }, level: 33 },
     { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45,  speed:95,  special:115 }, level: 35 },
     { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43,  speed:65,  special:60  }, level: 39 },
