@@ -45,6 +45,10 @@ Rules:
 Battle mechanics:
 - Damage ≈ ((2·level/5 + 2) · movePower · Atk/Def / 50 + 2) · typeEff · STAB · itemMods · rand(0.85–1.00).
 - Higher Speed attacks first each turn. Crit = ×1.5 damage, 6.25% chance (20% with Scope Lens).
+- TEAM ORDER MATTERS: Pokémon fight in the order they sit in your team — slot 1 leads off,
+  slot 2 only enters after slot 1 faints, etc. Before a battle, put the Pokémon with the
+  best type matchup vs the expected opponent into slot 1, and keep type-disadvantaged
+  members deeper in the line. A bad lead can lose a battle a good team should win.
 - Physical vs Special split: a Pokémon uses Sp.Atk/Sp.Def if its base Special ≥ base Attack,
   otherwise Atk/Def. BST is the headline number, but the Atk/Special balance decides which
   stat it actually attacks with — match held items to that role.
@@ -65,10 +69,18 @@ Moves & move_tutor:
 Levels & evolution:
 - Level cap is 100. Wild battle = +1 level for the team; trainer/boss = +2.
 - Lucky Egg held item gives 30% chance of +1 bonus level after a battle.
+- Fainted Pokémon do NOT gain levels from a won battle (only living members level up).
+  A Pokémon that faints early misses the XP — keep your weakest/lowest members alive
+  long enough to soak the level gain, especially if they're close to evolving.
 - Evolutions trigger at species-specific levels (no stones, except Moon Stone as a
-  usable bag item). Eviolite blocks evolution entirely but grants +50% Def & Sp.Def —
-  strong on bulky non-final forms (e.g. Chansey, Porygon2).
+  usable bag item). Hitting an evolution threshold is one of the largest single power
+  spikes in the run — a Pokémon one level away from evolving is far more valuable than
+  its current stats suggest, so prioritise getting it into battles (or save a Rare Candy)
+  to push it over the line. Eviolite blocks evolution entirely but grants +50% Def &
+  Sp.Def — strong on bulky non-final forms (e.g. Chansey, Porygon2).
 - You cannot hold two Pokémon from the same evolution line; catch nodes filter these out.
+- After winning a boss fight, the whole team is fully healed automatically before the
+  next map starts — you don't need to save HP for "after" the boss, only for the boss.
 
 HP, healing & key held items (one per Pokémon):
 - HP carries between battles. The ONLY full heal is a pokecenter node.
@@ -107,6 +119,34 @@ Strategy tips:
 - Prioritise staying alive over maximising offence.
 - In NUZLOCKE MODE (shown in game state): fainted Pokémon are gone permanently.
   Layer 1 has two catch nodes — always pick carefully. Survival trumps everything.
+
+Starter protection:
+- Your starter is usually the strongest team member through the early-mid game: it joins
+  at level 5, banks every battle's XP, and reaches its final evolution earliest. Treat it
+  as a long-term investment — do NOT release it on a swap node, do NOT trade it away on a
+  trade node, and try hard not to let it faint in fights (lead with a counter-type when
+  it's at a disadvantage, see "TEAM ORDER MATTERS" above).
+
+Trainer archetypes — each trainer-class node uses a fixed species pool, so you can predict
+the matchup from the sprite/name and lead with a counter:
+- Bug Catcher → Bug (with some Poison/Flying): Caterpie/Metapod/Butterfree, Weedle/Kakuna/
+  Beedrill, Paras/Parasect, Venonat/Venomoth, Scyther, Pinsir. Counter with Fire, Flying, Rock.
+- Hiker → Rock/Ground/Fighting: Sandshrew/Sandslash, Diglett/Dugtrio, Machop line,
+  Geodude/Graveler/Golem, Onix, Rhyhorn/Rhydon. Counter with Water, Grass, Ice, Psychic.
+- Fisher → Water: Psyduck/Golduck, Poliwag line, Tentacool/Tentacruel, Seel/Dewgong,
+  Shellder/Cloyster, Krabby/Kingler, Goldeen/Seaking, Horsea/Seadra, Magikarp/Gyarados.
+  Counter with Electric, Grass.
+- Fire Breather → Fire: Charmander line, Vulpix/Ninetales, Growlithe/Arcanine, Ponyta/
+  Rapidash, Magmar, Flareon. Counter with Water, Ground, Rock.
+- Policeman → Fire (Growlithe/Arcanine only — never appears after map 4). Counter as Fire.
+- Scientist → Electric / Poison / Ghost mix: Magnemite/Magneton (Electric/Steel),
+  Grimer/Muk (Poison), Gastly/Haunter/Gengar (Ghost/Poison), Voltorb/Electrode (Electric),
+  Porygon (Normal). Counter with Ground (vs Electric), Psychic/Dark (vs Ghost/Poison).
+- Team Rocket Grunt → mostly Poison + Normal: Rattata/Raticate, Ekans/Arbok, Zubat/Golbat,
+  Meowth/Persian, Grimer/Muk, Koffing/Weezing. Counter with Ground, Psychic, Fighting.
+- Ace Trainer (only on maps 0–5) → random team from the map's BST pool; no reliable type
+  prediction, lead with your bulkiest/most-versatile attacker.
+- Old Man → random team from the map's BST pool; treat as a coin-flip matchup.
 
 Starter tier guide:
 - Squirtle (BEST): bulky, Water hits Brock (Rock) and Blaine (Fire) super-effectively, evolves
