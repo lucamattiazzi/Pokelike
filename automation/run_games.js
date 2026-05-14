@@ -253,8 +253,10 @@ async function main() {
   console.log(`Provider: ${template.label}${opts.nuzlocke ? ' | Mode: NUZLOCKE' : ''}`);
   console.log(`Output: ${opts.out}`);
   if (opts.memory) {
-    const entryCount = memoryContent.split(/^## Run/m).filter(Boolean).length;
-    console.log(`Memory: ${opts.memory} (${entryCount} entries loaded, max ${opts.memorySize})`);
+    const raw          = fs.existsSync(opts.memory) ? fs.readFileSync(opts.memory, 'utf8') : '';
+    const totalEntries = (raw.match(/^## Run /mg) || []).length;
+    const loadedCount  = Math.min(totalEntries, opts.memorySize);
+    console.log(`Memory: ${opts.memory} (${loadedCount}/${totalEntries} entries loaded, max ${opts.memorySize})`);
   }
   if (opts.rules?.length) {
     console.log(`Rules (${opts.rules.length}):`);
