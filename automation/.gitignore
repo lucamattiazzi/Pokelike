@@ -4,3 +4,4 @@ results/
 models/
 *.pkl
 .env
+.claude

@@ -21,28 +21,55 @@ const path = require('path');
  *   OPENAI_BASE_URL     — base URL for openai-compat provider
  */
 
-const BASE_SYSTEM_PROMPT = `You are an expert Pokémon strategist playing a roguelike game.
+const BASE_SYSTEM_PROMPT = `
+You are an expert Pokémon strategist playing a roguelike game.
 Your goal is to WIN the run (defeat all 8 gym leaders + Elite Four).
 
 Rules:
 - You start with one of three starters (Bulbasaur/Charmander/Squirtle).
 - Each map has branching paths; you pick one node per layer.
-- Node types: battle, catch (add a Pokémon), item (held item or consumable),
-  trainer (harder battle), pokecenter (free heal), move_tutor (upgrade move power),
-  trade (swap a team member), legendary (rare strong encounter), boss (gym leader).
+- Node types:
+    - battle: if won, all pokemon are raised 1 level, if lost, game is over
+    - catch: add a Pokémon, up to 6, then you might need to free one to swap with a new one
+    - item: held item (max 1 per pokemon) or consumable
+    - trainer: harder battle, if won all pokemon are raised 2 levels, if lost, game is over 
+    - pokecenter: free heal all pokemon, only before boss battle
+    - move_tutor: upgrade move power for a single pokemon
+    - trade: swap a team member with a random pokemon 3 levels higher
+    - legendary: rare strong encounter that can be caught
+    - boss: gym leader, if won all pokemon are raised 2 levels, if lost, game is over 
 - After winning battles, your Pokémon gain levels and may evolve.
 - You can carry at most 6 Pokémon.  When the team is full you must release one.
 - Items are held (one per Pokémon) or usable (bag).
 
 Strategy tips:
+- Battling is (almost) the only way to raise the level of your pokemon and thus making them stronger.
 - Type coverage: having Pokémon that cover each other's weaknesses is crucial.
 - BST (base stat total) is a rough strength proxy.
-- Early catch nodes on map 0 are very valuable — grab high-BST or type-diverse Pokémon.
 - Held items: Life Orb, Choice Band/Specs, and Shell Bell are very strong.
 - Pokecenter nodes before the boss are guaranteed in the last content layer.
 - Prioritise staying alive over maximising offence.
 - In NUZLOCKE MODE (shown in game state): fainted Pokémon are gone permanently.
   Layer 1 has two catch nodes — always pick carefully. Survival trumps everything.
+
+Type effectiveness (attacker → defenders | 2× super-effective / ½× resisted / 0× no effect):
+  Normal   → 2×: —                                    | ½×: Rock, Steel              | 0×: Ghost
+  Fire     → 2×: Grass, Ice, Bug, Steel               | ½×: Fire, Water, Rock, Dragon
+  Water    → 2×: Fire, Ground, Rock                   | ½×: Water, Grass, Dragon
+  Electric → 2×: Water, Flying                        | ½×: Electric, Grass, Dragon  | 0×: Ground
+  Grass    → 2×: Water, Ground, Rock                  | ½×: Fire, Grass, Poison, Flying, Bug, Dragon, Steel
+  Ice      → 2×: Grass, Ground, Flying, Dragon        | ½×: Fire, Water, Ice, Steel
+  Fighting → 2×: Normal, Ice, Rock, Dark, Steel       | ½×: Poison, Flying, Psychic, Bug | 0×: Ghost
+  Poison   → 2×: Grass                                | ½×: Poison, Ground, Rock, Ghost  | 0×: Steel
+  Ground   → 2×: Fire, Electric, Poison, Rock, Steel  | ½×: Grass, Bug               | 0×: Flying
+  Flying   → 2×: Grass, Fighting, Bug                 | ½×: Electric, Rock, Steel
+  Psychic  → 2×: Fighting, Poison                     | ½×: Psychic, Steel           | 0×: Dark
+  Bug      → 2×: Grass, Psychic, Dark                 | ½×: Fire, Fighting, Poison, Flying, Ghost, Steel
+  Rock     → 2×: Fire, Ice, Flying, Bug               | ½×: Fighting, Ground, Steel
+  Ghost    → 2×: Psychic, Ghost                       | ½×: Dark                     | 0×: Normal
+  Dragon   → 2×: Dragon                               | ½×: Steel
+  Dark     → 2×: Psychic, Ghost                       | ½×: Fighting, Dark
+  Steel    → 2×: Ice, Rock                            | ½×: Fire, Water, Electric, Steel
 
 Output format (strict JSON, nothing else):
 {"choice": <0-based index of chosen option>, "reason": "<one short sentence>"}`;
@@ -63,34 +90,62 @@ function buildSystemPrompt(rules, memory) {
 }
 
 // ─── Memory file helpers ──────────────────────────────────────────────────────
+//
+// The memory file is a flat list of voted tactics, one per line, e.g.:
+//
+//   - Prioritise type coverage early. [seed:42, LOSS 1/9, fainted:3, votes:+2]
+//
+// Each line is a self-contained tactic with metadata in trailing brackets.
+// Votes accumulate per-tactic; sampling at run start is lightly weighted by votes.
 
-// Parse the .md file into an array of entry objects.
+const META_RE = /\s*\[([^\]]+)\]\s*$/;
+
 function parseMemoryFile(filePath) {
   if (!fs.existsSync(filePath)) return [];
-  const content  = fs.readFileSync(filePath, 'utf8');
-  const sections = content.split(/(?=^## Run )/m)
-    .filter(s => s.trimStart().startsWith('## Run'));
-  return sections.map(section => {
-    const lines  = section.trimEnd().split('\n');
-    const header = lines[0];
-    const m      = header.match(/\|\s*votes:([+-]?\d+)\s*$/);
-    const votes  = m ? parseInt(m[1], 10) : 0;
-    const bullets = lines.slice(1).filter(l => l.trim());
-    return { header, votes, bullets };
-  });
+  const content = fs.readFileSync(filePath, 'utf8');
+  return content.split('\n')
+    .map(l => l.trim())
+    .filter(l => l.startsWith('- '))
+    .map(line => {
+      const body = line.slice(2);
+      const m    = body.match(META_RE);
+      let text = body, meta = '', votes = 0;
+      if (m) {
+        text = body.slice(0, m.index).trim();
+        meta = m[1];
+        const v = meta.match(/votes:([+-]?\d+)/);
+        if (v) votes = parseInt(v[1], 10);
+      }
+      return { text, meta, votes };
+    });
 }
 
-// Serialise one entry back to markdown (updating the vote count in the header).
-function formatMemoryEntry(entry) {
-  const base   = entry.header.replace(/\s*\|\s*votes:[+-]?\d+\s*$/, '');
-  const header = `${base} | votes:${entry.votes >= 0 ? '+' : ''}${entry.votes}`;
-  return header + '\n' + entry.bullets.join('\n');
+function formatMemoryEntry(e) {
+  const sign = e.votes >= 0 ? '+' : '';
+  let meta   = e.meta || '';
+  if (/votes:[+-]?\d+/.test(meta)) {
+    meta = meta.replace(/votes:[+-]?\d+/, `votes:${sign}${e.votes}`);
+  } else {
+    meta = meta ? `${meta}, votes:${sign}${e.votes}` : `votes:${sign}${e.votes}`;
+  }
+  return `- ${e.text} [${meta}]`;
 }
 
-// Rewrite the whole file preserving all entries with updated vote counts.
 function rewriteMemoryFile(filePath, entries) {
-  const body = entries.map(formatMemoryEntry).join('\n\n');
+  const body = entries.map(formatMemoryEntry).join('\n');
   fs.writeFileSync(filePath, '# Pokémon Roguelike Tactics Memory\n\n' + body + '\n');
+}
+
+// Weighted sampling without replacement (Efraimidis–Spirakis).
+// Weight is exp(0.1 * votes): high-voted tactics are favoured, but every entry
+// keeps a real chance — a -5 entry still has ~37% the weight of a 0 entry.
+function sampleEntries(entries, n) {
+  if (entries.length <= n) return [...entries];
+  return entries
+    .map(e => ({ e, key: -Math.log(Math.random() || 1e-12) / Math.exp(0.1 * e.votes) }))
+    .sort((a, b) => a.key - b.key)
+    .slice(0, n)
+    .map(x => x.e);
 }
 
 // ─── Provider backends ────────────────────────────────────────────────────────
@@ -217,9 +272,10 @@ class LLMAgent {
    */
   constructor(provider, opts = {}) {
     if (typeof provider === 'object' && provider !== null) opts = provider;
-    this._backend      = createBackend(provider || 'anthropic', opts);
-    this._callCount    = 0;
-    this._systemPrompt = buildSystemPrompt(opts.rules || [], opts.memory || '');
+    this._backend        = createBackend(provider || 'anthropic', opts);
+    this._callCount      = 0;
+    this._memoryEntries  = opts.memoryEntries || [];
+    this._systemPrompt   = buildSystemPrompt(opts.rules || [], opts.memory || '');
   }
 
   get callCount() { return this._callCount; }
@@ -245,30 +301,31 @@ class LLMAgent {
   }
 
   /**
-   * Vote on the currently-loaded memory entries, then append new insights.
-   * Entries that helped get +1; misleading ones get -1; the file is rewritten
-   * with updated scores before the new entry is appended.
+   * Vote on the memory entries that were sampled into this run's prompt,
+   * then append 1–5 new tactical insights to the flat memory list.
    *
-   * @param {object} result     — return value of playGame()
-   * @param {string} filePath   — path to the .md memory file
-   * @param {number} maxEntries — how many entries were loaded (must match loadMemory call)
+   * @param {object} result   — return value of playGame()
+   * @param {string} filePath — path to the .md memory file
    */
-  async appendMemory(result, filePath, maxEntries = 10) {
-    // ── 1. Vote on entries that were shown to the model ────────────────────────
+  async appendMemory(result, filePath) {
     const allEntries = parseMemoryFile(filePath);
-    const loaded     = [...allEntries]
-      .sort((a, b) => b.votes - a.votes)
-      .slice(0, maxEntries);
 
-    if (loaded.length > 0) {
-      const votes = await this._voteOnEntries(result, loaded);
-      for (const [i, entry] of loaded.entries()) {
-        entry.votes = Math.max(-99, Math.min(99, entry.votes + (votes[i] ?? 0)));
+    // ── 1. Vote on entries shown to this agent during the run ───────────────
+    const shown = this._memoryEntries || [];
+    if (shown.length > 0) {
+      const votes = await this._voteOnEntries(result, shown);
+      // Re-identify shown entries in the current file by text (file may have
+      // been rewritten by a concurrent worker since we sampled it).
+      const byText = new Map(allEntries.map(e => [e.text, e]));
+      for (const [i, e] of shown.entries()) {
+        const delta = votes[i];
+        if (!delta) continue;
+        const target = byText.get(e.text);
+        if (target) target.votes = Math.max(-99, Math.min(99, target.votes + delta));
       }
-      rewriteMemoryFile(filePath, allEntries);
     }
 
-    // ── 2. Generate and append new insights ────────────────────────────────────
+    // ── 2. Generate 1–5 new insights for this run ───────────────────────────
     const s    = result.stats || {};
     const team = (result.finalTeam || [])
       .map(p => `${p.name} Lv${p.level} [${(p.types || []).join('/')}]`)
@@ -282,24 +339,34 @@ class LLMAgent {
 
     const prompt =
       `You just finished this Pokémon roguelike run:\n\n${summary}\n\n` +
-      `Write exactly 2 bullet points (starting with "- ") of tactical insights ` +
-      `for future runs. Focus on what you'd do differently or what worked. ` +
-      `Be specific and concise (max 25 words each). No preamble, no headers.`;
+      `Write between 1 and 5 bullet points (starting with "- ") of tactical ` +
+      `insights for future runs. Each bullet must be a single self-contained ` +
+      `tactic (max 25 words). Focus on what you'd do differently or what ` +
+      `worked. No preamble, no headers.`;
 
     const text = await this._backend.complete(
-      'You are a Pokémon strategy analyst. Output only two bullet points, nothing else.',
+      'You are a Pokémon strategy analyst. Output only between 1 and 5 bullet points, nothing else.',
       prompt
     ).catch(err => `- (memory write failed: ${err.message})`);
 
-    const date   = new Date().toISOString().replace('T', ' ').slice(0, 16);
-    const header = `\n## Run | ${date} | Seed: ${result.seed} | ` +
-                   `${result.outcome.toUpperCase()} (${result.mapsCleared}/9 maps) | votes:0\n`;
+    const newBullets = text.split('\n')
+      .map(l => l.trim())
+      .filter(l => l.startsWith('- '))
+      .slice(0, 5)
+      .map(l => l.slice(2).trim())
+      .filter(Boolean);
 
-    fs.appendFileSync(filePath, header + text.trim() + '\n');
+    const meta = `seed:${result.seed}, ${result.outcome.toUpperCase()} ${result.mapsCleared}/9, ` +
+                 `fainted:${s.pokemonFainted ?? '?'}`;
+
+    for (const b of newBullets) {
+      allEntries.push({ text: b, meta, votes: 0 });
+    }
+    rewriteMemoryFile(filePath, allEntries);
   }
 
   /**
-   * Ask the model to rate each loaded tactic entry.
+   * Ask the model to rate each shown tactic entry.
    * Returns a plain object mapping entry index → vote (-1 | 0 | +1).
    */
   async _voteOnEntries(result, entries) {
@@ -310,9 +377,8 @@ class LLMAgent {
       `Team: ${team || 'none'} | Battles: ${s.battlesTotal ?? '?'} | Fainted: ${s.pokemonFainted ?? '?'}`;
 
     const tacticLines = entries.map((e, i) => {
-      const badge  = `[${e.votes >= 0 ? '+' : ''}${e.votes}]`;
-      const bullet = e.bullets[0]?.replace(/^-\s*/, '') || '';
-      return `${i} ${badge}: "${bullet}"`;
+      const sign = e.votes >= 0 ? '+' : '';
+      return `${i} [${sign}${e.votes}]: "${e.text}"`;
     }).join('\n');
 
     const prompt =
@@ -345,21 +411,25 @@ class LLMAgent {
   // ─── Static helpers (called by run_games.js) ──────────────────────────────
 
   /**
-   * Load and format memory entries for injection into the system prompt.
-   * Sorts by votes descending and prefixes each bullet with its vote badge.
+   * Sample memory entries for injection into the system prompt.
+   *
+   * Picks `n` entries via weighted sampling (weight = exp(0.1 * votes)) so
+   * high-voted tactics are favoured but every entry retains a real chance.
+   *
+   * Returns { text, entries } — `text` is the formatted block for the prompt,
+   * `entries` are the sampled objects (pass them back via `memoryEntries` so
+   * the agent can vote on the exact set it saw).
    */
-  static loadMemory(filePath, maxEntries = 10) {
-    if (!filePath || !fs.existsSync(filePath)) return '';
-    const entries = parseMemoryFile(filePath);
-    if (!entries.length) return '';
-    return [...entries]
-      .sort((a, b) => b.votes - a.votes)
-      .slice(0, maxEntries)
-      .map(e => {
-        const badge = `[${e.votes >= 0 ? '+' : ''}${e.votes}]`;
-        return e.bullets.map(b => `${badge} ${b.replace(/^-\s*/, '')}`).join('\n');
-      })
-      .join('\n');
+  static loadMemory(filePath, n = 10) {
+    if (!filePath || !fs.existsSync(filePath)) return { text: '', entries: [] };
+    const all = parseMemoryFile(filePath);
+    if (!all.length) return { text: '', entries: [] };
+    const sampled = sampleEntries(all, n);
+    const text    = sampled.map(e => {
+      const sign = e.votes >= 0 ? '+' : '';
+      return `[${sign}${e.votes}] ${e.text}`;
+    }).join('\n');
+    return { text, entries: sampled };
   }
 
   static initMemoryFile(filePath) {

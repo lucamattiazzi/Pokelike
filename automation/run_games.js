@@ -65,9 +65,15 @@ function parseArgs() {
   }
   const memorySize = parseInt(get('--memory-size', '10'), 10);
 
+  // Random base seed by default; explicit --seed overrides for reproducibility.
+  const seedProvided = args.indexOf('--seed') !== -1;
+  const seed         = seedProvided
+    ? parseInt(get('--seed'), 10)
+    : Math.floor(Math.random() * 1e9);
+
   return {
     games:      parseInt(get('--games',    '50'),  10),
-    seed:       parseInt(get('--seed',     '1'),   10),
+    seed,
     out:        get('--out', path.join(__dirname, 'results',
                   provider === 'random' ? 'random_games.jsonl'
                   : nuzlocke ? 'nuzlocke_games.jsonl' : 'games.jsonl')),
@@ -222,9 +228,14 @@ function makeAgent(opts) {
     ...(opts.model   && { model:   opts.model   }),
     ...(opts.baseUrl && { baseUrl: opts.baseUrl }),
     ...(opts.rules?.length && { rules: opts.rules }),
-    // Reload memory from disk each time so every game sees the latest entries and votes
-    ...(opts.memory && { memory: LLMAgent.loadMemory(opts.memory, opts.memorySize) }),
   };
+  // Re-sample memory from disk each game (lightly weighted by votes) so every
+  // game sees a fresh subset of the latest accumulated tactics.
+  if (opts.memory) {
+    const { text, entries } = LLMAgent.loadMemory(opts.memory, opts.memorySize);
+    agentOpts.memory        = text;
+    agentOpts.memoryEntries = entries;
+  }
   return new LLMAgent(agentOpts);
 }
 
@@ -241,8 +252,7 @@ async function main() {
 
   const runner   = new GameRunner(cache);
   const template = makeAgent(opts);   // used only for label; each game gets its own instance
-  // Dedicated agent for memory writes (reused across games, no per-game callCount needed)
-  const memoryWriter = (opts.memory && opts.provider !== 'random') ? makeAgent(opts) : null;
+  const writesMemory = opts.memory && opts.provider !== 'random';
 
   fs.mkdirSync(path.dirname(opts.out), { recursive: true });
   const outStream = fs.createWriteStream(opts.out, { flags: 'a' });
@@ -252,9 +262,9 @@ async function main() {
   console.log(`Output: ${opts.out}`);
   if (opts.memory) {
     const raw          = fs.existsSync(opts.memory) ? fs.readFileSync(opts.memory, 'utf8') : '';
-    const totalEntries = (raw.match(/^## Run /mg) || []).length;
-    const loadedCount  = Math.min(totalEntries, opts.memorySize);
-    console.log(`Memory: ${opts.memory} (${loadedCount}/${totalEntries} entries, top-${opts.memorySize} reloaded each game)`);
+    const totalEntries = (raw.match(/^-\s+/mg) || []).length;
+    const sampleCount  = Math.min(totalEntries, opts.memorySize);
+    console.log(`Memory: ${opts.memory} (${totalEntries} tactics, sample ${sampleCount}/game, weighted by votes)`);
   }
   if (opts.rules?.length) {
     console.log(`Rules (${opts.rules.length}):`);
@@ -271,16 +281,17 @@ async function main() {
   if (opts.parallel <= 1) {
     // Sequential
     for (let i = 0; i < opts.games; i++) {
-      const seed = opts.seed + i;
-      const result = await playGame(runner, makeAgent(opts), seed, true, opts);
+      const seed   = opts.seed + i;
+      const agent  = makeAgent(opts);
+      const result = await playGame(runner, agent, seed, true, opts);
       outStream.write(JSON.stringify(result) + '\n');
       if (result.outcome === 'win')   wins++;
       else if (result.outcome === 'loss') losses++;
       else errors++;
       for (const k of Object.keys(statTotals)) statTotals[k] += result.stats?.[k] ?? 0;
 
-      if (memoryWriter) {
-        await memoryWriter.appendMemory(result, opts.memory, opts.memorySize)
+      if (writesMemory) {
+        await agent.appendMemory(result, opts.memory)
           .catch(e => console.warn(`  [memory] write failed: ${e.message}`));
       }
 
@@ -307,8 +318,9 @@ async function main() {
         (_, j) => opts.seed + i + j
       );
 
+      const agents  = batch.map(() => makeAgent(opts));
       const results = await Promise.all(
-        batch.map(seed => playGame(runner, makeAgent(opts), seed, opts.verbose, opts))
+        agents.map((agent, k) => playGame(runner, agent, batch[k], opts.verbose, opts))
       );
 
       for (const r of results) {
@@ -318,10 +330,11 @@ async function main() {
         else                       { errors++; if (!opts.verbose) process.stdout.write('E'); }
         for (const k of Object.keys(statTotals)) statTotals[k] += r.stats?.[k] ?? 0;
       }
-      // Memory writes are sequential to avoid concurrent file appends
-      if (memoryWriter) {
-        for (const r of results) {
-          await memoryWriter.appendMemory(r, opts.memory, opts.memorySize)
+      // Memory writes are sequential to avoid concurrent file rewrites;
+      // each agent votes on its own sampled set then appends its bullets.
+      if (writesMemory) {
+        for (let k = 0; k < results.length; k++) {
+          await agents[k].appendMemory(results[k], opts.memory)
             .catch(e => console.warn(`  [memory] write failed: ${e.message}`));
         }
       }
