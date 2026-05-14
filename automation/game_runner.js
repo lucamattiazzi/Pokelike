@@ -40,17 +40,12 @@ function makeDomStub() {
 
 // ─── Build the vm sandbox ─────────────────────────────────────────────────────
 function buildSandbox(pokemonCache) {
-  // In-memory localStorage backed by a plain object
   const storage = {};
 
-  // Pre-populate with species-list stub (getCatchChoices calls getSpeciesPool()
-  // but ignores the result — we just need the promise to resolve)
   storage['pkrl_species_list'] = JSON.stringify(
     Object.values(pokemonCache).map(p => ({ name: p.name.toLowerCase(), id: p.id }))
   );
-  // Pre-populate each Pokemon entry so fetchPokemonById hits the cache immediately
   for (const [id, poke] of Object.entries(pokemonCache)) {
-    // Store in the format getCached/setCached expect (matching fetchPokemonById output)
     storage[`pkrl_poke_${poke.id}`] = JSON.stringify(poke);
   }
 
@@ -60,14 +55,12 @@ function buildSandbox(pokemonCache) {
     removeItem: k => { delete storage[k]; },
   };
 
-  // fetch mock: only Pokemon lookups are needed; everything else is pre-cached
   async function fetchMock(url) {
     const m = url.match(/\/pokemon\/([^/?]+)/);
     if (m) {
       const key = m[1];
       const entry = pokemonCache[key] || pokemonCache[parseInt(key)];
       if (entry) {
-        // Return a fake Response whose .json() mirrors what fetchPokemonById parses
         return {
           ok: true,
           json: async () => ({
@@ -87,7 +80,6 @@ function buildSandbox(pokemonCache) {
         };
       }
     }
-    // Species list URL — return empty list (not actually used)
     if (url.includes('/pokemon?limit=')) {
       return { ok: true, json: async () => ({ results: [] }) };
     }
@@ -95,7 +87,6 @@ function buildSandbox(pokemonCache) {
   }
 
   const sandbox = {
-    // Standard JS globals
     console: { log() {}, warn() {}, error() {} },
     setTimeout,
     clearTimeout,
@@ -117,18 +108,15 @@ function buildSandbox(pokemonCache) {
     Symbol,
     undefined,
 
-    // Browser globals the game files expect
     localStorage,
     fetch: fetchMock,
     document: makeDomStub(),
-    window:   {},         // filled in below
+    window:   {},
     requestAnimationFrame() {},
     Image: function() {},
 
-    // ── RNG (copied verbatim from game.js) ──────────────────────────────────
     _rngSeed: 0,
 
-    // ── Game state (same shape as game.js) ──────────────────────────────────
     state: {
       currentMap: 0, currentNode: null, team: [], items: [], badges: 0,
       map: null, eliteIndex: 0, trainer: 'boy', starterSpeciesId: null,
@@ -136,10 +124,8 @@ function buildSandbox(pokemonCache) {
       usedPokecenter: false,
     },
 
-    // Endless-mode stub (unused in normal-mode runs)
     endlessState: { stageNumber: 1, regionNumber: 1, mapIndexInRegion: 0 },
 
-    // ── Stubs for game.js UI functions referenced by data.js/map.js ─────────
     markPokedexCaught()     {},
     markShinyDexCaught()    {},
     checkDexAchievements()  {},
@@ -150,7 +136,7 @@ function buildSandbox(pokemonCache) {
     getUsedStarters()       { return []; },
     loadPersistentBuffs()   { return {}; },
     savePersistentBuffs()   {},
-    loadBuffsIntoPokemon()  {},      // no-op in normal mode
+    loadBuffsIntoPokemon()  {},
     getEndlessMaxGenId()    { return 649; },
     getSettings()           { return {}; },
     unlockAchievement()     { return null; },
@@ -170,8 +156,9 @@ function buildSandbox(pokemonCache) {
 function loadGameFiles(sandbox) {
   const ctx = vm.createContext(sandbox);
 
-  // Inject the RNG and helper globals that data.js/battle.js/map.js reference
-  // before they are loaded (these live in game.js normally)
+  // Inject RNG, helper functions, and game.js constants/functions that
+  // data.js/battle.js/map.js reference, plus game.js logic injected here to
+  // avoid loading the full game.js (which uses `let state` at module scope).
   const prelude = `
     function rng() {
       _rngSeed = (_rngSeed + 0x6D2B79F5) | 0;
@@ -180,10 +167,55 @@ function loadGameFiles(sandbox) {
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     }
     function seedRng(seed) { _rngSeed = seed >>> 0; }
-    function getRngSeed() { return _rngSeed >>> 0; }
+    function getRngSeed()  { return _rngSeed >>> 0; }
 
-    // battle.js uses calcHp which is defined in data.js — ensure it's hoisted
-    // (data.js defines it as a plain function, so hoisting works within the context)
+    // From game.js — walks EVOLUTIONS/BRANCHING_EVOLUTIONS backwards to find base form.
+    // Must be defined after data.js loads, so wrap in a late-binding function.
+    function getEvoLineRoot(speciesId) {
+      const parentOf = {};
+      for (const [from, evo] of Object.entries(EVOLUTIONS)) {
+        parentOf[evo.into] = Number(from);
+      }
+      for (const [fromId, choices] of Object.entries(BRANCHING_EVOLUTIONS)) {
+        for (const evo of choices) parentOf[evo.into] = Number(fromId);
+      }
+      let id = speciesId;
+      while (parentOf[id] !== undefined) id = parentOf[id];
+      return id;
+    }
+
+    // From game.js — level scaled to node layer using the seeded RNG.
+    function getLevelForNode(node) {
+      const [minL, maxL] = MAP_LEVEL_RANGES[state.currentMap];
+      const t      = Math.min(1, Math.max(0, (node.layer - 1) / 5));
+      const base   = Math.round(minL + t * (maxL - minL));
+      const spread = Math.max(1, Math.round((maxL - minL) / 8));
+      return Math.min(maxL, Math.max(minL, base + Math.floor(rng() * spread)));
+    }
+
+    // From game.js — resolves a question-mark node type.
+    function resolveQuestionMark() {
+      const r = rng();
+      if (r < 0.22) return 'battle';
+      if (r < 0.42) return 'trainer';
+      if (r < 0.52) return state.nuzlockeMode ? 'battle' : 'catch';
+      if (r < 0.65) return 'item';
+      if (r < 0.72) return 'shiny';
+      return 'mega';
+    }
+
+    // From game.js — trainer type → name + species pool.
+    const TRAINER_BATTLE_CONFIG = {
+      bugCatcher:  { name: 'Bug Catcher',  pool: [10,11,12,13,14,15,46,47,48,49,123,127] },
+      hiker:       { name: 'Hiker',        pool: [27,28,50,51,66,67,68,74,75,76,95,111,112] },
+      fisher:      { name: 'Fisherman',    pool: [54,55,60,61,62,72,73,86,87,90,91,98,99,116,117,118,119,129,130] },
+      Scientist:   { name: 'Scientist',    pool: [81,82,88,89,92,93,94,100,101,137] },
+      teamRocket:  { name: 'Rocket Grunt', pool: [19,20,23,24,41,42,52,53,88,89,109,110] },
+      policeman:   { name: 'Officer',      pool: [58,59] },
+      fireSpitter: { name: 'Fire Trainer', pool: [4,5,6,37,38,58,59,77,78,126,136] },
+      aceTrainer:  { name: 'Ace Trainer',  pool: null },
+      oldGuy:      { name: 'Old Man',      pool: null },
+    };
   `;
   vm.runInContext(prelude, ctx);
 
@@ -198,45 +230,23 @@ function loadGameFiles(sandbox) {
 // ─── GameRunner ───────────────────────────────────────────────────────────────
 
 class GameRunner {
-  /**
-   * @param {Record<number, object>} pokemonCache  — output of build_cache.js
-   */
   constructor(pokemonCache) {
     this._cache = pokemonCache;
   }
 
-  /**
-   * Play a full normal-mode run.
-   *
-   * @param {number}   seed       — RNG seed for this run
-   * @param {Function} agentFn   — async (decision) => choiceIndex
-   *   decision shapes:
-   *     { type: 'starter',    options: PokemonSpecies[] }
-   *     { type: 'branch',     options: MapNode[],   state: StateSummary }
-   *     { type: 'catch',      options: Pokemon[],   canSkip: true, state }
-   *     { type: 'swap',       newPokemon: Pokemon,  team: Pokemon[], state }
-   *     { type: 'item',       options: Item[],      canSkip: true, state }
-   *     { type: 'item_assign',item: Item,           team: Pokemon[], state }
-   *     { type: 'evolve_branch', pokemon, choices: Evo[], state }
-   *
-   * @returns {{ outcome, mapsCleared, finalTeam, decisions, seed }}
-   */
   async play(seed, agentFn, { nuzlocke = false } = {}) {
     const sandbox = buildSandbox(this._cache);
     const ctx     = loadGameFiles(sandbox);
 
-    // Convenience: call a sandbox function by name with args
     const call = (name, ...args) => {
       sandbox.__args = args;
       return vm.runInContext(`${name}(...__args)`, ctx);
     };
 
-    // Convenience: evaluate a sandbox expression
     const get = expr => vm.runInContext(expr, ctx);
 
     const decisions = [];
 
-    // Helper to record and delegate a decision
     const decide = async (decision) => {
       const idx = await agentFn({ ...decision, state: this._stateSummary(sandbox) });
       decisions.push({ ...decision, choice: idx, state: undefined });
@@ -244,7 +254,6 @@ class GameRunner {
     };
 
     try {
-      // ── Initialise ──────────────────────────────────────────────────────────
       vm.runInContext(`seedRng(${seed >>> 0})`, ctx);
       sandbox.state = {
         currentMap: 0, currentNode: null, team: [], items: [], badges: 0,
@@ -253,16 +262,16 @@ class GameRunner {
         usedPokecenter: false, catchesThisMap: 0,
       };
       sandbox._stats = {
-        nodesVisited:   0,  // map nodes entered (a "turn" at game scale)
-        battlesTotal:   0,  // all individual battle encounters
-        battleRounds:   0,  // total combat rounds across all battles
-        pokemonCaught:  0,  // pokemon added via catch/legendary (not starter/trade)
-        pokemonFainted: 0,  // player pokemon that fainted across all battles
-        permadeaths:    0,  // nuzlocke: pokemon permanently lost
-        itemsTaken:     0,  // items picked up
-        movesLearned:   0,  // move tutor upgrades granted
-        timesCured:     0,  // pokecenter visits
-        pokemonHistory: [], // full log of every pokemon that ever joined the team
+        nodesVisited:   0,
+        battlesTotal:   0,
+        battleRounds:   0,
+        pokemonCaught:  0,
+        pokemonFainted: 0,
+        permadeaths:    0,
+        itemsTaken:     0,
+        movesLearned:   0,
+        timesCured:     0,
+        pokemonHistory: [],
       };
 
       // ── Starter selection ────────────────────────────────────────────────────
@@ -274,7 +283,6 @@ class GameRunner {
       const starterSpecies = starters[starterIdx] || starters[0];
       const starter = call('createInstance', starterSpecies, 5, false, 0);
 
-      // Record starter in history
       sandbox._stats.pokemonHistory.push({
         name: starterSpecies.name, species: starterSpecies.id,
         level: 5, types: starterSpecies.types,
@@ -284,15 +292,15 @@ class GameRunner {
       });
       starter._histId = sandbox._stats.pokemonHistory.length - 1;
 
-      sandbox.state.team            = [starter];
+      sandbox.state.team             = [starter];
       sandbox.state.starterSpeciesId = starter.speciesId;
       sandbox.state.maxTeamSize      = 1;
 
-      // ── Maps 0–7 (8 gym leaders) ─────────────────────────────────────────────
+      // ── Maps 0–7 ─────────────────────────────────────────────────────────────
       for (let mapIdx = 0; mapIdx < 8; mapIdx++) {
-        sandbox.state.currentMap = mapIdx;
+        sandbox.state.currentMap     = mapIdx;
         sandbox.state.catchesThisMap = 0;
-        sandbox.state.map = call('generateMap', mapIdx, nuzlocke);
+        sandbox.state.map            = call('generateMap', mapIdx, nuzlocke);
 
         const mapResult = await this._playMap(ctx, sandbox, call, get, decide, mapIdx);
         if (!mapResult.won) {
@@ -306,7 +314,7 @@ class GameRunner {
         sandbox.state.badges++;
       }
 
-      // ── Elite Four + Champion (map index 8) ──────────────────────────────────
+      // ── Elite Four + Champion (map 8) ────────────────────────────────────────
       sandbox.state.currentMap = 8;
       const ELITE_4 = get('ELITE_4');
       for (let i = 0; i < ELITE_4.length; i++) {
@@ -359,7 +367,6 @@ class GameRunner {
       const accessible = Object.values(map.nodes).filter(n => n.accessible && !n.visited);
       if (!accessible.length) break;
 
-      // If only one accessible node, take it without asking the agent
       let chosen;
       if (accessible.length === 1) {
         chosen = accessible[0];
@@ -368,7 +375,6 @@ class GameRunner {
         chosen = accessible[idx] ?? accessible[0];
       }
 
-      // Lock siblings and mark chosen as current
       for (const n of Object.values(map.nodes)) {
         if (n.layer === chosen.layer && n.id !== chosen.id && n.accessible) {
           n.accessible = false;
@@ -376,7 +382,6 @@ class GameRunner {
       }
       sandbox.state.currentNode = chosen;
 
-      // Resolve question marks (resolveQuestionMark lives in game.js which isn't loaded)
       let resolvedType = chosen.type;
       if (resolvedType === 'question') {
         try { resolvedType = vm.runInContext('resolveQuestionMark()', ctx); }
@@ -388,20 +393,13 @@ class GameRunner {
 
       const nodeResult = await this._resolveNode(ctx, sandbox, call, get, decide, chosen, resolvedType, mapIdx);
 
-      // Always advance after resolving
       call('advanceFromNode', map, chosen.id);
 
-      if (resolvedType === 'boss' && nodeResult && !nodeResult.won) {
-        return { won: false };
-      }
-      if (resolvedType === 'boss' && nodeResult && nodeResult.won) {
-        return { won: true };
-      }
-
-      // Heal at pokecenter is instant
+      if (resolvedType === 'boss' && nodeResult && !nodeResult.won) return { won: false };
+      if (resolvedType === 'boss' && nodeResult && nodeResult.won)  return { won: true };
     }
 
-    return { won: false }; // should not reach here normally
+    return { won: false };
   }
 
   // ─── Resolve a single map node ─────────────────────────────────────────────
@@ -416,15 +414,19 @@ class GameRunner {
         return null;
 
       case 'battle':
+        return await this._doBattleNode(ctx, sandbox, call, get, decide, node);
+
       case 'trainer':
-        return await this._doBattleNode(ctx, sandbox, call, get, decide, node, false);
+        return await this._doTrainerNode(ctx, sandbox, call, get, decide, node);
 
       case 'boss':
         return await this._doBossNode(ctx, sandbox, call, get, decide, mapIdx);
 
       case 'catch':
+        return await this._doCatchNode(ctx, sandbox, call, get, decide, node, false);
+
       case 'shiny':
-        return await this._doCatchNode(ctx, sandbox, call, get, decide, node, type === 'shiny');
+        return await this._doCatchNode(ctx, sandbox, call, get, decide, node, true);
 
       case 'item':
       case 'mega':
@@ -440,18 +442,45 @@ class GameRunner {
         return await this._doTradeNode(ctx, sandbox, call, get, decide, node);
 
       default:
-        return await this._doBattleNode(ctx, sandbox, call, get, decide, node, false);
+        return await this._doBattleNode(ctx, sandbox, call, get, decide, node);
     }
   }
 
-  // ─── Wild / Trainer battle ──────────────────────────────────────────────────
-  async _doBattleNode(ctx, sandbox, call, get, decide, node, isBoss) {
-    const level = this._getLevelForNode(sandbox, node);
-    const choices = await call('getCatchChoices', sandbox.state.currentMap, 3, 151, true);
+  // ─── Wild battle ────────────────────────────────────────────────────────────
+  async _doBattleNode(ctx, sandbox, call, get, decide, node) {
+    // Mirror game.js doBattleNode: maps >= 1 fight one level below getLevelForNode
+    const rawLevel = call('getLevelForNode', node);
+    const level    = sandbox.state.currentMap >= 1 ? rawLevel - 1 : rawLevel;
+
+    let choices = await call('getCatchChoices', sandbox.state.currentMap, 3, 151, true);
     if (!choices || !choices.length) return { won: true };
 
-    const species = choices[Math.floor(call('rng') * choices.length)] || choices[0];
-    const enemy   = call('createInstance', species, level, false,
+    const lvlFiltered = choices.filter(sp => call('minLevelForSpecies', sp.id ?? sp.speciesId) <= level);
+    if (lvlFiltered.length > 0) choices = lvlFiltered;
+
+    // Map 0 layer 1: exclude enemies super-effective against the starter
+    if (sandbox.state.currentMap === 0 && node.layer === 1 && sandbox.state.team.length > 0) {
+      const TYPE_CHART   = get('TYPE_CHART');
+      const starterTypes = sandbox.state.team[0].types || [];
+      const isSafe = sp => !(sp.types || []).some(et =>
+        starterTypes.some(st => (TYPE_CHART[et]?.[st] || 1) >= 2)
+      );
+      const safe = choices.filter(isSafe);
+      if (safe.length > 0) {
+        choices = safe;
+      } else {
+        const eevee = await call('fetchPokemonById', 133);
+        if (eevee) choices = [eevee];
+      }
+    }
+
+    const rawSpecies = choices[Math.floor(call('rng') * choices.length)];
+    if (!rawSpecies) return { won: true };
+
+    const rawId = rawSpecies.id ?? rawSpecies.speciesId;
+    const evoId = call('resolveEvoForLevel', rawId, level);
+    const enemySpecies = evoId !== rawId ? (await call('fetchPokemonById', evoId) || rawSpecies) : rawSpecies;
+    const enemy = call('createInstance', enemySpecies, level, false,
       get('getMoveТierForMap')(sandbox.state.currentMap));
 
     const battleResult = call(
@@ -461,6 +490,52 @@ class GameRunner {
     sandbox._stats.battlesTotal++;
     this._applyBattleResult(sandbox, battleResult.pTeam, battleResult.playerParticipants,
       [enemy], battleResult.detailedLog);
+    await this._checkEvolutions(ctx, sandbox, call, decide);
+    if (sandbox.state.nuzlockeMode) this._applyPermadeath(sandbox);
+    return { won: battleResult.playerWon && sandbox.state.team.length > 0 };
+  }
+
+  // ─── Trainer battle ─────────────────────────────────────────────────────────
+  async _doTrainerNode(ctx, sandbox, call, get, decide, node) {
+    const key    = node.trainerSprite || 'aceTrainer';
+    const config = get(`TRAINER_BATTLE_CONFIG['${key}']`) ||
+                   get(`TRAINER_BATTLE_CONFIG['aceTrainer']`);
+    const teamSize = sandbox.state.currentMap === 0 ? 1
+                   : sandbox.state.currentMap <= 2  ? 2 : 3;
+    const level    = call('getLevelForNode', node);
+    const moveTier = get('getMoveТierForMap')(sandbox.state.currentMap);
+
+    let speciesList;
+    if (config && config.pool) {
+      const poolSet  = [...new Set(config.pool)];
+      const eligible = poolSet.filter(id => call('minLevelForSpecies', id) <= level);
+      const pool     = eligible.length ? eligible : poolSet;
+      const shuffled = pool.slice().sort(() => call('rng') - 0.5);
+      const ids      = Array.from(
+        { length: teamSize },
+        (_, i) => call('resolveEvoForLevel', shuffled[i % shuffled.length], level)
+      );
+      speciesList = (await Promise.all(ids.map(id => call('fetchPokemonById', id)))).filter(Boolean);
+    } else {
+      // aceTrainer / oldGuy: use getCatchChoices pool
+      const rawChoices = await call('getCatchChoices', sandbox.state.currentMap, 3, 151, true);
+      speciesList = (await Promise.all((rawChoices || []).slice(0, teamSize).map(async sp => {
+        const rawId = sp.id ?? sp.speciesId;
+        const evoId = call('resolveEvoForLevel', rawId, level);
+        return evoId !== rawId ? (await call('fetchPokemonById', evoId) || sp) : sp;
+      }))).filter(Boolean);
+    }
+
+    if (!speciesList.length) return { won: true };
+    const enemyTeam = speciesList.map(sp => call('createInstance', sp, level, false, moveTier));
+
+    const battleResult = call(
+      'runBattle',
+      [...sandbox.state.team], enemyTeam, sandbox.state.items, [], null, null
+    );
+    sandbox._stats.battlesTotal++;
+    this._applyBattleResult(sandbox, battleResult.pTeam, battleResult.playerParticipants,
+      enemyTeam, battleResult.detailedLog);
     await this._checkEvolutions(ctx, sandbox, call, decide);
     if (sandbox.state.nuzlockeMode) this._applyPermadeath(sandbox);
     return { won: battleResult.playerWon && sandbox.state.team.length > 0 };
@@ -491,27 +566,69 @@ class GameRunner {
 
   // ─── Catch node ─────────────────────────────────────────────────────────────
   async _doCatchNode(ctx, sandbox, call, get, decide, node, forceShiny) {
-    const level = this._getLevelForNode(sandbox, node);
-    const choices = await call(
-      'getCatchChoices', sandbox.state.currentMap, 18, 151, true
-    );
+    let choices = await call('getCatchChoices', sandbox.state.currentMap, 18, 151, true);
     if (!choices || !choices.length) return null;
 
-    // Filter by min level requirement
-    const lvlFiltered = choices.filter(sp =>
-      call('minLevelForSpecies', sp.id ?? sp.speciesId) <= level
-    );
-    const pool = (lvlFiltered.length > 0 ? lvlFiltered : choices).slice(0, 3);
+    // Map 0: floor level at 4
+    const isFirstMap = sandbox.state.currentMap === 0;
+    let level = call('getLevelForNode', node);
+    if (isFirstMap) level = Math.max(4, level);
 
-    const moveTier = get('getMoveТierForMap')(sandbox.state.currentMap);
-    const instances = pool.map(sp =>
-      call('createInstance', sp, forceShiny ? level : sp._legendary ? level + 5 : level,
-        forceShiny, moveTier)
+    // Level filter (pad below 3 to always offer 3 options)
+    const lvlFiltered = choices.filter(sp => call('minLevelForSpecies', sp.id ?? sp.speciesId) <= level);
+    if (lvlFiltered.length > 0) {
+      choices = lvlFiltered.length < 3
+        ? [...lvlFiltered, ...choices.filter(sp => !lvlFiltered.includes(sp))].slice(0, 3)
+        : lvlFiltered;
+    }
+
+    // Nuzlocke map 0: curated 22-pokemon pool
+    if (sandbox.state.nuzlockeMode && sandbox.state.currentMap === 0) {
+      const nuzlockeIds = new Set([10,11,27,54,56,60,69,72,74,79,81,86,96,98,100,102,111,116,118,120,129,133]);
+      const filtered = choices.filter(sp => nuzlockeIds.has(sp.id ?? sp.speciesId));
+      if (filtered.length > 0) choices = filtered;
+    }
+
+    // Map 0 layer 1 (non-nuzlocke): guarantee at least one Grass AND one Water
+    if (!sandbox.state.nuzlockeMode && sandbox.state.currentMap === 0 && node.layer === 1) {
+      const grassIds = [43, 69, 102];
+      const waterIds = [54, 60, 72, 79, 86, 98, 116, 118, 120, 129];
+      if (!choices.some(p => p.types?.includes('Grass'))) {
+        const id = grassIds[Math.floor(call('rng') * grassIds.length)];
+        const r  = await call('fetchPokemonById', id);
+        if (r) choices[0] = r;
+      }
+      if (!choices.some(p => p.types?.includes('Water'))) {
+        const id = waterIds[Math.floor(call('rng') * waterIds.length)];
+        const r  = await call('fetchPokemonById', id);
+        if (r) {
+          const slot = choices.findIndex(p => !p.types?.includes('Grass'));
+          choices[slot === -1 ? 2 : slot] = r;
+        }
+      }
+    }
+
+    // Evo-line dedup: remove pokemon whose evo-line root is already on the team
+    const teamRoots = new Set(sandbox.state.team.map(p => call('getEvoLineRoot', p.speciesId)));
+    if (sandbox.state.nuzlockeMode) {
+      // Nuzlocke: show only 1 pokemon, no evo-line duplicates
+      const filtered = choices.filter(sp => !teamRoots.has(call('getEvoLineRoot', sp.id ?? sp.speciesId)));
+      choices = (filtered.length > 0 ? filtered : choices).slice(0, 1);
+    } else if (forceShiny) {
+      // Shiny node: only the first candidate, forced shiny
+      choices = choices.slice(0, 1);
+    } else {
+      choices = choices.slice(0, 3);
+    }
+
+    const moveTier  = get('getMoveТierForMap')(sandbox.state.currentMap);
+    const instances = choices.map(sp =>
+      call('createInstance', sp, sp._legendary ? level + 5 : level,
+        forceShiny ? true : call('rng') < 0.01, moveTier)
     );
 
-    // options: instances + implicit "skip" at index instances.length
     const idx = await decide({ type: 'catch', options: instances, canSkip: true });
-    if (idx === instances.length || idx === null || idx === undefined) return null; // skip
+    if (idx === instances.length || idx === null || idx === undefined) return null;
 
     const chosen = instances[Math.min(idx, instances.length - 1)];
     await this._addToTeam(ctx, sandbox, call, decide, chosen, 'catch');
@@ -520,17 +637,20 @@ class GameRunner {
 
   // ─── Legendary encounter ────────────────────────────────────────────────────
   async _doLegendaryNode(ctx, sandbox, call, get, decide, node) {
-    const level = this._getLevelForNode(sandbox, node);
-    // Use a fixed legendary pool for gen 1
-    const legendaryPool = [144, 145, 146];
-    const id = legendaryPool[Math.floor(call('rng') * legendaryPool.length)];
-    const species = await call('fetchPokemonById', id);
+    const LEGENDARY_IDS = get('LEGENDARY_IDS');
+    const teamLegendIds = sandbox.state.team.map(p => p.speciesId);
+    const available     = LEGENDARY_IDS.filter(id => id <= 151 && !teamLegendIds.includes(id));
+    if (!available.length) return null;
+
+    const legendId = available[Math.floor(call('rng') * available.length)];
+    const species  = await call('fetchPokemonById', legendId);
     if (!species) return null;
 
-    const legendary = call('createInstance', species, level + 5, call('rng') < 0.01,
-      get('getMoveТierForMap')(sandbox.state.currentMap));
+    // Legendary level = max level for the current map (game.js line 1480)
+    const MAP_LEVEL_RANGES = get('MAP_LEVEL_RANGES');
+    const level    = MAP_LEVEL_RANGES[Math.min(sandbox.state.currentMap, 8)][1];
+    const legendary = call('createInstance', species, level, call('rng') < 0.01, 2);
 
-    // Fight it first
     const battleResult = call(
       'runBattle',
       [...sandbox.state.team], [legendary], sandbox.state.items, [], null, null
@@ -538,11 +658,11 @@ class GameRunner {
     sandbox._stats.battlesTotal++;
     this._applyBattleResult(sandbox, battleResult.pTeam, battleResult.playerParticipants,
       [legendary], battleResult.detailedLog);
+    await this._checkEvolutions(ctx, sandbox, call, decide);
     if (sandbox.state.nuzlockeMode) this._applyPermadeath(sandbox);
 
     if (!battleResult.playerWon || sandbox.state.team.length === 0) return { won: false };
 
-    // Offer to add legendary to team
     const idx = await decide({ type: 'catch', options: [legendary], canSkip: true });
     if (idx === 0) {
       await this._addToTeam(ctx, sandbox, call, decide, legendary, 'legendary');
@@ -570,21 +690,18 @@ class GameRunner {
     });
 
     const available = [...heldAvailable, ...usableAvailable];
-    // Shuffle using RNG (match game logic)
-    const shuffled = [...available].sort(() => call('rng') - 0.5);
-    const picks = shuffled.slice(0, 3);
+    const shuffled  = [...available].sort(() => call('rng') - 0.5);
+    const picks     = shuffled.slice(0, 3);
     if (!picks.length) return null;
 
-    // options + implicit "skip" at index picks.length
     const idx = await decide({ type: 'item', options: picks, canSkip: true });
-    if (idx === picks.length || idx === null || idx === undefined) return null; // skip
+    if (idx === picks.length || idx === null || idx === undefined) return null;
 
     const item = picks[Math.min(idx, picks.length - 1)];
     sandbox._stats.itemsTaken++;
     if (item.usable) {
       sandbox.state.items.push({ ...item });
     } else {
-      // Ask agent which Pokemon to give it to (or put in bag at index team.length)
       const assignIdx = await decide({
         type: 'item_assign', item, team: sandbox.state.team,
       });
@@ -602,7 +719,6 @@ class GameRunner {
   // ─── Move tutor node ────────────────────────────────────────────────────────
   async _doMoveTutorNode(ctx, sandbox, call, decide, node) {
     if (!sandbox.state.team.length) return null;
-    // Ask which Pokemon should get an upgraded move tier
     const idx = await decide({ type: 'move_tutor', team: sandbox.state.team });
     if (idx < sandbox.state.team.length) {
       const p = sandbox.state.team[idx];
@@ -615,7 +731,6 @@ class GameRunner {
   // ─── Trade node ─────────────────────────────────────────────────────────────
   async _doTradeNode(ctx, sandbox, call, get, decide, node) {
     if (!sandbox.state.team.length) return null;
-    // Ask agent whether to trade at all (skip = team.length, else index of Pokemon to trade)
     const idx = await decide({ type: 'trade', team: sandbox.state.team, canSkip: true });
     if (idx === sandbox.state.team.length || idx === null || idx === undefined) return null;
 
@@ -626,18 +741,16 @@ class GameRunner {
     if (!choices || !choices.length) return null;
     const species = choices[Math.floor(call('rng') * choices.length)];
     const level   = Math.min(100, mine.level + 3);
-    const offer   = call('createInstance', species, level, false,
+    const offer   = call('createInstance', species, level, call('rng') < 0.01,
       Math.max(get('getMoveТierForMap')(sandbox.state.currentMap), mine.moveTier ?? 0));
 
-    // Mark traded-away pokemon as released in history
     if (mine._histId != null) {
-      sandbox._stats.pokemonHistory[mine._histId].released = true;
+      sandbox._stats.pokemonHistory[mine._histId].released    = true;
       sandbox._stats.pokemonHistory[mine._histId].releasedMap = sandbox.state.currentMap;
-      sandbox._stats.pokemonHistory[mine._histId].releasedBy = 'trade';
+      sandbox._stats.pokemonHistory[mine._histId].releasedBy  = 'trade';
     }
     if (mine.heldItem) sandbox.state.items.push(mine.heldItem);
 
-    // Record received pokemon in history (not counted as "caught")
     const offerBst = offer.baseStats
       ? Object.values(offer.baseStats).reduce((a, b) => a + b, 0) : 0;
     const histEntry = {
@@ -653,12 +766,11 @@ class GameRunner {
     return null;
   }
 
-  // ─── Add a Pokemon to the team, asking for swap if full ────────────────────
+  // ─── Add a Pokemon to the team (swap if full) ────────────────────────────────
   async _addToTeam(ctx, sandbox, call, decide, pokemon, acquired = 'catch') {
     sandbox.state.catchesThisMap = (sandbox.state.catchesThisMap || 0) + 1;
     if (acquired === 'catch' || acquired === 'legendary') sandbox._stats.pokemonCaught++;
 
-    // Record in history
     const bst = pokemon.baseStats
       ? Object.values(pokemon.baseStats).reduce((a, b) => a + b, 0) : 0;
     const histEntry = {
@@ -676,13 +788,11 @@ class GameRunner {
         sandbox.state.maxTeamSize = sandbox.state.team.length;
       }
     } else {
-      // Team full — ask who to release
-      const idx = await decide({ type: 'swap', newPokemon: pokemon, team: sandbox.state.team });
-      const safe = Math.min(idx, sandbox.state.team.length - 1);
+      const swapIdx  = await decide({ type: 'swap', newPokemon: pokemon, team: sandbox.state.team });
+      const safe     = Math.min(swapIdx, sandbox.state.team.length - 1);
       const released = sandbox.state.team[safe];
-      // Mark as released in history
       if (released._histId != null) {
-        sandbox._stats.pokemonHistory[released._histId].released = true;
+        sandbox._stats.pokemonHistory[released._histId].released    = true;
         sandbox._stats.pokemonHistory[released._histId].releasedMap = sandbox.state.currentMap;
       }
       if (released.heldItem) sandbox.state.items.push(released.heldItem);
@@ -694,21 +804,17 @@ class GameRunner {
   _applyBattleResult(sandbox, resultP, playerParticipants, enemyTeam, detailedLog = []) {
     if (!resultP) return;
 
-    // Count combat rounds and player faints from battle log
     if (detailedLog && sandbox._stats) {
       let rounds = 0;
       for (const e of detailedLog) {
-        if (e && e.type === 'faint' && e.side === 'player') sandbox._stats.pokemonFainted++;
-        // Each player attack marks a new round (one attack per side per round)
+        if (e && e.type === 'faint'  && e.side === 'player') sandbox._stats.pokemonFainted++;
         if (e && e.type === 'attack' && e.side === 'player') rounds++;
       }
       sandbox._stats.battleRounds += rounds;
     }
-    // Sync HP from battle result
     for (let i = 0; i < sandbox.state.team.length; i++) {
       if (resultP[i]) sandbox.state.team[i].currentHp = resultP[i].currentHp;
     }
-    // Level gain (1 level per battle in normal mode, capped)
     const maxEnemyLevel = Math.max(...enemyTeam.map(p => p.level));
     for (const p of sandbox.state.team) {
       if (p.currentHp > 0 || (playerParticipants && playerParticipants.has(
@@ -717,8 +823,8 @@ class GameRunner {
         const newLevel = Math.min(p.level + 1, maxEnemyLevel + 5, 100);
         if (newLevel > p.level) {
           const oldMax = p.maxHp;
-          p.level = newLevel;
-          p.maxHp = Math.floor(p.baseStats.hp * newLevel / 50) + newLevel + 10;
+          p.level  = newLevel;
+          p.maxHp  = Math.floor(p.baseStats.hp * newLevel / 50) + newLevel + 10;
           if (p.currentHp > 0) {
             p.currentHp = Math.min(p.currentHp + (p.maxHp - oldMax), p.maxHp);
           }
@@ -727,29 +833,25 @@ class GameRunner {
     }
   }
 
-  // ─── Nuzlocke permadeath: remove fainted pokemon permanently ────────────────
+  // ─── Nuzlocke permadeath ─────────────────────────────────────────────────────
   _applyPermadeath(sandbox) {
     const before = sandbox.state.team.length;
     sandbox.state.team = sandbox.state.team.filter(p => {
       if (p.currentHp > 0) return true;
-      // Mark as dead in history
       if (p._histId != null) {
         const entry = sandbox._stats.pokemonHistory[p._histId];
-        if (entry) {
-          entry.dead = true;
-          entry.diedMap = sandbox.state.currentMap;
-        }
+        if (entry) { entry.dead = true; entry.diedMap = sandbox.state.currentMap; }
       }
       sandbox._stats.permadeaths++;
       return false;
     });
-    return sandbox.state.team.length === 0 && before > 0; // true if team wiped
+    return sandbox.state.team.length === 0 && before > 0;
   }
 
   // ─── Auto-evolve team after level ups ──────────────────────────────────────
   async _checkEvolutions(ctx, sandbox, call, decide) {
     try {
-      const EVOLUTIONS         = vm.runInContext('EVOLUTIONS', ctx);
+      const EVOLUTIONS          = vm.runInContext('EVOLUTIONS', ctx);
       const BRANCHING_EVOLUTIONS = vm.runInContext('BRANCHING_EVOLUTIONS', ctx);
 
       for (const p of sandbox.state.team) {
@@ -779,39 +881,27 @@ class GameRunner {
   async _applyEvolution(sandbox, call, p, evo) {
     const newSpecies = await call('fetchPokemonById', evo.into);
     if (!newSpecies) return;
-    const oldHpRatio  = p.currentHp / p.maxHp;
-    p.speciesId  = evo.into;
-    p.name       = evo.name || newSpecies.name;
-    p.types      = newSpecies.types;
-    p.baseStats  = newSpecies.baseStats;
-    p.maxHp      = Math.floor(newSpecies.baseStats.hp * p.level / 50) + p.level + 10;
-    p.currentHp  = Math.max(1, Math.floor(oldHpRatio * p.maxHp));
+    const oldHpRatio = p.currentHp / p.maxHp;
+    p.speciesId = evo.into;
+    p.name      = evo.name || newSpecies.name;
+    p.types     = newSpecies.types;
+    p.baseStats = newSpecies.baseStats;
+    p.maxHp     = Math.floor(newSpecies.baseStats.hp * p.level / 50) + p.level + 10;
+    p.currentHp = Math.max(1, Math.floor(oldHpRatio * p.maxHp));
   }
 
-  // ─── resolveQuestionMark fallback (in case game.js isn't loaded) ────────────
+  // ─── Fallback question-mark resolver (used only if prelude inject fails) ────
   _resolveQuestion(sandbox) {
     const r = Math.random();
     if (r < 0.22) return 'battle';
     if (r < 0.42) return 'trainer';
-    if (r < 0.52) return 'catch';
+    if (r < 0.52) return sandbox.state.nuzlockeMode ? 'battle' : 'catch';
     if (r < 0.65) return 'item';
-    return 'battle';
+    if (r < 0.72) return 'shiny';
+    return 'mega';
   }
 
-  // ─── Level helper (mirrors getLevelForNode from game.js) ───────────────────
-  _getLevelForNode(sandbox, node) {
-    const MAP_LEVEL_RANGES = [
-      [1, 5], [8, 15], [14, 21], [21, 29],
-      [29, 37], [37, 43], [43, 47], [47, 52], [53, 64],
-    ];
-    const [minL, maxL] = MAP_LEVEL_RANGES[Math.min(sandbox.state.currentMap, 8)];
-    const t    = Math.min(1, Math.max(0, ((node.layer || 1) - 1) / 5));
-    const base = Math.round(minL + t * (maxL - minL));
-    const spread = Math.max(1, Math.round((maxL - minL) / 8));
-    return Math.min(maxL, Math.max(minL, base + Math.floor(Math.random() * spread)));
-  }
-
-  // ─── Summarise current state for the agent ─────────────────────────────────
+  // ─── State summary for the agent ───────────────────────────────────────────
   _stateSummary(sandbox) {
     return {
       badges:         sandbox.state.badges,
@@ -825,13 +915,13 @@ class GameRunner {
 
   _teamSummary(team) {
     return team.map(p => ({
-      name:    p.name,
-      species: p.speciesId,
-      level:   p.level,
-      hp:      `${p.currentHp}/${p.maxHp}`,
-      types:   p.types,
-      bst:     p.baseStats ? Object.values(p.baseStats).reduce((a, b) => a + b, 0) : 0,
-      item:    p.heldItem?.name || null,
+      name:     p.name,
+      species:  p.speciesId,
+      level:    p.level,
+      hp:       `${p.currentHp}/${p.maxHp}`,
+      types:    p.types,
+      bst:      p.baseStats ? Object.values(p.baseStats).reduce((a, b) => a + b, 0) : 0,
+      item:     p.heldItem?.name || null,
       moveTier: p.moveTier ?? 1,
     }));
   }
