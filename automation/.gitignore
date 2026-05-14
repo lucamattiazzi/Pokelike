@@ -3,3 +3,4 @@ pokemon_cache.json
 results/
 models/
 *.pkl
+.env
