@@ -1,4 +1,6 @@
 'use strict';
+const fs = require('fs');
+
 /**
  * llm_agent.js
  *
@@ -44,13 +46,19 @@ Strategy tips:
 Output format (strict JSON, nothing else):
 {"choice": <0-based index of chosen option>, "reason": "<one short sentence>"}`;
 
-function buildSystemPrompt(rules) {
-  if (!rules || rules.length === 0) return BASE_SYSTEM_PROMPT;
-  const rulesBlock = rules.map((r, i) => `  ${i + 1}. ${r}`).join('\n');
-  return `${BASE_SYSTEM_PROMPT}
+function buildSystemPrompt(rules, memory) {
+  let prompt = BASE_SYSTEM_PROMPT;
 
-MANDATORY RULES (override default strategy — follow these strictly):
-${rulesBlock}`;
+  if (memory) {
+    prompt += `\n\nTACTICS MEMORY (lessons learned from previous runs — use as guidance):\n${memory}`;
+  }
+
+  if (rules?.length) {
+    const rulesBlock = rules.map((r, i) => `  ${i + 1}. ${r}`).join('\n');
+    prompt += `\n\nMANDATORY RULES (override default strategy — follow these strictly):\n${rulesBlock}`;
+  }
+
+  return prompt;
 }
 
 // ─── Provider backends ────────────────────────────────────────────────────────
@@ -177,9 +185,9 @@ class LLMAgent {
    */
   constructor(provider, opts = {}) {
     if (typeof provider === 'object' && provider !== null) opts = provider;
-    this._backend     = createBackend(provider || 'anthropic', opts);
-    this._callCount   = 0;
-    this._systemPrompt = buildSystemPrompt(opts.rules || []);
+    this._backend      = createBackend(provider || 'anthropic', opts);
+    this._callCount    = 0;
+    this._systemPrompt = buildSystemPrompt(opts.rules || [], opts.memory || '');
   }
 
   get callCount() { return this._callCount; }
@@ -202,6 +210,44 @@ class LLMAgent {
     } catch (err) {
       return { choice: 0, reason: `Backend error: ${err.message}` };
     }
+  }
+
+  /**
+   * Ask the model to reflect on a completed game and append tactical insights
+   * to a shared markdown memory file read by future runs.
+   *
+   * @param {object} result  — return value of playGame()
+   * @param {string} filePath — path to the .md memory file
+   */
+  async appendMemory(result, filePath) {
+    const s    = result.stats || {};
+    const team = (result.finalTeam || [])
+      .map(p => `${p.name} Lv${p.level} [${(p.types || []).join('/')}]`)
+      .join(', ');
+
+    const summary =
+      `Outcome: ${result.outcome.toUpperCase()} | Maps cleared: ${result.mapsCleared}/9\n` +
+      `Final team: ${team || '(empty)'}\n` +
+      `Battles: ${s.battlesTotal ?? '?'} | Caught: ${s.pokemonCaught ?? '?'} | ` +
+      `Fainted: ${s.pokemonFainted ?? '?'} | Items: ${s.itemsTaken ?? '?'}`;
+
+    const prompt =
+      `You just finished this Pokémon roguelike run:\n\n${summary}\n\n` +
+      `Write exactly 2 bullet points (starting with "- ") of tactical insights ` +
+      `for future runs. Focus on what you'd do differently or what worked. ` +
+      `Be specific and concise (max 25 words each). No preamble, no headers.`;
+
+    const systemPrompt =
+      'You are a Pokémon strategy analyst. Output only two bullet points, nothing else.';
+
+    const text = await this._backend.complete(systemPrompt, prompt)
+      .catch(err => `- (memory write failed: ${err.message})`);
+
+    const date   = new Date().toISOString().replace('T', ' ').slice(0, 16);
+    const header = `\n## Run | ${date} | Seed: ${result.seed} | ` +
+                   `${result.outcome.toUpperCase()} (${result.mapsCleared}/9 maps)\n`;
+
+    fs.appendFileSync(filePath, header + text.trim() + '\n');
   }
 }
 

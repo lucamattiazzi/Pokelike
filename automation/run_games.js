@@ -53,20 +53,50 @@ function parseArgs() {
   }
 
   const nuzlocke = args.includes('--nuzlocke');
+
+  // --memory [file]  — omit path to use default results/memory.md
+  const memoryIdx = args.indexOf('--memory');
+  let memory = '';
+  if (memoryIdx !== -1) {
+    const next = args[memoryIdx + 1];
+    memory = (next && !next.startsWith('--'))
+      ? next
+      : path.join(__dirname, 'results', 'memory.md');
+  }
+  const memorySize = parseInt(get('--memory-size', '10'), 10);
+
   return {
-    games:    parseInt(get('--games',    '50'),  10),
-    seed:     parseInt(get('--seed',     '1'),   10),
-    out:      get('--out', path.join(__dirname, 'results',
-                provider === 'random' ? 'random_games.jsonl'
-                : nuzlocke ? 'nuzlocke_games.jsonl' : 'games.jsonl')),
-    parallel: parseInt(get('--parallel', provider === 'random' ? '8' : '1'), 10),
-    verbose:  args.includes('--verbose'),
+    games:      parseInt(get('--games',    '50'),  10),
+    seed:       parseInt(get('--seed',     '1'),   10),
+    out:        get('--out', path.join(__dirname, 'results',
+                  provider === 'random' ? 'random_games.jsonl'
+                  : nuzlocke ? 'nuzlocke_games.jsonl' : 'games.jsonl')),
+    parallel:   parseInt(get('--parallel', provider === 'random' ? '8' : '1'), 10),
+    verbose:    args.includes('--verbose'),
     provider,
-    model:    get('--model',    process.env.POKELIKE_MODEL || ''),
-    baseUrl:  get('--base-url', process.env.LLAMA_BASE_URL || process.env.OPENAI_BASE_URL || ''),
+    model:      get('--model',    process.env.POKELIKE_MODEL || ''),
+    baseUrl:    get('--base-url', process.env.LLAMA_BASE_URL || process.env.OPENAI_BASE_URL || ''),
     rules,
     nuzlocke,
+    memory,
+    memorySize,
   };
+}
+
+// ─── Shared memory file helpers ──────────────────────────────────────────────
+function loadMemory(filePath, maxEntries = 10) {
+  if (!filePath || !fs.existsSync(filePath)) return '';
+  const content  = fs.readFileSync(filePath, 'utf8');
+  // Split on section headers and take the most recent entries
+  const sections = content.split(/(?=^## Run)/m).filter(s => s.trim());
+  return sections.slice(-maxEntries).join('\n');
+}
+
+function initMemoryFile(filePath) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  if (!fs.existsSync(filePath)) {
+    fs.writeFileSync(filePath, '# Pokémon Roguelike Tactics Memory\n\n');
+  }
 }
 
 // ─── Load Pokemon cache ───────────────────────────────────────────────────────
@@ -207,7 +237,8 @@ function makeAgent(opts) {
     provider: opts.provider,
     ...(opts.model   && { model:   opts.model   }),
     ...(opts.baseUrl && { baseUrl: opts.baseUrl }),
-    ...(opts.rules?.length && { rules: opts.rules }),
+    ...(opts.rules?.length  && { rules:  opts.rules  }),
+    ...(opts._memory        && { memory: opts._memory }),
   };
   return new LLMAgent(agentOpts);
 }
@@ -220,8 +251,16 @@ async function main() {
   const cache  = loadCache();
   console.log(`Cache loaded: ${Object.keys(cache).length} species`);
 
+  // ── Memory ──────────────────────────────────────────────────────────────────
+  if (opts.memory) initMemoryFile(opts.memory);
+  const memoryContent = loadMemory(opts.memory, opts.memorySize);
+  // Attach loaded memory to opts so makeAgent can inject it into the system prompt
+  opts._memory = memoryContent;
+
   const runner   = new GameRunner(cache);
   const template = makeAgent(opts);   // used only for label; each game gets its own instance
+  // Dedicated agent for memory writes (reused across games, no per-game callCount needed)
+  const memoryWriter = (opts.memory && opts.provider !== 'random') ? makeAgent(opts) : null;
 
   fs.mkdirSync(path.dirname(opts.out), { recursive: true });
   const outStream = fs.createWriteStream(opts.out, { flags: 'a' });
@@ -229,6 +268,10 @@ async function main() {
   console.log(`Running ${opts.games} games (seed ${opts.seed} → ${opts.seed + opts.games - 1})`);
   console.log(`Provider: ${template.label}${opts.nuzlocke ? ' | Mode: NUZLOCKE' : ''}`);
   console.log(`Output: ${opts.out}`);
+  if (opts.memory) {
+    const entryCount = memoryContent.split(/^## Run/m).filter(Boolean).length;
+    console.log(`Memory: ${opts.memory} (${entryCount} entries loaded, max ${opts.memorySize})`);
+  }
   if (opts.rules?.length) {
     console.log(`Rules (${opts.rules.length}):`);
     for (const r of opts.rules) console.log(`  • ${r}`);
@@ -251,6 +294,11 @@ async function main() {
       else if (result.outcome === 'loss') losses++;
       else errors++;
       for (const k of Object.keys(statTotals)) statTotals[k] += result.stats?.[k] ?? 0;
+
+      if (memoryWriter) {
+        await memoryWriter.appendMemory(result, opts.memory)
+          .catch(e => console.warn(`  [memory] write failed: ${e.message}`));
+      }
 
       // Progress every 10 games
       if ((i + 1) % 10 === 0 || i === opts.games - 1) {
@@ -285,6 +333,13 @@ async function main() {
         else if (r.outcome === 'loss') { losses++; if (!opts.verbose) process.stdout.write('L'); }
         else                       { errors++; if (!opts.verbose) process.stdout.write('E'); }
         for (const k of Object.keys(statTotals)) statTotals[k] += r.stats?.[k] ?? 0;
+      }
+      // Memory writes are sequential to avoid concurrent file appends
+      if (memoryWriter) {
+        for (const r of results) {
+          await memoryWriter.appendMemory(r, opts.memory)
+            .catch(e => console.warn(`  [memory] write failed: ${e.message}`));
+        }
       }
 
       if (!opts.verbose && (i + BATCH) % 50 === 0) {
