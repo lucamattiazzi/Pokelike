@@ -1,0 +1,15 @@
+{
+  "name": "pokelike-automation",
+  "version": "1.0.0",
+  "description": "LLM-driven game automation and strategy analysis for Pokelike",
+  "main": "run_games.js",
+  "scripts": {
+    "build-cache": "node build_cache.js",
+    "run-games": "node run_games.js",
+    "analyze": "node analyze.js",
+    "play-model": "node play_model.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0"
+  }
+}
