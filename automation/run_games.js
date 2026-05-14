@@ -83,22 +83,6 @@ function parseArgs() {
   };
 }
 
-// ─── Shared memory file helpers ──────────────────────────────────────────────
-function loadMemory(filePath, maxEntries = 10) {
-  if (!filePath || !fs.existsSync(filePath)) return '';
-  const content  = fs.readFileSync(filePath, 'utf8');
-  // Split on section headers and take the most recent entries
-  const sections = content.split(/(?=^## Run)/m).filter(s => s.trim());
-  return sections.slice(-maxEntries).join('\n');
-}
-
-function initMemoryFile(filePath) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, '# Pokémon Roguelike Tactics Memory\n\n');
-  }
-}
-
 // ─── Load Pokemon cache ───────────────────────────────────────────────────────
 function loadCache() {
   const p = path.join(__dirname, 'pokemon_cache.json');
@@ -252,8 +236,8 @@ async function main() {
   console.log(`Cache loaded: ${Object.keys(cache).length} species`);
 
   // ── Memory ──────────────────────────────────────────────────────────────────
-  if (opts.memory) initMemoryFile(opts.memory);
-  const memoryContent = loadMemory(opts.memory, opts.memorySize);
+  if (opts.memory) LLMAgent.initMemoryFile(opts.memory);
+  const memoryContent = LLMAgent.loadMemory(opts.memory, opts.memorySize);
   // Attach loaded memory to opts so makeAgent can inject it into the system prompt
   opts._memory = memoryContent;
 
@@ -296,7 +280,7 @@ async function main() {
       for (const k of Object.keys(statTotals)) statTotals[k] += result.stats?.[k] ?? 0;
 
       if (memoryWriter) {
-        await memoryWriter.appendMemory(result, opts.memory)
+        await memoryWriter.appendMemory(result, opts.memory, opts.memorySize)
           .catch(e => console.warn(`  [memory] write failed: ${e.message}`));
       }
 
@@ -337,7 +321,7 @@ async function main() {
       // Memory writes are sequential to avoid concurrent file appends
       if (memoryWriter) {
         for (const r of results) {
-          await memoryWriter.appendMemory(r, opts.memory)
+          await memoryWriter.appendMemory(r, opts.memory, opts.memorySize)
             .catch(e => console.warn(`  [memory] write failed: ${e.message}`));
         }
       }

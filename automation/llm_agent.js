@@ -1,5 +1,6 @@
 'use strict';
-const fs = require('fs');
+const fs   = require('fs');
+const path = require('path');
 
 /**
  * llm_agent.js
@@ -59,6 +60,37 @@ function buildSystemPrompt(rules, memory) {
   }
 
   return prompt;
+}
+
+// ─── Memory file helpers ──────────────────────────────────────────────────────
+
+// Parse the .md file into an array of entry objects.
+function parseMemoryFile(filePath) {
+  if (!fs.existsSync(filePath)) return [];
+  const content  = fs.readFileSync(filePath, 'utf8');
+  const sections = content.split(/(?=^## Run )/m)
+    .filter(s => s.trimStart().startsWith('## Run'));
+  return sections.map(section => {
+    const lines  = section.trimEnd().split('\n');
+    const header = lines[0];
+    const m      = header.match(/\|\s*votes:([+-]?\d+)\s*$/);
+    const votes  = m ? parseInt(m[1], 10) : 0;
+    const bullets = lines.slice(1).filter(l => l.trim());
+    return { header, votes, bullets };
+  });
+}
+
+// Serialise one entry back to markdown (updating the vote count in the header).
+function formatMemoryEntry(entry) {
+  const base   = entry.header.replace(/\s*\|\s*votes:[+-]?\d+\s*$/, '');
+  const header = `${base} | votes:${entry.votes >= 0 ? '+' : ''}${entry.votes}`;
+  return header + '\n' + entry.bullets.join('\n');
+}
+
+// Rewrite the whole file preserving all entries with updated vote counts.
+function rewriteMemoryFile(filePath, entries) {
+  const body = entries.map(formatMemoryEntry).join('\n\n');
+  fs.writeFileSync(filePath, '# Pokémon Roguelike Tactics Memory\n\n' + body + '\n');
 }
 
 // ─── Provider backends ────────────────────────────────────────────────────────
@@ -213,13 +245,30 @@ class LLMAgent {
   }
 
   /**
-   * Ask the model to reflect on a completed game and append tactical insights
-   * to a shared markdown memory file read by future runs.
+   * Vote on the currently-loaded memory entries, then append new insights.
+   * Entries that helped get +1; misleading ones get -1; the file is rewritten
+   * with updated scores before the new entry is appended.
    *
-   * @param {object} result  — return value of playGame()
-   * @param {string} filePath — path to the .md memory file
+   * @param {object} result     — return value of playGame()
+   * @param {string} filePath   — path to the .md memory file
+   * @param {number} maxEntries — how many entries were loaded (must match loadMemory call)
    */
-  async appendMemory(result, filePath) {
+  async appendMemory(result, filePath, maxEntries = 10) {
+    // ── 1. Vote on entries that were shown to the model ────────────────────────
+    const allEntries = parseMemoryFile(filePath);
+    const loaded     = [...allEntries]
+      .sort((a, b) => b.votes - a.votes)
+      .slice(0, maxEntries);
+
+    if (loaded.length > 0) {
+      const votes = await this._voteOnEntries(result, loaded);
+      for (const [i, entry] of loaded.entries()) {
+        entry.votes = Math.max(-99, Math.min(99, entry.votes + (votes[i] ?? 0)));
+      }
+      rewriteMemoryFile(filePath, allEntries);
+    }
+
+    // ── 2. Generate and append new insights ────────────────────────────────────
     const s    = result.stats || {};
     const team = (result.finalTeam || [])
       .map(p => `${p.name} Lv${p.level} [${(p.types || []).join('/')}]`)
@@ -237,17 +286,87 @@ class LLMAgent {
       `for future runs. Focus on what you'd do differently or what worked. ` +
       `Be specific and concise (max 25 words each). No preamble, no headers.`;
 
-    const systemPrompt =
-      'You are a Pokémon strategy analyst. Output only two bullet points, nothing else.';
-
-    const text = await this._backend.complete(systemPrompt, prompt)
-      .catch(err => `- (memory write failed: ${err.message})`);
+    const text = await this._backend.complete(
+      'You are a Pokémon strategy analyst. Output only two bullet points, nothing else.',
+      prompt
+    ).catch(err => `- (memory write failed: ${err.message})`);
 
     const date   = new Date().toISOString().replace('T', ' ').slice(0, 16);
     const header = `\n## Run | ${date} | Seed: ${result.seed} | ` +
-                   `${result.outcome.toUpperCase()} (${result.mapsCleared}/9 maps)\n`;
+                   `${result.outcome.toUpperCase()} (${result.mapsCleared}/9 maps) | votes:0\n`;
 
     fs.appendFileSync(filePath, header + text.trim() + '\n');
+  }
+
+  /**
+   * Ask the model to rate each loaded tactic entry.
+   * Returns a plain object mapping entry index → vote (-1 | 0 | +1).
+   */
+  async _voteOnEntries(result, entries) {
+    const s    = result.stats || {};
+    const team = (result.finalTeam || []).map(p => `${p.name} Lv${p.level}`).join(', ');
+    const runLine =
+      `${result.outcome.toUpperCase()} (${result.mapsCleared}/9 maps) | ` +
+      `Team: ${team || 'none'} | Battles: ${s.battlesTotal ?? '?'} | Fainted: ${s.pokemonFainted ?? '?'}`;
+
+    const tacticLines = entries.map((e, i) => {
+      const badge  = `[${e.votes >= 0 ? '+' : ''}${e.votes}]`;
+      const bullet = e.bullets[0]?.replace(/^-\s*/, '') || '';
+      return `${i} ${badge}: "${bullet}"`;
+    }).join('\n');
+
+    const prompt =
+      `Rate each tactic based on your last run.\n` +
+      `Run: ${runLine}\n\n` +
+      `Tactics (index [current_votes]: "text"):\n${tacticLines}\n\n` +
+      `Output ONLY a JSON object mapping index to vote.\n` +
+      `+1 = this advice was correct and helped, -1 = this advice was wrong or harmful, 0 = not applicable.\n` +
+      `Example: {"0":1,"1":0,"2":-1}`;
+
+    const text = await this._backend.complete(
+      'You are a game strategy reviewer. Output ONLY a valid JSON object. No explanation.',
+      prompt
+    ).catch(() => '{}');
+
+    try {
+      const cleaned = text.replace(/```json?\s*/g, '').replace(/```\s*/g, '').trim();
+      const parsed  = JSON.parse(cleaned);
+      const out     = {};
+      for (const [k, v] of Object.entries(parsed)) {
+        const idx = parseInt(k, 10);
+        if (!isNaN(idx) && [-1, 0, 1].includes(Number(v))) out[idx] = Number(v);
+      }
+      return out;
+    } catch {
+      return {}; // parse failure → no votes applied
+    }
+  }
+
+  // ─── Static helpers (called by run_games.js) ──────────────────────────────
+
+  /**
+   * Load and format memory entries for injection into the system prompt.
+   * Sorts by votes descending and prefixes each bullet with its vote badge.
+   */
+  static loadMemory(filePath, maxEntries = 10) {
+    if (!filePath || !fs.existsSync(filePath)) return '';
+    const entries = parseMemoryFile(filePath);
+    if (!entries.length) return '';
+    return [...entries]
+      .sort((a, b) => b.votes - a.votes)
+      .slice(0, maxEntries)
+      .map(e => {
+        const badge = `[${e.votes >= 0 ? '+' : ''}${e.votes}]`;
+        return e.bullets.map(b => `${badge} ${b.replace(/^-\s*/, '')}`).join('\n');
+      })
+      .join('\n');
+  }
+
+  static initMemoryFile(filePath) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    if (!fs.existsSync(filePath)) {
+      fs.writeFileSync(filePath, '# Pokémon Roguelike Tactics Memory\n\n');
+    }
   }
 }
 
