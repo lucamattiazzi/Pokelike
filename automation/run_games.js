@@ -40,6 +40,18 @@ function parseArgs() {
     return i !== -1 && args[i + 1] ? args[i + 1] : def;
   };
   const provider = get('--provider', 'anthropic');
+
+  // Parse rules: --rules "rule1; rule2" splits on semicolons,
+  // --rules-file FILE reads one rule per line
+  let rules = [];
+  const rulesStr  = get('--rules', '');
+  const rulesFile = get('--rules-file', '');
+  if (rulesStr)  rules = rulesStr.split(';').map(r => r.trim()).filter(Boolean);
+  if (rulesFile) {
+    const lines = fs.readFileSync(rulesFile, 'utf8').split('\n');
+    rules = [...rules, ...lines.map(l => l.trim()).filter(l => l && !l.startsWith('#'))];
+  }
+
   return {
     games:    parseInt(get('--games',    '50'),  10),
     seed:     parseInt(get('--seed',     '1'),   10),
@@ -50,6 +62,7 @@ function parseArgs() {
     provider,
     model:    get('--model',    process.env.POKELIKE_MODEL || ''),
     baseUrl:  get('--base-url', process.env.LLAMA_BASE_URL || process.env.OPENAI_BASE_URL || ''),
+    rules,
   };
 }
 
@@ -184,6 +197,7 @@ function makeAgent(opts) {
     provider: opts.provider,
     ...(opts.model   && { model:   opts.model   }),
     ...(opts.baseUrl && { baseUrl: opts.baseUrl }),
+    ...(opts.rules?.length && { rules: opts.rules }),
   };
   return new LLMAgent(agentOpts);
 }
@@ -204,7 +218,12 @@ async function main() {
 
   console.log(`Running ${opts.games} games (seed ${opts.seed} → ${opts.seed + opts.games - 1})`);
   console.log(`Provider: ${template.label}`);
-  console.log(`Output: ${opts.out}\n`);
+  console.log(`Output: ${opts.out}`);
+  if (opts.rules?.length) {
+    console.log(`Rules (${opts.rules.length}):`);
+    for (const r of opts.rules) console.log(`  • ${r}`);
+  }
+  console.log();
 
   let wins = 0, losses = 0, errors = 0;
   const startAll = Date.now();

@@ -17,11 +17,12 @@ A pipeline for playing Pokelike automatically, discovering winning strategies, a
 6. [Step 3 — Train the model](#step-3--train-the-model)
 7. [Step 4 — Play with the model](#step-4--play-with-the-model)
 8. [Full workflow example](#full-workflow-example)
-9. [Script reference](#script-reference)
-10. [Results file format](#results-file-format)
-11. [Decision points](#decision-points)
-12. [Game mechanics summary](#game-mechanics-summary)
-13. [Environment variables](#environment-variables)
+9. [Rulesets — guiding the LLM](#rulesets--guiding-the-llm)
+10. [Script reference](#script-reference)
+11. [Results file format](#results-file-format)
+12. [Decision points](#decision-points)
+13. [Game mechanics summary](#game-mechanics-summary)
+14. [Environment variables](#environment-variables)
 
 ---
 
@@ -374,6 +375,60 @@ node play_model.js --models models/v2/ --games 10000 --parallel 8
 
 ---
 
+## Rulesets — guiding the LLM
+
+You can pass a set of natural-language rules to the LLM agent that will be injected into its system prompt as mandatory constraints.  This lets you experiment with specific strategies, restrict the agent's behaviour, or enforce house-rules — all without touching any code.
+
+### Passing rules on the command line
+
+Use `--rules` to give a semicolon-separated list of rules:
+
+```bash
+node run_games.js --games 20 \
+  --rules "always pick the Pokémon with the highest BST; only catch one Pokémon per map"
+```
+
+### Passing rules from a file
+
+Use `--rules-file` to point at a plain-text file with one rule per line (lines starting with `#` are comments):
+
+```bash
+node run_games.js --games 50 --rules-file my_rules.txt
+```
+
+Example `my_rules.txt`:
+```
+# Aggressive type-diversity strategy
+only catch a Pokémon if it adds a new type to the team
+always prefer Fire or Electric types when catching
+give held items to the Pokémon with the lowest current HP ratio
+skip trade nodes — never trade a team member away
+choose the move_tutor for the Pokémon with the lowest move tier
+```
+
+Both flags can be combined; rules from the file are appended after inline rules.
+
+### How it works
+
+The rules are placed in a **MANDATORY RULES** block at the end of the system prompt, clearly labelled as overriding the default strategy.  The `state` snapshot passed to the LLM with every decision already includes `catchesThisMap` (number of Pokémon added to the team this map), so stateful rules like "only catch one per map" have the context they need.
+
+### Example rules
+
+| Goal | Rule |
+|------|------|
+| Limit catching | `only catch one Pokémon per map` |
+| Favour strong Pokémon | `always pick the highest BST option when catching` |
+| Type diversity | `only catch a Pokémon that adds a new type to the team` |
+| Specific type | `prefer Water or Ice type Pokémon over all others` |
+| Item strategy | `always give Life Orb to the highest-BST team member` |
+| Avoid trading | `never trade — always skip trade nodes` |
+| Route preference | `prefer trainer nodes over catch nodes for faster levelling` |
+| Starter pick | `always choose Charmander as starter` |
+
+Rules are interpreted by the LLM, so they can be as specific or as vague as you like.  Ambiguous rules (e.g. "play defensively") will be interpreted according to the model's understanding of the game.
+
+---
+
 ## Script reference
 
 ### `build_cache.js`
@@ -402,6 +457,8 @@ node run_games.js [options]
   --provider NAME    Agent to use: anthropic (default), llama, openai, random
   --model NAME       Model name (overrides POKELIKE_MODEL env var)
   --base-url URL     Base URL for llama/openai providers
+  --rules RULES      Semicolon-separated rules injected into the LLM system prompt
+  --rules-file FILE  Path to a text file with one rule per line (# = comment)
 ```
 
 ### `analyze.js`

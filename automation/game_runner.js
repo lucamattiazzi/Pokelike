@@ -250,7 +250,7 @@ class GameRunner {
         currentMap: 0, currentNode: null, team: [], items: [], badges: 0,
         map: null, eliteIndex: 0, trainer: 'boy', starterSpeciesId: null,
         maxTeamSize: 1, nuzlockeMode: false, isEndlessMode: false,
-        usedPokecenter: false,
+        usedPokecenter: false, catchesThisMap: 0,
       };
 
       // ── Starter selection ────────────────────────────────────────────────────
@@ -269,6 +269,7 @@ class GameRunner {
       // ── Maps 0–7 (8 gym leaders) ─────────────────────────────────────────────
       for (let mapIdx = 0; mapIdx < 8; mapIdx++) {
         sandbox.state.currentMap = mapIdx;
+        sandbox.state.catchesThisMap = 0;
         sandbox.state.map = call('generateMap', mapIdx, false);
 
         const mapResult = await this._playMap(ctx, sandbox, call, get, decide, mapIdx);
@@ -592,6 +593,7 @@ class GameRunner {
 
   // ─── Add a Pokemon to the team, asking for swap if full ────────────────────
   async _addToTeam(ctx, sandbox, call, decide, pokemon) {
+    sandbox.state.catchesThisMap = (sandbox.state.catchesThisMap || 0) + 1;
     if (sandbox.state.team.length < 6) {
       sandbox.state.team.push(pokemon);
       if (sandbox.state.team.length > sandbox.state.maxTeamSize) {
@@ -701,10 +703,11 @@ class GameRunner {
   // ─── Summarise current state for the agent ─────────────────────────────────
   _stateSummary(sandbox) {
     return {
-      badges:    sandbox.state.badges,
-      currentMap: sandbox.state.currentMap,
-      team:      this._teamSummary(sandbox.state.team),
-      bagItems:  sandbox.state.items.map(it => ({ id: it.id, name: it.name })),
+      badges:       sandbox.state.badges,
+      currentMap:   sandbox.state.currentMap,
+      catchesThisMap: sandbox.state.catchesThisMap || 0,
+      team:         this._teamSummary(sandbox.state.team),
+      bagItems:     sandbox.state.items.map(it => ({ id: it.id, name: it.name })),
     };
   }
 

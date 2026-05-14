@@ -18,7 +18,7 @@
  *   OPENAI_BASE_URL     — base URL for openai-compat provider
  */
 
-const SYSTEM_PROMPT = `You are an expert Pokémon strategist playing a roguelike game.
+const BASE_SYSTEM_PROMPT = `You are an expert Pokémon strategist playing a roguelike game.
 Your goal is to WIN the run (defeat all 8 gym leaders + Elite Four).
 
 Rules:
@@ -41,6 +41,15 @@ Strategy tips:
 
 Output format (strict JSON, nothing else):
 {"choice": <0-based index of chosen option>, "reason": "<one short sentence>"}`;
+
+function buildSystemPrompt(rules) {
+  if (!rules || rules.length === 0) return BASE_SYSTEM_PROMPT;
+  const rulesBlock = rules.map((r, i) => `  ${i + 1}. ${r}`).join('\n');
+  return `${BASE_SYSTEM_PROMPT}
+
+MANDATORY RULES (override default strategy — follow these strictly):
+${rulesBlock}`;
+}
 
 // ─── Provider backends ────────────────────────────────────────────────────────
 
@@ -162,10 +171,13 @@ class LLMAgent {
    *     new LLMAgent()                          → Anthropic (env ANTHROPIC_API_KEY)
    *     new LLMAgent('llama')                   → llama-cpp on localhost:8080
    *     new LLMAgent({ provider:'llama', baseUrl:'http://localhost:11434/v1', model:'mistral' })
+   *     new LLMAgent({ rules: ['only catch one pokemon per map', 'prefer fire types'] })
    */
   constructor(provider, opts = {}) {
-    this._backend    = createBackend(provider || 'anthropic', opts);
-    this._callCount  = 0;
+    if (typeof provider === 'object' && provider !== null) opts = provider;
+    this._backend     = createBackend(provider || 'anthropic', opts);
+    this._callCount   = 0;
+    this._systemPrompt = buildSystemPrompt(opts.rules || []);
   }
 
   get callCount() { return this._callCount; }
@@ -183,7 +195,7 @@ class LLMAgent {
     this._callCount++;
 
     try {
-      const text   = await this._backend.complete(SYSTEM_PROMPT, prompt);
+      const text   = await this._backend.complete(this._systemPrompt, prompt);
       return parseResponse(text, maxIdx);
     } catch (err) {
       return { choice: 0, reason: `Backend error: ${err.message}` };
@@ -199,7 +211,7 @@ function formatPrompt(decision) {
 
   if (state) {
     lines.push(`=== Game State ===`);
-    lines.push(`Map: ${state.currentMap}/8 (${state.badges} badges)`);
+    lines.push(`Map: ${state.currentMap}/8 (${state.badges} badges)${state.catchesThisMap != null ? ` | Catches this map: ${state.catchesThisMap}` : ''}`);
     if (state.team?.length) {
       lines.push(`Team (${state.team.length}/6):`);
       for (const p of state.team) {
