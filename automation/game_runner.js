@@ -221,7 +221,7 @@ class GameRunner {
    *
    * @returns {{ outcome, mapsCleared, finalTeam, decisions, seed }}
    */
-  async play(seed, agentFn) {
+  async play(seed, agentFn, { nuzlocke = false } = {}) {
     const sandbox = buildSandbox(this._cache);
     const ctx     = loadGameFiles(sandbox);
 
@@ -249,7 +249,7 @@ class GameRunner {
       sandbox.state = {
         currentMap: 0, currentNode: null, team: [], items: [], badges: 0,
         map: null, eliteIndex: 0, trainer: 'boy', starterSpeciesId: null,
-        maxTeamSize: 1, nuzlockeMode: false, isEndlessMode: false,
+        maxTeamSize: 1, nuzlockeMode: nuzlocke, isEndlessMode: false,
         usedPokecenter: false, catchesThisMap: 0,
       };
       sandbox._stats = {
@@ -258,6 +258,7 @@ class GameRunner {
         battleRounds:   0,  // total combat rounds across all battles
         pokemonCaught:  0,  // pokemon added via catch/legendary (not starter/trade)
         pokemonFainted: 0,  // player pokemon that fainted across all battles
+        permadeaths:    0,  // nuzlocke: pokemon permanently lost
         itemsTaken:     0,  // items picked up
         movesLearned:   0,  // move tutor upgrades granted
         timesCured:     0,  // pokecenter visits
@@ -291,12 +292,12 @@ class GameRunner {
       for (let mapIdx = 0; mapIdx < 8; mapIdx++) {
         sandbox.state.currentMap = mapIdx;
         sandbox.state.catchesThisMap = 0;
-        sandbox.state.map = call('generateMap', mapIdx, false);
+        sandbox.state.map = call('generateMap', mapIdx, nuzlocke);
 
         const mapResult = await this._playMap(ctx, sandbox, call, get, decide, mapIdx);
         if (!mapResult.won) {
           return {
-            outcome: 'loss', mapsCleared: mapIdx,
+            outcome: 'loss', mapsCleared: mapIdx, mode: nuzlocke ? 'nuzlocke' : 'normal',
             finalTeam: this._teamSummary(sandbox.state.team),
             stats: { ...sandbox._stats },
             decisions, seed,
@@ -320,9 +321,11 @@ class GameRunner {
         this._applyBattleResult(sandbox, battleResult.pTeam, battleResult.playerParticipants,
           enemyTeam, battleResult.detailedLog);
         await this._checkEvolutions(ctx, sandbox, call, decide);
-        if (!battleResult.playerWon) {
+        if (nuzlocke) this._applyPermadeath(sandbox);
+        if (!battleResult.playerWon || sandbox.state.team.length === 0) {
           return {
             outcome: 'loss', mapsCleared: 8, eliteDefeated: i,
+            mode: nuzlocke ? 'nuzlocke' : 'normal',
             finalTeam: this._teamSummary(sandbox.state.team),
             stats: { ...sandbox._stats },
             decisions, seed,
@@ -332,6 +335,7 @@ class GameRunner {
 
       return {
         outcome: 'win', mapsCleared: 9,
+        mode: nuzlocke ? 'nuzlocke' : 'normal',
         finalTeam: this._teamSummary(sandbox.state.team),
         stats: { ...sandbox._stats },
         decisions, seed,
@@ -339,6 +343,7 @@ class GameRunner {
     } catch (err) {
       return {
         outcome: 'error', error: err.message,
+        mode: nuzlocke ? 'nuzlocke' : 'normal',
         finalTeam: this._teamSummary(sandbox.state.team),
         stats: sandbox._stats ? { ...sandbox._stats } : {},
         decisions, seed,
@@ -457,7 +462,8 @@ class GameRunner {
     this._applyBattleResult(sandbox, battleResult.pTeam, battleResult.playerParticipants,
       [enemy], battleResult.detailedLog);
     await this._checkEvolutions(ctx, sandbox, call, decide);
-    return { won: battleResult.playerWon };
+    if (sandbox.state.nuzlockeMode) this._applyPermadeath(sandbox);
+    return { won: battleResult.playerWon && sandbox.state.team.length > 0 };
   }
 
   // ─── Gym boss battle ────────────────────────────────────────────────────────
@@ -479,7 +485,8 @@ class GameRunner {
     this._applyBattleResult(sandbox, battleResult.pTeam, battleResult.playerParticipants,
       enemyTeam, battleResult.detailedLog);
     await this._checkEvolutions(ctx, sandbox, call, decide);
-    return { won: battleResult.playerWon };
+    if (sandbox.state.nuzlockeMode) this._applyPermadeath(sandbox);
+    return { won: battleResult.playerWon && sandbox.state.team.length > 0 };
   }
 
   // ─── Catch node ─────────────────────────────────────────────────────────────
@@ -531,10 +538,9 @@ class GameRunner {
     sandbox._stats.battlesTotal++;
     this._applyBattleResult(sandbox, battleResult.pTeam, battleResult.playerParticipants,
       [legendary], battleResult.detailedLog);
+    if (sandbox.state.nuzlockeMode) this._applyPermadeath(sandbox);
 
-    // Even if you lose the fight in the original game you get a chance to catch,
-    // but here we skip adding to team if the fight was lost (team may be weakened)
-    if (!battleResult.playerWon) return { won: false };
+    if (!battleResult.playerWon || sandbox.state.team.length === 0) return { won: false };
 
     // Offer to add legendary to team
     const idx = await decide({ type: 'catch', options: [legendary], canSkip: true });
@@ -721,6 +727,25 @@ class GameRunner {
     }
   }
 
+  // ─── Nuzlocke permadeath: remove fainted pokemon permanently ────────────────
+  _applyPermadeath(sandbox) {
+    const before = sandbox.state.team.length;
+    sandbox.state.team = sandbox.state.team.filter(p => {
+      if (p.currentHp > 0) return true;
+      // Mark as dead in history
+      if (p._histId != null) {
+        const entry = sandbox._stats.pokemonHistory[p._histId];
+        if (entry) {
+          entry.dead = true;
+          entry.diedMap = sandbox.state.currentMap;
+        }
+      }
+      sandbox._stats.permadeaths++;
+      return false;
+    });
+    return sandbox.state.team.length === 0 && before > 0; // true if team wiped
+  }
+
   // ─── Auto-evolve team after level ups ──────────────────────────────────────
   async _checkEvolutions(ctx, sandbox, call, decide) {
     try {
@@ -789,11 +814,12 @@ class GameRunner {
   // ─── Summarise current state for the agent ─────────────────────────────────
   _stateSummary(sandbox) {
     return {
-      badges:       sandbox.state.badges,
-      currentMap:   sandbox.state.currentMap,
+      badges:         sandbox.state.badges,
+      currentMap:     sandbox.state.currentMap,
       catchesThisMap: sandbox.state.catchesThisMap || 0,
-      team:         this._teamSummary(sandbox.state.team),
-      bagItems:     sandbox.state.items.map(it => ({ id: it.id, name: it.name })),
+      nuzlocke:       sandbox.state.nuzlockeMode || false,
+      team:           this._teamSummary(sandbox.state.team),
+      bagItems:       sandbox.state.items.map(it => ({ id: it.id, name: it.name })),
     };
   }
 

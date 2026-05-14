@@ -38,6 +38,8 @@ Strategy tips:
 - Held items: Life Orb, Choice Band/Specs, and Shell Bell are very strong.
 - Pokecenter nodes before the boss are guaranteed in the last content layer.
 - Prioritise staying alive over maximising offence.
+- In NUZLOCKE MODE (shown in game state): fainted Pokémon are gone permanently.
+  Layer 1 has two catch nodes — always pick carefully. Survival trumps everything.
 
 Output format (strict JSON, nothing else):
 {"choice": <0-based index of chosen option>, "reason": "<one short sentence>"}`;
@@ -211,7 +213,11 @@ function formatPrompt(decision) {
 
   if (state) {
     lines.push(`=== Game State ===`);
-    lines.push(`Map: ${state.currentMap}/8 (${state.badges} badges)${state.catchesThisMap != null ? ` | Catches this map: ${state.catchesThisMap}` : ''}`);
+    lines.push(
+      `Map: ${state.currentMap}/8 (${state.badges} badges)` +
+      (state.catchesThisMap != null ? ` | Catches this map: ${state.catchesThisMap}` : '') +
+      (state.nuzlocke ? ' | NUZLOCKE MODE' : '')
+    );
     if (state.team?.length) {
       lines.push(`Team (${state.team.length}/6):`);
       for (const p of state.team) {

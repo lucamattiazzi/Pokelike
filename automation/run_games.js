@@ -52,17 +52,20 @@ function parseArgs() {
     rules = [...rules, ...lines.map(l => l.trim()).filter(l => l && !l.startsWith('#'))];
   }
 
+  const nuzlocke = args.includes('--nuzlocke');
   return {
     games:    parseInt(get('--games',    '50'),  10),
     seed:     parseInt(get('--seed',     '1'),   10),
     out:      get('--out', path.join(__dirname, 'results',
-                provider === 'random' ? 'random_games.jsonl' : 'games.jsonl')),
+                provider === 'random' ? 'random_games.jsonl'
+                : nuzlocke ? 'nuzlocke_games.jsonl' : 'games.jsonl')),
     parallel: parseInt(get('--parallel', provider === 'random' ? '8' : '1'), 10),
     verbose:  args.includes('--verbose'),
     provider,
     model:    get('--model',    process.env.POKELIKE_MODEL || ''),
     baseUrl:  get('--base-url', process.env.LLAMA_BASE_URL || process.env.OPENAI_BASE_URL || ''),
     rules,
+    nuzlocke,
   };
 }
 
@@ -141,7 +144,7 @@ function extractFeatures(decision, gameState) {
 }
 
 // ─── Play one game ─────────────────────────────────────────────────────────────
-async function playGame(runner, agent, seed, verbose) {
+async function playGame(runner, agent, seed, verbose, opts = {}) {
   const startMs = Date.now();
 
   const result = await runner.play(seed, async (decision) => {
@@ -150,7 +153,7 @@ async function playGame(runner, agent, seed, verbose) {
     decision._features = extractFeatures(decision, decision.state);
     decision._reason   = reason;
     return choice;
-  });
+  }, { nuzlocke: opts.nuzlocke || false });
 
   const elapsed = Date.now() - startMs;
 
@@ -224,7 +227,7 @@ async function main() {
   const outStream = fs.createWriteStream(opts.out, { flags: 'a' });
 
   console.log(`Running ${opts.games} games (seed ${opts.seed} → ${opts.seed + opts.games - 1})`);
-  console.log(`Provider: ${template.label}`);
+  console.log(`Provider: ${template.label}${opts.nuzlocke ? ' | Mode: NUZLOCKE' : ''}`);
   console.log(`Output: ${opts.out}`);
   if (opts.rules?.length) {
     console.log(`Rules (${opts.rules.length}):`);
@@ -234,14 +237,15 @@ async function main() {
 
   let wins = 0, losses = 0, errors = 0;
   const statTotals = { battlesTotal: 0, pokemonCaught: 0, pokemonFainted: 0,
-                       itemsTaken: 0, movesLearned: 0, timesCured: 0, battleRounds: 0 };
+                       itemsTaken: 0, movesLearned: 0, timesCured: 0, battleRounds: 0,
+                       permadeaths: 0 };
   const startAll = Date.now();
 
   if (opts.parallel <= 1) {
     // Sequential
     for (let i = 0; i < opts.games; i++) {
       const seed = opts.seed + i;
-      const result = await playGame(runner, makeAgent(opts), seed, true);
+      const result = await playGame(runner, makeAgent(opts), seed, true, opts);
       outStream.write(JSON.stringify(result) + '\n');
       if (result.outcome === 'win')   wins++;
       else if (result.outcome === 'loss') losses++;
@@ -272,7 +276,7 @@ async function main() {
       );
 
       const results = await Promise.all(
-        batch.map(seed => playGame(runner, makeAgent(opts), seed, opts.verbose))
+        batch.map(seed => playGame(runner, makeAgent(opts), seed, opts.verbose, opts))
       );
 
       for (const r of results) {
@@ -305,7 +309,8 @@ async function main() {
   console.log(`\n  Averages per game:`);
   console.log(`    Battles fought : ${avg('battlesTotal')}  (${avg('battleRounds')} rounds)`);
   console.log(`    Pokemon caught : ${avg('pokemonCaught')}`);
-  console.log(`    Pokemon fainted: ${avg('pokemonFainted')}`);
+  console.log(`    Pokemon fainted: ${avg('pokemonFainted')}` +
+    (opts.nuzlocke ? `  (permadeaths: ${avg('permadeaths')})` : ''));
   console.log(`    Items taken    : ${avg('itemsTaken')}`);
   console.log(`    Moves learned  : ${avg('movesLearned')}`);
   console.log(`    Times healed   : ${avg('timesCured')}`);
