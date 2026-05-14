@@ -1,0 +1,5 @@
+node_modules/
+pokemon_cache.json
+results/
+models/
+*.pkl
