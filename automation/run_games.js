@@ -156,9 +156,15 @@ async function playGame(runner, agent, seed, verbose) {
 
   if (verbose) {
     const icon = result.outcome === 'win' ? '🏆' : result.outcome === 'loss' ? '💀' : '❌';
+    const s = result.stats || {};
     console.log(
       `${icon} Seed ${seed}: ${result.outcome.padEnd(5)} | ` +
-      `Maps cleared: ${result.mapsCleared}/9 | ` +
+      `Maps: ${result.mapsCleared}/9 | ` +
+      `Battles: ${s.battlesTotal ?? '?'} | ` +
+      `Caught: ${s.pokemonCaught ?? '?'} | ` +
+      `Fainted: ${s.pokemonFainted ?? '?'} | ` +
+      `Items: ${s.itemsTaken ?? '?'} | ` +
+      `Healed: ${s.timesCured ?? '?'} | ` +
       `Team: ${(result.finalTeam || []).map(p => `${p.name} Lv${p.level}`).join(', ')} | ` +
       `${elapsed}ms`
     );
@@ -166,11 +172,12 @@ async function playGame(runner, agent, seed, verbose) {
 
   return {
     seed,
-    outcome:      result.outcome,
-    mapsCleared:  result.mapsCleared,
+    outcome:       result.outcome,
+    mapsCleared:   result.mapsCleared,
     eliteDefeated: result.eliteDefeated,
-    finalTeam:    result.finalTeam,
-    decisions:    (result.decisions || []).map(d => ({
+    finalTeam:     result.finalTeam,
+    stats:         result.stats || {},
+    decisions:     (result.decisions || []).map(d => ({
       type:     d.type,
       choice:   d.choice,
       features: d._features,
@@ -226,6 +233,8 @@ async function main() {
   console.log();
 
   let wins = 0, losses = 0, errors = 0;
+  const statTotals = { battlesTotal: 0, pokemonCaught: 0, pokemonFainted: 0,
+                       itemsTaken: 0, movesLearned: 0, timesCured: 0, battleRounds: 0 };
   const startAll = Date.now();
 
   if (opts.parallel <= 1) {
@@ -237,13 +246,20 @@ async function main() {
       if (result.outcome === 'win')   wins++;
       else if (result.outcome === 'loss') losses++;
       else errors++;
+      for (const k of Object.keys(statTotals)) statTotals[k] += result.stats?.[k] ?? 0;
 
       // Progress every 10 games
       if ((i + 1) % 10 === 0 || i === opts.games - 1) {
+        const done = i + 1;
         const elapsed = ((Date.now() - startAll) / 1000).toFixed(1);
-        console.log(`\n--- Progress: ${i + 1}/${opts.games} | ` +
-          `Wins: ${wins} (${(100 * wins / (i + 1)).toFixed(1)}%) | ` +
-          `Losses: ${losses} | Errors: ${errors} | ${elapsed}s elapsed ---\n`);
+        const avg = k => (statTotals[k] / done).toFixed(1);
+        console.log(`\n--- Progress: ${done}/${opts.games} | ` +
+          `Wins: ${wins} (${(100 * wins / done).toFixed(1)}%) | ` +
+          `Losses: ${losses} | Errors: ${errors} | ${elapsed}s elapsed`);
+        console.log(`    Avg/game: battles=${avg('battlesTotal')} rounds=${avg('battleRounds')} ` +
+          `caught=${avg('pokemonCaught')} fainted=${avg('pokemonFainted')} ` +
+          `items=${avg('itemsTaken')} tutor=${avg('movesLearned')} ` +
+          `healed=${avg('timesCured')} ---\n`);
       }
     }
   } else {
@@ -264,6 +280,7 @@ async function main() {
         if (r.outcome === 'win')   { wins++;   if (!opts.verbose) process.stdout.write('W'); }
         else if (r.outcome === 'loss') { losses++; if (!opts.verbose) process.stdout.write('L'); }
         else                       { errors++; if (!opts.verbose) process.stdout.write('E'); }
+        for (const k of Object.keys(statTotals)) statTotals[k] += r.stats?.[k] ?? 0;
       }
 
       if (!opts.verbose && (i + BATCH) % 50 === 0) {
@@ -277,12 +294,21 @@ async function main() {
   outStream.end();
   const totalSec = ((Date.now() - startAll) / 1000).toFixed(1);
 
+  const n = opts.games;
+  const avg = k => (statTotals[k] / n).toFixed(1);
   console.log(`\n${'='.repeat(60)}`);
-  console.log(`COMPLETE: ${opts.games} games in ${totalSec}s`);
-  console.log(`  Wins:   ${wins}  (${(100 * wins  / opts.games).toFixed(1)}%)`);
+  console.log(`COMPLETE: ${n} games in ${totalSec}s`);
+  console.log(`  Wins:   ${wins}  (${(100 * wins  / n).toFixed(1)}%)`);
   console.log(`  Losses: ${losses}`);
   console.log(`  Errors: ${errors}`);
   console.log(`  Output: ${opts.out}`);
+  console.log(`\n  Averages per game:`);
+  console.log(`    Battles fought : ${avg('battlesTotal')}  (${avg('battleRounds')} rounds)`);
+  console.log(`    Pokemon caught : ${avg('pokemonCaught')}`);
+  console.log(`    Pokemon fainted: ${avg('pokemonFainted')}`);
+  console.log(`    Items taken    : ${avg('itemsTaken')}`);
+  console.log(`    Moves learned  : ${avg('movesLearned')}`);
+  console.log(`    Times healed   : ${avg('timesCured')}`);
   console.log(`${'='.repeat(60)}`);
 }
 

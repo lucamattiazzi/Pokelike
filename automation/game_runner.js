@@ -252,6 +252,17 @@ class GameRunner {
         maxTeamSize: 1, nuzlockeMode: false, isEndlessMode: false,
         usedPokecenter: false, catchesThisMap: 0,
       };
+      sandbox._stats = {
+        nodesVisited:   0,  // map nodes entered (a "turn" at game scale)
+        battlesTotal:   0,  // all individual battle encounters
+        battleRounds:   0,  // total combat rounds across all battles
+        pokemonCaught:  0,  // pokemon added via catch/legendary (not starter/trade)
+        pokemonFainted: 0,  // player pokemon that fainted across all battles
+        itemsTaken:     0,  // items picked up
+        movesLearned:   0,  // move tutor upgrades granted
+        timesCured:     0,  // pokecenter visits
+        pokemonHistory: [], // full log of every pokemon that ever joined the team
+      };
 
       // ── Starter selection ────────────────────────────────────────────────────
       const STARTER_IDS = [1, 4, 7];
@@ -261,6 +272,16 @@ class GameRunner {
       const starterIdx = await decide({ type: 'starter', options: starters });
       const starterSpecies = starters[starterIdx] || starters[0];
       const starter = call('createInstance', starterSpecies, 5, false, 0);
+
+      // Record starter in history
+      sandbox._stats.pokemonHistory.push({
+        name: starterSpecies.name, species: starterSpecies.id,
+        level: 5, types: starterSpecies.types,
+        bst: starterSpecies.baseStats ? Object.values(starterSpecies.baseStats).reduce((a, b) => a + b, 0) : 0,
+        acquired: 'starter', acquiredMap: 0,
+        released: false, releasedMap: null,
+      });
+      starter._histId = sandbox._stats.pokemonHistory.length - 1;
 
       sandbox.state.team            = [starter];
       sandbox.state.starterSpeciesId = starter.speciesId;
@@ -277,6 +298,7 @@ class GameRunner {
           return {
             outcome: 'loss', mapsCleared: mapIdx,
             finalTeam: this._teamSummary(sandbox.state.team),
+            stats: { ...sandbox._stats },
             decisions, seed,
           };
         }
@@ -290,16 +312,19 @@ class GameRunner {
         sandbox.state.eliteIndex = i;
         const boss = ELITE_4[i];
         const enemyTeam = boss.team.map(p => call('createInstance', p, p.level, false, 2));
-        const { playerWon, pTeam: resultP, playerParticipants } = call(
+        const battleResult = call(
           'runBattle',
           [...sandbox.state.team], enemyTeam, sandbox.state.items, [], null, null
         );
-        this._applyBattleResult(sandbox, resultP, playerParticipants, enemyTeam);
+        sandbox._stats.battlesTotal++;
+        this._applyBattleResult(sandbox, battleResult.pTeam, battleResult.playerParticipants,
+          enemyTeam, battleResult.detailedLog);
         await this._checkEvolutions(ctx, sandbox, call, decide);
-        if (!playerWon) {
+        if (!battleResult.playerWon) {
           return {
             outcome: 'loss', mapsCleared: 8, eliteDefeated: i,
             finalTeam: this._teamSummary(sandbox.state.team),
+            stats: { ...sandbox._stats },
             decisions, seed,
           };
         }
@@ -308,12 +333,14 @@ class GameRunner {
       return {
         outcome: 'win', mapsCleared: 9,
         finalTeam: this._teamSummary(sandbox.state.team),
+        stats: { ...sandbox._stats },
         decisions, seed,
       };
     } catch (err) {
       return {
         outcome: 'error', error: err.message,
         finalTeam: this._teamSummary(sandbox.state.team),
+        stats: sandbox._stats ? { ...sandbox._stats } : {},
         decisions, seed,
       };
     }
@@ -350,6 +377,9 @@ class GameRunner {
         try { resolvedType = vm.runInContext('resolveQuestionMark()', ctx); }
         catch { resolvedType = this._resolveQuestion(sandbox); }
       }
+
+      sandbox._stats.nodesVisited++;
+      if (resolvedType === 'pokecenter') sandbox._stats.timesCured++;
 
       const nodeResult = await this._resolveNode(ctx, sandbox, call, get, decide, chosen, resolvedType, mapIdx);
 
@@ -419,14 +449,15 @@ class GameRunner {
     const enemy   = call('createInstance', species, level, false,
       get('getMoveТierForMap')(sandbox.state.currentMap));
 
-    const { playerWon, pTeam: resultP, playerParticipants } = call(
+    const battleResult = call(
       'runBattle',
       [...sandbox.state.team], [enemy], sandbox.state.items, [], null, null
     );
-
-    this._applyBattleResult(sandbox, resultP, playerParticipants, [enemy]);
+    sandbox._stats.battlesTotal++;
+    this._applyBattleResult(sandbox, battleResult.pTeam, battleResult.playerParticipants,
+      [enemy], battleResult.detailedLog);
     await this._checkEvolutions(ctx, sandbox, call, decide);
-    return { won: playerWon };
+    return { won: battleResult.playerWon };
   }
 
   // ─── Gym boss battle ────────────────────────────────────────────────────────
@@ -440,14 +471,15 @@ class GameRunner {
       heldItem: p.heldItem || null,
     }));
 
-    const { playerWon, pTeam: resultP, playerParticipants } = call(
+    const battleResult = call(
       'runBattle',
       [...sandbox.state.team], enemyTeam, sandbox.state.items, [], null, null
     );
-
-    this._applyBattleResult(sandbox, resultP, playerParticipants, enemyTeam);
+    sandbox._stats.battlesTotal++;
+    this._applyBattleResult(sandbox, battleResult.pTeam, battleResult.playerParticipants,
+      enemyTeam, battleResult.detailedLog);
     await this._checkEvolutions(ctx, sandbox, call, decide);
-    return { won: playerWon };
+    return { won: battleResult.playerWon };
   }
 
   // ─── Catch node ─────────────────────────────────────────────────────────────
@@ -475,7 +507,7 @@ class GameRunner {
     if (idx === instances.length || idx === null || idx === undefined) return null; // skip
 
     const chosen = instances[Math.min(idx, instances.length - 1)];
-    await this._addToTeam(ctx, sandbox, call, decide, chosen);
+    await this._addToTeam(ctx, sandbox, call, decide, chosen, 'catch');
     return null;
   }
 
@@ -492,19 +524,22 @@ class GameRunner {
       get('getMoveТierForMap')(sandbox.state.currentMap));
 
     // Fight it first
-    const { playerWon } = call(
+    const battleResult = call(
       'runBattle',
       [...sandbox.state.team], [legendary], sandbox.state.items, [], null, null
     );
+    sandbox._stats.battlesTotal++;
+    this._applyBattleResult(sandbox, battleResult.pTeam, battleResult.playerParticipants,
+      [legendary], battleResult.detailedLog);
 
     // Even if you lose the fight in the original game you get a chance to catch,
     // but here we skip adding to team if the fight was lost (team may be weakened)
-    if (!playerWon) return { won: false };
+    if (!battleResult.playerWon) return { won: false };
 
     // Offer to add legendary to team
     const idx = await decide({ type: 'catch', options: [legendary], canSkip: true });
     if (idx === 0) {
-      await this._addToTeam(ctx, sandbox, call, decide, legendary);
+      await this._addToTeam(ctx, sandbox, call, decide, legendary, 'legendary');
     }
     return null;
   }
@@ -539,6 +574,7 @@ class GameRunner {
     if (idx === picks.length || idx === null || idx === undefined) return null; // skip
 
     const item = picks[Math.min(idx, picks.length - 1)];
+    sandbox._stats.itemsTaken++;
     if (item.usable) {
       sandbox.state.items.push({ ...item });
     } else {
@@ -565,6 +601,7 @@ class GameRunner {
     if (idx < sandbox.state.team.length) {
       const p = sandbox.state.team[idx];
       p.moveTier = Math.min(2, (p.moveTier || 0) + 1);
+      sandbox._stats.movesLearned++;
     }
     return null;
   }
@@ -586,14 +623,47 @@ class GameRunner {
     const offer   = call('createInstance', species, level, false,
       Math.max(get('getMoveТierForMap')(sandbox.state.currentMap), mine.moveTier ?? 0));
 
+    // Mark traded-away pokemon as released in history
+    if (mine._histId != null) {
+      sandbox._stats.pokemonHistory[mine._histId].released = true;
+      sandbox._stats.pokemonHistory[mine._histId].releasedMap = sandbox.state.currentMap;
+      sandbox._stats.pokemonHistory[mine._histId].releasedBy = 'trade';
+    }
     if (mine.heldItem) sandbox.state.items.push(mine.heldItem);
+
+    // Record received pokemon in history (not counted as "caught")
+    const offerBst = offer.baseStats
+      ? Object.values(offer.baseStats).reduce((a, b) => a + b, 0) : 0;
+    const histEntry = {
+      name: offer.name, species: offer.speciesId,
+      level: offer.level, types: offer.types, bst: offerBst,
+      acquired: 'trade', acquiredMap: sandbox.state.currentMap,
+      released: false, releasedMap: null,
+    };
+    sandbox._stats.pokemonHistory.push(histEntry);
+    offer._histId = sandbox._stats.pokemonHistory.length - 1;
+
     sandbox.state.team.splice(idx, 1, offer);
     return null;
   }
 
   // ─── Add a Pokemon to the team, asking for swap if full ────────────────────
-  async _addToTeam(ctx, sandbox, call, decide, pokemon) {
+  async _addToTeam(ctx, sandbox, call, decide, pokemon, acquired = 'catch') {
     sandbox.state.catchesThisMap = (sandbox.state.catchesThisMap || 0) + 1;
+    if (acquired === 'catch' || acquired === 'legendary') sandbox._stats.pokemonCaught++;
+
+    // Record in history
+    const bst = pokemon.baseStats
+      ? Object.values(pokemon.baseStats).reduce((a, b) => a + b, 0) : 0;
+    const histEntry = {
+      name: pokemon.name, species: pokemon.speciesId,
+      level: pokemon.level, types: pokemon.types, bst,
+      acquired, acquiredMap: sandbox.state.currentMap,
+      released: false, releasedMap: null,
+    };
+    sandbox._stats.pokemonHistory.push(histEntry);
+    pokemon._histId = sandbox._stats.pokemonHistory.length - 1;
+
     if (sandbox.state.team.length < 6) {
       sandbox.state.team.push(pokemon);
       if (sandbox.state.team.length > sandbox.state.maxTeamSize) {
@@ -604,14 +674,30 @@ class GameRunner {
       const idx = await decide({ type: 'swap', newPokemon: pokemon, team: sandbox.state.team });
       const safe = Math.min(idx, sandbox.state.team.length - 1);
       const released = sandbox.state.team[safe];
+      // Mark as released in history
+      if (released._histId != null) {
+        sandbox._stats.pokemonHistory[released._histId].released = true;
+        sandbox._stats.pokemonHistory[released._histId].releasedMap = sandbox.state.currentMap;
+      }
       if (released.heldItem) sandbox.state.items.push(released.heldItem);
       sandbox.state.team.splice(safe, 1, pokemon);
     }
   }
 
   // ─── Apply battle result to the team ────────────────────────────────────────
-  _applyBattleResult(sandbox, resultP, playerParticipants, enemyTeam) {
+  _applyBattleResult(sandbox, resultP, playerParticipants, enemyTeam, detailedLog = []) {
     if (!resultP) return;
+
+    // Count combat rounds and player faints from battle log
+    if (detailedLog && sandbox._stats) {
+      let rounds = 0;
+      for (const e of detailedLog) {
+        if (e && e.type === 'faint' && e.side === 'player') sandbox._stats.pokemonFainted++;
+        // Each player attack marks a new round (one attack per side per round)
+        if (e && e.type === 'attack' && e.side === 'player') rounds++;
+      }
+      sandbox._stats.battleRounds += rounds;
+    }
     // Sync HP from battle result
     for (let i = 0; i < sandbox.state.team.length; i++) {
       if (resultP[i]) sandbox.state.team[i].currentHp = resultP[i].currentHp;
