@@ -248,8 +248,12 @@ class GameRunner {
     const decisions = [];
 
     const decide = async (decision) => {
-      const idx = await agentFn({ ...decision, state: this._stateSummary(sandbox) });
-      decisions.push({ ...decision, choice: idx, state: undefined });
+      // Pass the original decision object so agentFn can mutate _reason/_features onto it
+      decision.state = this._stateSummary(sandbox);
+      const idx = await agentFn(decision);
+      const entry = { ...decision, choice: idx };
+      delete entry.state;
+      decisions.push(entry);
       return typeof idx === 'number' ? idx : 0;
     };
 
@@ -395,8 +399,9 @@ class GameRunner {
 
       call('advanceFromNode', map, chosen.id);
 
-      if (resolvedType === 'boss' && nodeResult && !nodeResult.won) return { won: false };
-      if (resolvedType === 'boss' && nodeResult && nodeResult.won)  return { won: true };
+      // Any battle loss ends the run immediately — mirrors game.js showGameOver()
+      if (nodeResult?.won === false) return { won: false };
+      if (resolvedType === 'boss')   return { won: true };
     }
 
     return { won: false };

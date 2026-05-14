@@ -31,18 +31,42 @@ Rules:
   trainer (harder battle), pokecenter (free heal), move_tutor (upgrade move power),
   trade (swap a team member), legendary (rare strong encounter), boss (gym leader).
 - After winning battles, your Pokémon gain levels and may evolve.
-- You can carry at most 6 Pokémon.  When the team is full you must release one.
+- You can carry at most 6 Pokémon. When the team is full you must release one.
 - Items are held (one per Pokémon) or usable (bag).
+- Losing any battle ends the run immediately.
+
+CRITICAL — LEVELLING:
+- Each battle gives roughly +1 level to your Pokémon. The boss is always 4–6 levels
+  above the wild encounters on the same map. You MUST fight every battle node you can
+  or you will arrive at the boss fatally underlevelled.
+- Never skip a battle or trainer node if your team still needs levels.
+- Target: be within 2 levels of the boss before fighting it.
+
+GYM LEADER TYPES (boss of each map) — build your team to counter these:
+  Map 0: Brock     — Rock/Ground  → bring Water or Grass
+  Map 1: Misty     — Water        → bring Electric or Grass
+  Map 2: Lt. Surge — Electric     → bring Ground
+  Map 3: Erika     — Grass        → bring Fire, Poison, or Flying
+  Map 4: Koga      — Poison       → bring Ground or Psychic
+  Map 5: Sabrina   — Psychic      → bring Bug, Ghost, or Dark
+  Map 6: Blaine    — Fire         → bring Water or Rock
+  Map 7: Giovanni  — Ground       → bring Water, Ice, or Grass
+  Maps 8+: Elite Four — mixed; need a full balanced team
+
+STARTER GUIDE:
+  Squirtle (Water)   — best overall: counters map-0 (Rock) and map-6 (Fire)
+  Bulbasaur (Grass)  — solid: counters map-0 (Rock) and map-1 (Water)
+  Charmander (Fire)  — hard mode: weak to map-0 (Rock) and map-1 (Water)
 
 Strategy tips:
-- Type coverage: having Pokémon that cover each other's weaknesses is crucial.
-- BST (base stat total) is a rough strength proxy.
-- Early catch nodes on map 0 are very valuable — grab high-BST or type-diverse Pokémon.
+- BST (base stat total) is a rough strength proxy — prefer higher BST when equal type.
+- Catch on map 0 layer 1: the pool is guaranteed to include Grass and Water options.
+  Always catch at least one counter for the upcoming boss.
 - Held items: Life Orb, Choice Band/Specs, and Shell Bell are very strong.
-- Pokecenter nodes before the boss are guaranteed in the last content layer.
+  Equip them on your highest-BST or most-used attacker.
+- Use pokecenter nodes before the boss — they are guaranteed before the final layer.
 - Prioritise staying alive over maximising offence.
-- In NUZLOCKE MODE (shown in game state): fainted Pokémon are gone permanently.
-  Layer 1 has two catch nodes — always pick carefully. Survival trumps everything.
+- In NUZLOCKE MODE: fainted Pokémon are gone permanently. Survival trumps everything.
 
 Output format (strict JSON, nothing else):
 {"choice": <0-based index of chosen option>, "reason": "<one short sentence>"}`;
