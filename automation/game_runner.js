@@ -248,7 +248,8 @@ class GameRunner {
     const decisions = [];
 
     const decide = async (decision) => {
-      const idx = await agentFn({ ...decision, state: this._stateSummary(sandbox) });
+      decision.state = this._stateSummary(sandbox);
+      const idx = await agentFn(decision);
       decisions.push({ ...decision, choice: idx, state: undefined });
       return typeof idx === 'number' ? idx : 0;
     };
@@ -395,6 +396,7 @@ class GameRunner {
 
       call('advanceFromNode', map, chosen.id);
 
+      if (nodeResult?.won === false) return { won: false };
       if (resolvedType === 'boss' && nodeResult && !nodeResult.won) return { won: false };
       if (resolvedType === 'boss' && nodeResult && nodeResult.won)  return { won: true };
     }

@@ -42,8 +42,64 @@ Rules:
 - You can carry at most 6 Pokémon.  When the team is full you must release one.
 - Items are held (one per Pokémon) or usable (bag).
 
+Battle mechanics:
+- Damage ≈ ((2·level/5 + 2) · movePower · Atk/Def / 50 + 2) · typeEff · STAB · itemMods · rand(0.85–1.00).
+- Higher Speed attacks first each turn. Crit = ×1.5 damage, 6.25% chance (20% with Scope Lens).
+- Physical vs Special split: a Pokémon uses Sp.Atk/Sp.Def if its base Special ≥ base Attack,
+  otherwise Atk/Def. BST is the headline number, but the Atk/Special balance decides which
+  stat it actually attacks with — match held items to that role.
+- STAB: ×1.5 damage when the move's type matches one of the attacker's types.
+- Dual-type defenders MULTIPLY effectiveness: weak to both types = ×4, resist both = ×0.25,
+  immune via either type = ×0. Always check both defender types before choosing a fight.
+- Statuses are minimal: poison ticks 1/8 max HP/round; freeze = skip turn (20% thaw/round).
+- Round 101+ enters "overtime" — all damage is ×3, so stalemates resolve fast.
+
+Moves & move_tutor:
+- Each Pokémon has a moveTier ∈ {0, 1, 2}. Higher tier = stronger moves of its types
+  (rough power: tier 0 ≈ 35–60, tier 1 ≈ 65–100, tier 2 ≈ 100–150).
+- A move_tutor node bumps the chosen Pokémon's moveTier by +1 (cap 2). Picking tutor
+  on a tier-2 Pokémon is wasted; biggest gain is upgrading a tier-0 attacker.
+- A few Pokémon have fixed no-damage moves (e.g. Magikarp → Splash, Abra → Teleport)
+  until they evolve.
+
+Levels & evolution:
+- Level cap is 100. Wild battle = +1 level for the team; trainer/boss = +2.
+- Lucky Egg held item gives 30% chance of +1 bonus level after a battle.
+- Evolutions trigger at species-specific levels (no stones, except Moon Stone as a
+  usable bag item). Eviolite blocks evolution entirely but grants +50% Def & Sp.Def —
+  strong on bulky non-final forms (e.g. Chansey, Porygon2).
+- You cannot hold two Pokémon from the same evolution line; catch nodes filter these out.
+
+HP, healing & key held items (one per Pokémon):
+- HP carries between battles. The ONLY full heal is a pokecenter node.
+- Damage boosters: Life Orb +30% all moves | Choice Band +40% phys (locks one move, −20% Def) |
+  Choice Specs +40% spec (locks one move, −20% Sp.Def) | Expert Belt +30% on super-effective hits |
+  Type gems (Charcoal/Mystic Water/Magnet/…) +50% to that type | Wide Lens +20% | Metronome +50%
+  if 4+ team share the attacker's type.
+- Survival/utility: Choice Scarf +50% Speed | Eviolite +50% Def & Sp.Def (non-final only) |
+  Assault Vest +50% Sp.Def | Leftovers heals 10% max HP/round | Shell Bell heals 15% of damage
+  dealt | Focus Sash survives one KO at full HP → 1 HP | Focus Band 20% to survive any KO →
+  1 HP | Rocky Helmet reflects 12% of attacker's max HP on contact.
+- Useful bag items include Max Revive (revive a fainted Pokémon), Rare Candy (+3 levels),
+  Moon Stone (force-evolve), Scope Lens (raises crit chance — held).
+
+Catch / Trade / Legendary:
+- Caught Pokémon arrive near the current map's level. Legendaries arrive at the map's
+  MAX level, so a caught legendary is immediately one of the strongest team members.
+- Trade swaps your Pokémon for a random species at YOUR level + 3 (cap 100), inheriting
+  the better of your moveTier and the map's tier. Trading away a Pokémon that's one level
+  from evolving is a bad deal; trading away a stat-poor dead end is a great deal.
+
 Strategy tips:
 - Battling is (almost) the only way to raise the level of your pokemon and thus making them stronger.
+- LEVEL UP EVERY OPPORTUNITY: you should fight most available battle/trainer node on each map.
+  Skipping battles to take items/catches/pokecenters leaves you underlevelled at the boss — and
+  the boss WILL out-level and out-stat your team. Fight first, optimise second.
+  The goal is to get to 6 pokemon later in the game, not before the 4th level in any case.
+- BRANCH RULE — when choosing a branch, prefer battle/trainer over catch/item/shiny UNLESS your
+  current team size is ≤ the current map number (e.g. map 2 ⇒ catch only if team ≤ 2, map 5 ⇒
+  catch only if team ≤ 5). At a catch node when above that threshold, choose SKIP.
+  Exception: catch anyway if the candidate covers a type you're missing for the upcoming gym leader.
 - Type coverage: having Pokémon that cover each other's weaknesses is crucial.
 - BST (base stat total) is a rough strength proxy.
 - Held items: Life Orb, Choice Band/Specs, and Shell Bell are very strong.
@@ -51,6 +107,25 @@ Strategy tips:
 - Prioritise staying alive over maximising offence.
 - In NUZLOCKE MODE (shown in game state): fainted Pokémon are gone permanently.
   Layer 1 has two catch nodes — always pick carefully. Survival trumps everything.
+
+Starter tier guide:
+- Squirtle (BEST): bulky, Water hits Brock (Rock) and Blaine (Fire) super-effectively, evolves
+  into Blastoise. The safest pick for a new run.
+- Bulbasaur (GOOD): Grass/Poison covers Brock (Rock) and Misty (Water) — the two hardest early
+  gyms — super-effectively. Weak to Erika (Grass mirror is fine) but struggles vs Sabrina.
+- Charmander (HARD MODE): loses to Brock and Misty (the first two gyms) and is fragile early.
+  Only pick if you're confident you can catch a Water/Rock/Ground type fast in map 0.
+
+Gym leader type matchups (use this to plan your team — every map should have at least one
+Pokémon that's super-effective vs the gym leader's type):
+- Map 0 — Brock (Rock):       use Water, Grass, Fighting, Ground
+- Map 1 — Misty (Water):      use Electric, Grass
+- Map 2 — Lt. Surge (Electric): use Ground (immune!)
+- Map 3 — Erika (Grass):      use Fire, Ice, Flying, Bug, Poison
+- Map 4 — Koga (Poison):      use Ground, Psychic
+- Map 5 — Sabrina (Psychic):  use Bug, Ghost, Dark
+- Map 6 — Blaine (Fire):      use Water, Ground, Rock
+- Map 7 — Giovanni (Ground):  use Water, Grass, Ice
 
 Type effectiveness (attacker → defenders | 2× super-effective / ½× resisted / 0× no effect):
   Normal   → 2×: —                                    | ½×: Rock, Steel              | 0×: Ghost
@@ -337,15 +412,20 @@ class LLMAgent {
       `Battles: ${s.battlesTotal ?? '?'} | Caught: ${s.pokemonCaught ?? '?'} | ` +
       `Fainted: ${s.pokemonFainted ?? '?'} | Items: ${s.itemsTaken ?? '?'}`;
 
+    const existingList = allEntries.length
+      ? allEntries.map(e => `- ${e.text}`).join('\n')
+      : '(none yet)';
+
     const prompt =
       `You just finished this Pokémon roguelike run:\n\n${summary}\n\n` +
-      `Write between 1 and 5 bullet points (starting with "- ") of tactical ` +
-      `insights for future runs. Each bullet must be a single self-contained ` +
-      `tactic (max 25 words). Focus on what you'd do differently or what ` +
-      `worked. No preamble, no headers.`;
+      `Tactics already in memory (do NOT repeat or paraphrase these):\n${existingList}\n\n` +
+      `Write between 0 and 2 bullet points (starting with "- ") of NEW tactical ` +
+      `insights for future runs that are not already covered above. Each bullet ` +
+      `must be a single self-contained tactic (max 25 words). If you have nothing ` +
+      `genuinely new to add, output nothing. No preamble, no headers.`;
 
     const text = await this._backend.complete(
-      'You are a Pokémon strategy analyst. Output only between 1 and 5 bullet points, nothing else.',
+      'You are a Pokémon strategy analyst. Output only between 0 and 2 bullet points, nothing else.',
       prompt
     ).catch(err => `- (memory write failed: ${err.message})`);
 
