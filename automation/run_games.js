@@ -3,23 +3,34 @@
 /**
  * run_games.js
  *
- * Main entry point.  Runs N games with the LLM agent and appends results to
- * a JSONL file for later analysis / model training.
+ * Main entry point.  Runs N games with the chosen agent and appends results
+ * to a JSONL file for later analysis / model training.
  *
  * Usage:
  *   node run_games.js [--games 100] [--seed 42] [--out results/games.jsonl]
- *                     [--parallel 4] [--model claude-haiku-4-5-20251001]
+ *                     [--parallel 4] [--provider anthropic|llama|openai|random]
+ *                     [--model <name>] [--base-url http://localhost:8080/v1]
+ *
+ * Providers:
+ *   anthropic  (default) — Claude via Anthropic API; needs ANTHROPIC_API_KEY
+ *   llama                — llama-cpp or any OpenAI-compatible local server
+ *   openai               — OpenAI or any OpenAI-compatible remote API
+ *   random               — fully random agent (no API needed; great for baselines)
  *
  * Environment:
- *   ANTHROPIC_API_KEY  — required
- *   POKELIKE_MODEL     — optional model override
+ *   ANTHROPIC_API_KEY  — Anthropic key
+ *   OPENAI_API_KEY     — key for openai/llama providers (use "none" for local)
+ *   LLAMA_BASE_URL     — local server URL (default http://localhost:8080/v1)
+ *   OPENAI_BASE_URL    — OpenAI-compatible server URL
+ *   POKELIKE_MODEL     — model name override
  */
 
 const fs   = require('fs');
 const path = require('path');
 
-const GameRunner = require('./game_runner');
-const LLMAgent   = require('./llm_agent');
+const GameRunner  = require('./game_runner');
+const LLMAgent    = require('./llm_agent');
+const RandomAgent = require('./random_agent');
 
 // ─── CLI args ─────────────────────────────────────────────────────────────────
 function parseArgs() {
@@ -28,12 +39,17 @@ function parseArgs() {
     const i = args.indexOf(flag);
     return i !== -1 && args[i + 1] ? args[i + 1] : def;
   };
+  const provider = get('--provider', 'anthropic');
   return {
     games:    parseInt(get('--games',    '50'),  10),
     seed:     parseInt(get('--seed',     '1'),   10),
-    out:      get('--out',      path.join(__dirname, 'results', 'games.jsonl')),
-    parallel: parseInt(get('--parallel', '1'),   10),
+    out:      get('--out', path.join(__dirname, 'results',
+                provider === 'random' ? 'random_games.jsonl' : 'games.jsonl')),
+    parallel: parseInt(get('--parallel', provider === 'random' ? '8' : '1'), 10),
     verbose:  args.includes('--verbose'),
+    provider,
+    model:    get('--model',    process.env.POKELIKE_MODEL || ''),
+    baseUrl:  get('--base-url', process.env.LLAMA_BASE_URL || process.env.OPENAI_BASE_URL || ''),
   };
 }
 
@@ -153,28 +169,42 @@ async function playGame(runner, agent, seed, verbose) {
   };
 }
 
+// ─── Agent factory ────────────────────────────────────────────────────────────
+function makeAgent(opts) {
+  if (opts.provider === 'random') return new RandomAgent();
+
+  // LLM providers
+  if (opts.provider === 'anthropic' || opts.provider === 'claude') {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.error('ANTHROPIC_API_KEY environment variable is required for provider=anthropic');
+      process.exit(1);
+    }
+  }
+  const agentOpts = {
+    provider: opts.provider,
+    ...(opts.model   && { model:   opts.model   }),
+    ...(opts.baseUrl && { baseUrl: opts.baseUrl }),
+  };
+  return new LLMAgent(agentOpts);
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
   const opts = parseArgs();
-
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.error('ANTHROPIC_API_KEY environment variable is required');
-    process.exit(1);
-  }
 
   console.log(`Loading Pokemon cache...`);
   const cache  = loadCache();
   console.log(`Cache loaded: ${Object.keys(cache).length} species`);
 
-  const runner = new GameRunner(cache);
-  const agent  = new LLMAgent();
+  const runner   = new GameRunner(cache);
+  const template = makeAgent(opts);   // used only for label; each game gets its own instance
 
   fs.mkdirSync(path.dirname(opts.out), { recursive: true });
   const outStream = fs.createWriteStream(opts.out, { flags: 'a' });
 
   console.log(`Running ${opts.games} games (seed ${opts.seed} → ${opts.seed + opts.games - 1})`);
-  console.log(`Output: ${opts.out}`);
-  console.log(`Model: ${process.env.POKELIKE_MODEL || 'claude-haiku-4-5-20251001'}\n`);
+  console.log(`Provider: ${template.label}`);
+  console.log(`Output: ${opts.out}\n`);
 
   let wins = 0, losses = 0, errors = 0;
   const startAll = Date.now();
@@ -183,7 +213,7 @@ async function main() {
     // Sequential
     for (let i = 0; i < opts.games; i++) {
       const seed = opts.seed + i;
-      const result = await playGame(runner, new LLMAgent(), seed, true);
+      const result = await playGame(runner, makeAgent(opts), seed, true);
       outStream.write(JSON.stringify(result) + '\n');
       if (result.outcome === 'win')   wins++;
       else if (result.outcome === 'loss') losses++;
@@ -207,7 +237,7 @@ async function main() {
       );
 
       const results = await Promise.all(
-        batch.map(seed => playGame(runner, new LLMAgent(), seed, opts.verbose))
+        batch.map(seed => playGame(runner, makeAgent(opts), seed, opts.verbose))
       );
 
       for (const r of results) {
