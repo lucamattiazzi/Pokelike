@@ -221,8 +221,9 @@ function makeAgent(opts) {
     provider: opts.provider,
     ...(opts.model   && { model:   opts.model   }),
     ...(opts.baseUrl && { baseUrl: opts.baseUrl }),
-    ...(opts.rules?.length  && { rules:  opts.rules  }),
-    ...(opts._memory        && { memory: opts._memory }),
+    ...(opts.rules?.length && { rules: opts.rules }),
+    // Reload memory from disk each time so every game sees the latest entries and votes
+    ...(opts.memory && { memory: LLMAgent.loadMemory(opts.memory, opts.memorySize) }),
   };
   return new LLMAgent(agentOpts);
 }
@@ -237,9 +238,6 @@ async function main() {
 
   // ── Memory ──────────────────────────────────────────────────────────────────
   if (opts.memory) LLMAgent.initMemoryFile(opts.memory);
-  const memoryContent = LLMAgent.loadMemory(opts.memory, opts.memorySize);
-  // Attach loaded memory to opts so makeAgent can inject it into the system prompt
-  opts._memory = memoryContent;
 
   const runner   = new GameRunner(cache);
   const template = makeAgent(opts);   // used only for label; each game gets its own instance
@@ -256,7 +254,7 @@ async function main() {
     const raw          = fs.existsSync(opts.memory) ? fs.readFileSync(opts.memory, 'utf8') : '';
     const totalEntries = (raw.match(/^## Run /mg) || []).length;
     const loadedCount  = Math.min(totalEntries, opts.memorySize);
-    console.log(`Memory: ${opts.memory} (${loadedCount}/${totalEntries} entries loaded, max ${opts.memorySize})`);
+    console.log(`Memory: ${opts.memory} (${loadedCount}/${totalEntries} entries, top-${opts.memorySize} reloaded each game)`);
   }
   if (opts.rules?.length) {
     console.log(`Rules (${opts.rules.length}):`);
