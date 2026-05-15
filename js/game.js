@@ -161,13 +161,17 @@ async function startNewRun(nuzlockeMode = false, gen2Mode = false, forcedStarter
 
 // Skip the starter chooser by instancing the requested species directly. Used
 // by the reset-run button so the player gets the same starter back.
-async function pickForcedStarter(speciesId) {
+// forcedShiny (optional): if a boolean is passed, use it instead of re-rolling
+// — prevents the Battle Tower exploit where resetting re-rolls shiny status.
+async function pickForcedStarter(speciesId, forcedShiny = null) {
   const species = await fetchPokemonById(speciesId);
   if (!species) {
     await showStarterSelect();
     return;
   }
-  const isShiny = rng() < (hasShinyCharm() ? 0.02 : 0.01);
+  const isShiny = typeof forcedShiny === 'boolean'
+    ? forcedShiny
+    : rng() < (hasShinyCharm() ? 0.02 : 0.01);
   const inst = createInstance(species, 5, isShiny, 0);
   await selectStarter(inst);
 }
@@ -422,6 +426,7 @@ async function selectStarter(pokemon) {
   loadBuffsIntoPokemon(pokemon);
   state.team = [pokemon];
   state.starterSpeciesId = pokemon.speciesId;
+  state.starterWasShiny = !!pokemon.isShiny;
   recordUsedStarter(pokemon.speciesId);
   setLastUsedTime(getEvoLineRoot(pokemon.speciesId));
   state.maxTeamSize = 1;
@@ -2540,7 +2545,7 @@ function showEndlessStageSelect() {
   showScreen('endless-stage-select');
 }
 
-async function startEndlessRun(stageNum = 1, forcedStarterId = null) {
+async function startEndlessRun(stageNum = 1, forcedStarterId = null, forcedStarterShiny = null) {
   clearSavedRun();
   const seed = (Date.now() ^ (Math.random() * 0x100000000 | 0)) >>> 0;
   seedRng(seed);
@@ -2557,7 +2562,7 @@ async function startEndlessRun(stageNum = 1, forcedStarterId = null) {
   };
   clearEndlessState();
   if (forcedStarterId && localStorage.getItem('poke_trainer')) {
-    await pickForcedStarter(forcedStarterId);
+    await pickForcedStarter(forcedStarterId, forcedStarterShiny);
     return;
   }
   if (!localStorage.getItem('poke_trainer')) {
@@ -2571,13 +2576,14 @@ async function startEndlessRun(stageNum = 1, forcedStarterId = null) {
 function confirmResetRun() {
   if (!state || !state.starterSpeciesId) return;
   const starterId = state.starterSpeciesId;
+  const starterShiny = !!state.starterWasShiny;
   const nuz = !!state.nuzlockeMode;
   const gen2 = !!state.gen2Mode;
   const isEndless = !!state.isEndlessMode;
   const stage = endlessState?.stageNumber ?? 1;
   clearSavedRun();
   if (isEndless) {
-    startEndlessRun(stage, starterId);
+    startEndlessRun(stage, starterId, starterShiny);
   } else {
     startNewRun(nuz, gen2, starterId);
   }
