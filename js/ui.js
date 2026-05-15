@@ -3813,7 +3813,6 @@ const PATCH_NOTES = [
           '9-map Johto run with Falkner, Bugsy, Whitney, Morty, Chuck, Jasmine, Pryce and Clair as gym leaders, the Johto Elite Four (Will / Koga / Bruno / Karen / Lance), and Red as the final boss in Kanto',
           'Silver rival: 7 canonical encounters across Johto and Kanto. He always picks the starter that counters yours and rewards Double XP',
           'HGSS-accurate gym teams, levels, and trainer rosters throughout',
-          'Per-Pokémon XP and level — each team member has its own XP curve. The lead earns the full share, others get a reduced cut. XP bar shown under the HP bar with smooth animation and level-up effects',
           'Per-route map backgrounds (routes 1–9) plus new trainer sprites and themed encounter pools (Firebreather, Bird Keeper, Super Nerd, Bug Catcher, Hiker, Fisherman, Biker, Old Man, and more)',
           'Larvitar line gated behind map 3 in Gen 2 mode',
         ],
@@ -3844,8 +3843,6 @@ const PATCH_NOTES = [
         heading: 'Bug Fixes',
         entries: [
           '22-bug issue sweep across battle, map, and UI',
-          'XP bar no longer renders as 0% when the share is < 1% of next level',
-          'XP bar no longer goes dark after evolution',
           'Reverse-evolution through branching chains (Eevee, Tyrogue, Burmy, etc.) now resolves the correct prevo for level checks',
           'Gen 2 Elite Four levels rebalanced and Lance now fields three Dragonites as in canon',
           'Tyrogue evolution table no longer has a redundant entry',

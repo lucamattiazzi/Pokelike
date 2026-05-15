@@ -516,7 +516,7 @@ const ITEM_POOL = [
   { id: 'lagging_tail',       name: 'Lagging Tail',       desc: 'Always moves last, but +100% move damage',                            icon: '🐌' },
   { id: 'adrenaline_orb',     name: 'Adrenaline Orb',     desc: 'When YOU land a SUPER-EFFECTIVE hit (×2+): +1 ATK / +1 Sp.Atk this battle', icon: '⚡' },
   { id: 'red_card',           name: 'Red Card',           desc: 'Take 50% less damage from super-effective hits',                      icon: '🟥' },
-  { id: 'loaded_dice',        name: 'Loaded Dice',        desc: 'Start of each battle: 37% chance for +2 to ATK/DEF/Sp.Atk/Sp.Def/Speed, else -1 (one battle)', icon: '🎲', gen2Only: true },
+  { id: 'loaded_dice',        name: 'Loaded Dice',        desc: 'Start of each battle: 37% chance for +2 to ATK/DEF/Sp.Atk/Sp.Def/Speed, else -1 (one battle)', icon: '🎲', iconUrl: 'sprites/items/loaded_dice.png', gen2Only: true },
 ];
 
 const USABLE_ITEM_POOL = [
@@ -1639,10 +1639,11 @@ function incrementEliteWins() {
   return wins;
 }
 
-// Returns an <img> for the item's official sprite, falling back to its emoji if the sprite 404s
+// Returns an <img> for the item's official sprite, falling back to its emoji if the sprite 404s.
+// Items can override the URL with `iconUrl` for sprites not hosted on PokeAPI.
 function itemIconHtml(item, size = 24) {
   const slug = item.id.replace(/_/g, '-');
-  const url = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${slug}.png`;
+  const url = item.iconUrl || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${slug}.png`;
   const esc = item.icon.replace(/'/g, "\\'");
   return `<img src="${url}" alt="${item.name}" title="${item.name}" class="item-sprite-icon" `
        + `style="width:${size}px;height:${size}px;image-rendering:pixelated;vertical-align:middle;" `
