@@ -128,7 +128,8 @@ async function initGame() {
 async function startNewRun(nuzlockeMode = false) {
   clearEndlessState();
   const savedTrainer = localStorage.getItem('poke_trainer') || null;
-  const seed = (Date.now() ^ (Math.random() * 0x100000000 | 0)) >>> 0;
+  const querySeed = new URLSearchParams(window.location.search).get('seed');
+  const seed = querySeed !== null ? (parseInt(querySeed, 10) >>> 0) : (Date.now() ^ (Math.random() * 0x100000000 | 0)) >>> 0;
   seedRng(seed);
   state = { currentMap: 0, currentNode: null, team: [], items: [], badges: 0, map: null, eliteIndex: 0, trainer: savedTrainer || 'boy', starterSpeciesId: null, maxTeamSize: 1, nuzlockeMode, usedPokecenter: false, pickedUpItem: false, runSeed: seed };
   if (savedTrainer) {
