@@ -12,6 +12,7 @@ const NODE_TYPES = {
   LEGENDARY: 'legendary',
   MOVE_TUTOR: 'move_tutor',
   TRADE: 'trade',
+  SILVER: 'silver',
 };
 
 const NODE_WEIGHTS = [
@@ -29,6 +30,13 @@ const NODE_WEIGHTS = [
   { battle: 20, catch:  9, item: 14, trainer: 18, question:  9, pokecenter: 0,  move_tutor: 0, trade: 0, legendary: 0 },
 ];
 
+// Gen 2 uses a single flat distribution across all content layers. Sums to 100,
+// so each weight reads as a percentage. Forced pokecenter on the last layer and
+// Silver on map-4-middle (maps 1,3,5,7) still apply on top of these rolls.
+const GEN2_NODE_WEIGHTS = {
+  battle: 25, catch: 5, item: 10, trainer: 40, question: 10, pokecenter: 0, move_tutor: 5, trade: 5, legendary: 0,
+};
+
 function weightedRandom(weights) {
   const total = Object.values(weights).reduce((a, b) => a + b, 0);
   let r = rng() * total;
@@ -39,10 +47,14 @@ function weightedRandom(weights) {
   return Object.keys(weights)[0];
 }
 
-function generateMap(mapIndex, nuzlockeMode = false) {
-  // Layer sizes: start(1), catch/battle(2), 3,4,3,4,3,2, boss(1)
+function generateMap(mapIndex, nuzlockeMode = false, gen2Mode = false) {
+  // Layer sizes: start(1), catch/battle(2), content, boss(1)
   const CONTENT_SIZES = [3, 4, 3, 4, 3, 2]; // layers 2–7
-  const bossLayerIdx  = 2 + CONTENT_SIZES.length; // = 8
+  // Silver shows up as an optional node on these gen2 maps. Players who want
+  // the bonus XP can route through him; others can take a different path.
+  const hasSilverNode = gen2Mode && [1, 3, 5, 7].includes(mapIndex);
+  const contentCount  = CONTENT_SIZES.length;
+  const bossLayerIdx  = 2 + CONTENT_SIZES.length;
   const bossId        = `n${bossLayerIdx}_0`;
 
   // ── Helpers ──────────────────────────────────────────────────────
@@ -51,6 +63,9 @@ function generateMap(mapIndex, nuzlockeMode = false) {
     const availableKeys = TRAINER_SPRITE_KEYS.filter(k => {
       if (k === 'aceTrainer' && mapIndex >= 6) return false;
       if (k === 'policeman'  && mapIndex >= 4) return false;
+      // Gen 2-only sprites are hidden in Gen 1 mode (and vice versa).
+      if (!gen2Mode && GEN2_ONLY_TRAINER_KEYS.has(k)) return false;
+      if (gen2Mode  && GEN1_ONLY_TRAINER_KEYS.has(k)) return false;
       return true;
     });
     let h = 0;
@@ -66,7 +81,9 @@ function generateMap(mapIndex, nuzlockeMode = false) {
 
   // Pick a weighted-random node type; ci = content layer index (0–5)
   const pickType = (ci) => {
-    const w = { ...NODE_WEIGHTS[Math.min(ci, NODE_WEIGHTS.length - 1)] };
+    const w = gen2Mode
+      ? { ...GEN2_NODE_WEIGHTS }
+      : { ...NODE_WEIGHTS[Math.min(ci, NODE_WEIGHTS.length - 1)] };
     if (mapIndex >= 5 && ci >= 2 && !(typeof state !== 'undefined' && state.isEndlessMode)) w.legendary = 2;
     if (nuzlockeMode) { w.catch = 0; w.trade = 0; }
     if (typeof state !== 'undefined' && state.isEndlessMode) { w.trade = 0; w.catch = Math.floor(w.catch / 2); }
@@ -124,23 +141,36 @@ function generateMap(mapIndex, nuzlockeMode = false) {
 
   // Layer 1: always Catch (left) and Battle (right); nuzlocke gets two Catch nodes
   layers.push([
-    makeNode('n1_0', NODE_TYPES.CATCH,  1, 0),
+    makeNode('n1_0', NODE_TYPES.CATCH, 1, 0),
     makeNode('n1_1', nuzlockeMode ? NODE_TYPES.CATCH : NODE_TYPES.BATTLE, 1, 1),
   ]);
 
-  // Layers 2–7: random content nodes
-  for (let ci = 0; ci < CONTENT_SIZES.length; ci++) {
+  // Layers 2+: random content nodes (Silver maps use one fewer content layer)
+  for (let ci = 0; ci < contentCount; ci++) {
     const l    = ci + 2;
     const size = CONTENT_SIZES[ci];
     const layer = Array.from({ length: size }, (_, c) => makeNode(`n${l}_${c}`, pickType(ci), l, c));
 
     // Guarantee a pokecenter in the last content layer
-    if (ci === CONTENT_SIZES.length - 1 && !layer.some(n => n.type === NODE_TYPES.POKECENTER)) {
+    if (ci === contentCount - 1 && !layer.some(n => n.type === NODE_TYPES.POKECENTER)) {
       const idx = Math.floor(rng() * size);
       layer[idx].type = NODE_TYPES.POKECENTER;
     }
 
     layers.push(layer);
+  }
+
+  // Silver node: pinned to the center of the middle 3-node content layer.
+  // CONTENT_SIZES = [3,4,3,4,3,2] — the middle 3-node layer is content[2],
+  // which sits at absolute layer index 2 + 2 = 4. He's always the second
+  // node of those three, so he's impossible to miss (and routable around).
+  if (hasSilverNode) {
+    const silverLayer = layers[4]; // middle 3-node content layer
+    if (silverLayer && silverLayer.length === 3) {
+      const slotIdx = 1; // middle of 3
+      silverLayer[slotIdx].type = NODE_TYPES.SILVER;
+      delete silverLayer[slotIdx].trainerSprite;
+    }
   }
 
   // Boss layer
@@ -206,18 +236,84 @@ function advanceFromNode(map, nodeId) {
 const TRAINER_SPRITE_KEYS = [
   'aceTrainer', 'bugCatcher', 'fireSpitter', 'fisher',
   'hiker', 'oldGuy', 'policeman', 'Scientist', 'teamRocket',
+  // Gen 2-only trainer sprites
+  'birdCatcher', 'biker', 'nerd', 'medium', 'schoolBoy', 'captain',
 ];
+
+// Gen 2-only sprites — hidden in Gen 1 mode so no broken images appear.
+const GEN2_ONLY_TRAINER_KEYS = new Set([
+  'birdCatcher', 'biker', 'nerd', 'medium', 'schoolBoy', 'captain',
+]);
+// Gen 1-only sprites — replaced in Gen 2 (Scientist becomes Nerd, etc).
+const GEN1_ONLY_TRAINER_KEYS = new Set(['Scientist']);
+
+// Gen 2 mode has re-skinned versions of most trainer sprites under sprites/gen2/.
+// A few share the trainer key (aceTrainer, bugCatcher, etc), two are renamed
+// (fireSpitter→fireBreather, oldGuy→oldMan), and the Gen 2-exclusive sprites
+// only live here.
+const GEN2_SPRITE_FILENAME = {
+  aceTrainer:  'aceTrainer',
+  bugCatcher:  'bugCatcher',
+  fireSpitter: 'fireBreather',
+  fisher:      'fisher',
+  hiker:       'hiker',
+  oldGuy:      'oldMan',
+  policeman:   'policeman',
+  teamRocket:  'teamRocket',
+  birdCatcher: 'birdCatcher',
+  biker:       'biker',
+  nerd:        'nerd',
+  medium:      'medium',
+  schoolBoy:   'schoolBoy',
+  captain:     'captain',
+};
+
+function getTrainerSpritePath(key, isGen2) {
+  if (isGen2 && GEN2_SPRITE_FILENAME[key]) {
+    return `sprites/gen2/${GEN2_SPRITE_FILENAME[key]}.png`;
+  }
+  return `sprites/${key}.png`;
+}
 
 const TRAINER_SPRITE_NAMES = {
   aceTrainer:  'Ace Trainer',
   bugCatcher:  'Bug Catcher',
-  fireSpitter: 'Fire Breather',
-  fisher:      'Fisher',
+  fireSpitter: 'Firebreather',
+  fisher:      'Fisherman',
   hiker:       'Hiker',
-  oldGuy:      'Old Man',
-  policeman:   'Policeman',
+  oldGuy:      'Gentleman',
+  policeman:   'Officer',
   Scientist:   'Scientist',
   teamRocket:  'Team Rocket Grunt',
+  birdCatcher: 'Bird Keeper',
+  biker:       'Biker',
+  nerd:        'Super Nerd',
+  medium:      'Medium',
+  schoolBoy:   'Schoolboy',
+  captain:     'Sailor',
+};
+
+const TRAINER_SPECIALTIES = {
+  aceTrainer:  'Various Pokemon',
+  bugCatcher:  'Bug Pokemon',
+  fireSpitter: 'Fire Pokemon',
+  fisher:      'Water Pokemon',
+  hiker:       'Rock/Ground Pokemon',
+  oldGuy:      'Various Pokemon',
+  policeman:   'Fire Pokemon',
+  Scientist:   'Electric/Poison Pokemon',
+  teamRocket:  'Poison Pokemon',
+  birdCatcher: 'Flying Pokemon',
+  biker:       'Poison Pokemon',
+  nerd:        'Electric Pokemon',
+  medium:      'Ghost Pokemon',
+  schoolBoy:   'Normal Pokemon',
+  captain:     'Water Pokemon',
+};
+
+const TRAINER_SPECIALTIES_GEN2 = {
+  aceTrainer:  'Dragon/Psychic/Fighting Pokemon',
+  oldGuy:      'Normal Pokemon',
 };
 
 const RANDOM_TRAINER_SPRITES = TRAINER_SPRITE_KEYS.map(k => `sprites/${k}.png`);
@@ -233,10 +329,33 @@ const GYM_LEADER_SPRITES = [
   'sprites/giovanni.png',
 ];
 
+const JOHTO_GYM_LEADER_SPRITES = [
+  'sprites/gen2/falkner.png',
+  'sprites/gen2/bugsy.png',
+  'sprites/gen2/whitney.png',
+  'sprites/gen2/morty.png',
+  'sprites/gen2/chuck.png',
+  'sprites/gen2/jasmine.png',
+  'sprites/gen2/pryce.png',
+  'sprites/gen2/clair.png',
+];
+
+const KANTO_GYM_LEADER_SPRITES = [
+  'https://play.pokemonshowdown.com/sprites/trainers/brock.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/misty.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/ltsurge.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/erika.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/janine.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/sabrina.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/blaine.png',
+  'https://play.pokemonshowdown.com/sprites/trainers/blue.png',
+];
+
 function getNodeSprite(node) {
+  const gen2 = typeof state !== 'undefined' && state.gen2Mode;
   const ICON_SPRITES = {
-    [NODE_TYPES.BATTLE]:    'sprites/grass.png',
-    [NODE_TYPES.CATCH]:     'sprites/catchPokemon.png',
+    [NODE_TYPES.BATTLE]:    gen2 ? 'sprites/gen2/grass.png'    : 'sprites/grass.png',
+    [NODE_TYPES.CATCH]:     gen2 ? 'sprites/gen2/pokeball.png' : 'sprites/catchPokemon.png',
     [NODE_TYPES.ITEM]:      'sprites/itemIcon.png',
     [NODE_TYPES.TRADE]:      'sprites/tradeIcon.png',
     [NODE_TYPES.LEGENDARY]:  'sprites/legendaryEncounter.png',
@@ -247,18 +366,30 @@ function getNodeSprite(node) {
   if (ICON_SPRITES[node.type]) return ICON_SPRITES[node.type];
   if (node.type === NODE_TYPES.TRAINER) {
     const key = node.trainerSprite || (() => {
+      const keys = TRAINER_SPRITE_KEYS.filter(k => {
+        if (!gen2 && GEN2_ONLY_TRAINER_KEYS.has(k)) return false;
+        if (gen2  && GEN1_ONLY_TRAINER_KEYS.has(k)) return false;
+        return true;
+      });
       let h = 0;
       for (const c of node.id) h = (h * 31 + c.charCodeAt(0)) | 0;
-      return TRAINER_SPRITE_KEYS[Math.abs(h) % TRAINER_SPRITE_KEYS.length];
+      return keys[Math.abs(h) % keys.length];
     })();
-    return `sprites/${key}.png`;
+    return getTrainerSpritePath(key, gen2);
   }
   if (node.type === NODE_TYPES.BOSS) {
     if (typeof state !== 'undefined' && state.isEndlessMode) return 'sprites/misteryTrainer.png';
     const mi = node.mapIndex ?? -1;
+    if (typeof state !== 'undefined' && state.gen2Mode) {
+      if (mi === 17) return 'https://play.pokemonshowdown.com/sprites/trainers/red.png';
+      if (mi === 8)  return 'https://play.pokemonshowdown.com/sprites/trainers/lance.png';
+      if (mi >= 9 && mi < 17) return KANTO_GYM_LEADER_SPRITES[mi - 9];
+      if (mi >= 0 && mi < 8) return JOHTO_GYM_LEADER_SPRITES[mi];
+    }
     if (mi >= 0 && mi < GYM_LEADER_SPRITES.length) return GYM_LEADER_SPRITES[mi];
     return 'sprites/champ.png';
   }
+  if (node.type === NODE_TYPES.SILVER) return 'sprites/gen2/silver.png';
   return null;
 }
 
@@ -296,6 +427,7 @@ function renderMap(map, container, onNodeClick) {
   svg.setAttribute('width', W);
   svg.setAttribute('height', H);
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('overflow', 'visible');
   svg.style.width = '100%';
   svg.style.height = '100%';
 
@@ -360,7 +492,7 @@ function renderMap(map, container, onNodeClick) {
 
       // Sprite image, no circle background
       // Human figures (trainer/boss) are taller than wide; icons are square
-      const isHumanFigure = node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS;
+      const isHumanFigure = node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS || node.type === NODE_TYPES.SILVER;
       const iw = isHumanFigure ? (isBossNode ? 52 : 38) : (isBossNode ? 52 : 40);
       const ih = isHumanFigure ? (isBossNode ? 52 : 52) : (isBossNode ? 52 : 40);
 
@@ -416,19 +548,36 @@ function renderMap(map, container, onNodeClick) {
         g.appendChild(check);
       }
 
-      if (isBossNode && typeof state !== 'undefined' && state.isEndlessMode) {
+      if (isBossNode && typeof state !== 'undefined' && state.isEndlessMode
+          && window.matchMedia('(pointer: coarse)').matches) {
         const trainerData = typeof endlessState !== 'undefined' && endlessState.currentRegion
           ? endlessState.currentRegion.trainers[endlessState.mapIndexInRegion]
           : null;
         if (trainerData?.speciesIds?.length) {
           const ids = trainerData.speciesIds;
-          const iconSize = 20;
-          const gap = 2;
+          const iconSize = 28;
+          const gap = 3;
           const totalW = ids.length * iconSize + (ids.length - 1) * gap;
           const startX = -(totalW / 2);
-          const startY = ih / 2 + 4;
+          const startY = ih / 2 - 24;
           const BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
           ids.forEach((id, i) => {
+            const lvl = (trainerData.level ?? 0) + (trainerData.levelOffsets?.[i] ?? i);
+            const cx = startX + i * (iconSize + gap) + iconSize / 2;
+
+            const lvlText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            lvlText.setAttribute('x', cx);
+            lvlText.setAttribute('y', startY - 2);
+            lvlText.setAttribute('text-anchor', 'middle');
+            lvlText.setAttribute('font-family', "'Press Start 2P', monospace");
+            lvlText.setAttribute('font-size', '5');
+            lvlText.setAttribute('fill', '#fff');
+            lvlText.setAttribute('paint-order', 'stroke');
+            lvlText.setAttribute('stroke', '#000');
+            lvlText.setAttribute('stroke-width', '2');
+            lvlText.textContent = `${lvl}`;
+            g.appendChild(lvlText);
+
             const icon = document.createElementNS('http://www.w3.org/2000/svg', 'image');
             icon.setAttribute('href', `${BASE}${id}.png`);
             icon.setAttribute('x', startX + i * (iconSize + gap));
@@ -540,6 +689,7 @@ function getNodeColor(node) {
     [NODE_TYPES.LEGENDARY]:  '#7a6a00',
     [NODE_TYPES.MOVE_TUTOR]: '#3a4a6a',
     [NODE_TYPES.TRADE]:      '#1a5a5a',
+    [NODE_TYPES.SILVER]:     '#5a2a7a',
   };
   return colors[node.type] || '#444';
 }
@@ -558,26 +708,58 @@ function getNodeIcon(node) {
     [NODE_TYPES.LEGENDARY]:  '⚝',
     [NODE_TYPES.MOVE_TUTOR]: '♪',
     [NODE_TYPES.TRADE]:      '⇄',
+    [NODE_TYPES.SILVER]:     '⚔',
   };
   return icons[node.type] || '●';
+}
+
+function getSilverHoverLabel() {
+  if (typeof SILVER_ENCOUNTERS === 'undefined') {
+    return 'Rival Silver — Double XP';
+  }
+  // Encounter scales to the current map slot, not the win count, so skipping
+  // earlier Silver fights doesn't trivialize a later one.
+  const SILVER_ENC_BY_MAP = { 1: 0, 3: 1, 5: 2, 7: 3 };
+  const mapIdx     = (typeof state !== 'undefined') ? state.currentMap : 1;
+  const idx        = SILVER_ENC_BY_MAP[mapIdx] ?? 0;
+  const data       = SILVER_ENCOUNTERS[Math.min(idx, SILVER_ENCOUNTERS.length - 1)];
+  const team       = data.team.slice();
+  const starterId  = typeof state !== 'undefined' ? state.starterSpeciesId : null;
+  const starterArr = starterId && typeof SILVER_STARTER_LINES !== 'undefined' ? SILVER_STARTER_LINES[starterId] : null;
+  if (starterArr && team.length) {
+    const stage  = idx < 1 ? 0 : idx < 3 ? 1 : 2;
+    const last   = team[team.length - 1];
+    team[team.length - 1] = { ...starterArr[stage], level: last.level };
+  }
+  const teamHtml = team.map(p =>
+    `<div style="color:#ccc;font-size:9px;">${p.name} <span style="color:#aaa;">Lv${p.level}</span></div>`
+  ).join('');
+  return `<div style="font-weight:bold;margin-bottom:2px;">Rival Silver</div>` +
+         `<div style="color:#ffd76b;font-size:9px;">+4 Levels (Double XP)</div>` +
+         `<div style="color:#7ecf7e;font-size:9px;margin-bottom:4px;">Heals you after battle</div>` +
+         teamHtml;
 }
 
 function getNodeLabel(node) {
   if (node.visited) return 'Visited';
   if (node.type === NODE_TYPES.BOSS) {
     const mi = node.mapIndex ?? -1;
-    if (typeof GYM_LEADERS !== 'undefined' && mi >= 0 && mi < GYM_LEADERS.length) {
-      const leader = GYM_LEADERS[mi];
+    const isGen2 = typeof state !== 'undefined' && state.gen2Mode;
+    const leaders = isGen2 ? (typeof JOHTO_GYM_LEADERS !== 'undefined' ? JOHTO_GYM_LEADERS : null) : (typeof GYM_LEADERS !== 'undefined' ? GYM_LEADERS : null);
+    if (leaders && mi >= 0 && mi < leaders.length) {
+      const leader = leaders[mi];
       const teamHtml = leader.team.map(p =>
         `<div style="color:#ccc;font-size:9px;">${p.name} <span style="color:#aaa;">Lv${p.level}</span></div>`
       ).join('');
       return `<div style="font-weight:bold;margin-bottom:4px;">${leader.name} — ${leader.type} Gym</div>${teamHtml}`;
     }
+    if (isGen2 && mi === 8) return '<div style="font-weight:bold;">Elite Four &amp; Lance</div>';
     if (typeof ELITE_4 !== 'undefined' && mi === 8) {
       return '<div style="font-weight:bold;">Elite Four &amp; Champion</div>';
     }
     return 'Gym Leader';
   }
+  const isGen2Mode = typeof state !== 'undefined' && state.gen2Mode;
   const labels = {
     [NODE_TYPES.START]:      'Start',
     [NODE_TYPES.BATTLE]:     'Wild Battle — +1 level',
@@ -585,10 +767,15 @@ function getNodeLabel(node) {
     [NODE_TYPES.ITEM]:       'Item',
     [NODE_TYPES.QUESTION]:   'Random Event',
     [NODE_TYPES.POKECENTER]: 'Pokemon Center',
-    [NODE_TYPES.TRAINER]:    `Trainer Battle — +2 levels${node.trainerSprite && TRAINER_SPRITE_NAMES[node.trainerSprite] ? ' — ' + TRAINER_SPRITE_NAMES[node.trainerSprite] : ''}`,
+    [NODE_TYPES.TRAINER]:    (node.trainerSprite && TRAINER_SPRITE_NAMES[node.trainerSprite])
+      ? (isGen2Mode
+          ? `${TRAINER_SPRITE_NAMES[node.trainerSprite]} — +2 Levels — ${TRAINER_SPECIALTIES_GEN2[node.trainerSprite] || TRAINER_SPECIALTIES[node.trainerSprite] || 'Various Pokemon'}`
+          : `${TRAINER_SPRITE_NAMES[node.trainerSprite]} — +2 Levels — ${TRAINER_SPECIALTIES[node.trainerSprite] || 'Various Pokemon'}`)
+      : 'Trainer Battle — +2 Levels',
     [NODE_TYPES.LEGENDARY]:  'Legendary Pokemon',
     [NODE_TYPES.MOVE_TUTOR]: 'Move Tutor',
     [NODE_TYPES.TRADE]:      'Trade — swap a Pokémon for one 3 levels higher',
+    [NODE_TYPES.SILVER]:     getSilverHoverLabel(),
   };
   return labels[node.type] || node.type;
 }

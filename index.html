@@ -29,9 +29,16 @@
 <div id="title-screen" class="screen">
   <div class="game-logo">POKELIKE</div>
   <div class="game-subtitle">Pokemon Roguelike</div>
-  <div style="color:var(--text-dim);font-size:9px;margin-bottom:6px;cursor:pointer;" onclick="openPatchNotesModal()">v1.4.5 — patch notes</div>
+  <div style="color:var(--text-dim);font-size:9px;margin-bottom:6px;cursor:pointer;" onclick="openPatchNotesModal()">v1.5.1 — patch notes</div>
   <button id="btn-continue-run" class="btn-primary" style="display:none;margin-bottom:10px;">Continue Run</button>
   <button id="btn-continue-endless" class="btn-primary" style="display:none;margin-bottom:10px;">Continue Battle Tower</button>
+  <div class="gen-toggle-wrap">
+    <span class="gen-toggle-label">Gen:</span>
+    <div id="gen-toggle" class="gen-toggle" title="Choose generation">
+      <button class="gen-btn gen-btn--active" data-gen="1" aria-label="Gen 1 (Kanto)">I</button>
+      <button class="gen-btn" data-gen="2" aria-label="Gen 2 (Johto)">II</button>
+    </div>
+  </div>
   <button id="btn-new-run" class="btn-primary">Normal Mode</button>
   <button id="btn-hard-run" class="btn-primary" style="margin-top:6px;">Nuzlocke</button>
   <button id="btn-endless-run" class="btn-primary" style="margin-top:6px;">Battle Tower</button>
@@ -54,6 +61,9 @@
   </a>
   <div style="margin-top:6px;">
     <a href="privacy.html" style="color:var(--text-dim);font-size:8px;text-decoration:none;">Privacy Policy</a>
+  </div>
+  <div style="margin-top:10px;max-width:340px;color:var(--text-dim);font-size:8px;opacity:0.6;line-height:1.4;text-align:center;padding:0 10px;">
+    Fan-made project. Not affiliated with, endorsed by, or sponsored by Nintendo, Game Freak, or The Pokémon Company. All Pokémon names and sprites are property of their respective owners.
   </div>
 </div>
 
@@ -98,6 +108,7 @@
       <button onclick="openPokedexModal()" class="btn-icon-sm" title="Pokédex"><img src="ui/pokedex.png" alt="Pokédex"></button>
       <button onclick="openAchievementsModal()" class="btn-icon-sm" title="Achievements"><img src="ui/achievements.png" alt="Achievements"></button>
       <button onclick="openSettingsModal()" class="btn-icon-sm" title="Settings"><img src="ui/settings.png" alt="Settings"></button>
+      <button onclick="confirmResetRun()" class="btn-icon-sm btn-icon-glyph" title="Restart run">↻</button>
     </div>
   </div>
 
@@ -106,6 +117,7 @@
     <button onclick="openPokedexModal()" class="btn-icon-sm" title="Pokédex"><img src="ui/pokedex.png" alt="Pokédex"></button>
     <button onclick="openAchievementsModal()" class="btn-icon-sm" title="Achievements"><img src="ui/achievements.png" alt="Achievements"></button>
     <button onclick="openSettingsModal()" class="btn-icon-sm" title="Settings"><img src="ui/settings.png" alt="Settings"></button>
+    <button onclick="confirmResetRun()" class="btn-icon-sm btn-icon-glyph" title="Restart run">↻</button>
   </div>
 
   <div class="map-panels">
@@ -179,9 +191,9 @@
 <!-- ===== SWAP SCREEN ===== -->
 <div id="swap-screen" class="screen">
   <h2>Team Full!</h2>
-  <div id="swap-incoming"></div>
   <p id="swap-prompt" class="swap-prompt"></p>
   <div id="swap-choices"></div>
+  <div id="swap-incoming"></div>
   <div style="text-align:center;margin-top:12px;">
     <button id="btn-cancel-swap" class="btn-secondary">Keep team as-is</button>
   </div>
@@ -215,6 +227,29 @@
 <div id="transition-screen" class="screen">
   <div id="transition-msg"></div>
   <div id="transition-sub"></div>
+</div>
+
+<!-- ===== ELITE PREP SCREEN ===== -->
+<div id="elite-prep-screen" class="screen">
+  <div id="elite-prep-title"></div>
+  <div id="elite-prep-sub"></div>
+
+  <div class="elite-prep-section">
+    <div class="elite-prep-section-label">Next Opponent's Team</div>
+    <div id="elite-prep-enemy-team"></div>
+  </div>
+
+  <div class="elite-prep-section">
+    <div class="elite-prep-section-label">Your Team — drag to reorder</div>
+    <div id="elite-prep-player-team"></div>
+  </div>
+
+  <div class="elite-prep-section">
+    <div class="elite-prep-section-label">Items — click to use</div>
+    <div id="elite-prep-items"></div>
+  </div>
+
+  <button id="btn-elite-prep-continue" class="btn-primary">Continue →</button>
 </div>
 
 <!-- ===== GAME OVER ===== -->

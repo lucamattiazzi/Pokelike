@@ -125,17 +125,17 @@ const MOVE_POOL = {
                          {name:'Phantom Force',     power:90,  desc:'Vanishes, then strikes the foe on the next turn.'}],
               special:  [{name:'Lick',              power:40,  desc:'Licks the foe with a long tongue to inflict damage.'},
                          {name:'Shadow Ball',       power:80,  desc:'Hurls a blob of dark energy at the foe.'},
-                         {name:'Shadow Force',      power:120, desc:'Disappears, then strikes everything on the next turn.'}] },
+                         {name:'Shadow Force',      power:100, desc:'Disappears, then strikes everything on the next turn.'}] },
   Dragon:   { physical: [{name:'Twister',           power:40,  desc:'Whips up a powerful twister of draconic energy.'},
                          {name:'Dragon Claw',       power:80,  desc:'Slashes the foe with razor-sharp dragon claws.'},
                          {name:'Outrage',           power:120, desc:'Rampages and attacks the foe with intense dragon fury.'}],
               special:  [{name:'Dragon Breath',     power:60,  desc:'Exhales a scorching gust of dragon energy.'},
                          {name:'Dragon Pulse',      power:85,  desc:'Fires a shockwave of draconic energy.'},
                          {name:'Draco Meteor',      power:130, desc:'Comets are rained down on the foe. Sharply lowers the user\'s Sp. Atk.'}] },
-  Dark:     { physical: [{name:'Bite',              power:60,  desc:'Bites the foe with viciously sharp fangs.'},
+  Dark:     { physical: [{name:'Bite',              power:40,  desc:'Bites the foe with viciously sharp fangs.'},
                          {name:'Crunch',            power:80,  desc:'Crunches with sharp fangs. May lower the foe\'s Defense.'},
                          {name:'Knock Off',         power:120, desc:'Knocks down the foe\'s held item to boost damage.'}],
-              special:  [{name:'Snarl',             power:55,  desc:'Yells and snarls at the foe to lower its Sp. Atk.'},
+              special:  [{name:'Snarl',             power:40,  desc:'Yells and snarls at the foe to lower its Sp. Atk.'},
                          {name:'Dark Pulse',        power:80,  desc:'Fires a horrible aura of dark energy at the foe.'},
                          {name:'Night Daze',        power:110, desc:'Lets loose a pitch-black shockwave of dark energy.'}] },
   Steel:    { physical: [{name:'Metal Claw',        power:50,  desc:'Attacks with steel-hard claws. May raise the user\'s Attack.'},
@@ -156,14 +156,29 @@ function getMoveТierForMap(mapIndex) {
   return mapIndex <= 2 ? 0 : 1;
 }
 
-function getBestMove(types, baseStats, speciesId, moveTier = 1) {
+function getBestMove(types, baseStats, speciesId, moveTier = 1, heldItem = null) {
   if (speciesId === 129) return { name: 'Splash',   power: 0, type: 'Normal', isSpecial: false, noDamage: true };
   if (speciesId === 63)  return { name: 'Teleport', power: 0, type: 'Normal', isSpecial: false, noDamage: true };
   const isSpecial = (baseStats?.special || 0) >= (baseStats?.atk || 0);
   const tier = Math.max(0, Math.min(2, moveTier ?? 1));
+  // Metronome: dual-type holder uses the OTHER type's attack (the one the
+  // default picker would skip). The +20% damage boost is applied in calcDamage.
+  if (heldItem?.id === 'metronome' && types && types.length >= 2) {
+    const defaultIdx = (types[0].toLowerCase() === 'normal') ? 1 : 0;
+    const otherIdx   = defaultIdx === 0 ? 1 : 0;
+    const cap = types[otherIdx].charAt(0).toUpperCase() + types[otherIdx].slice(1).toLowerCase();
+    if (MOVE_POOL[cap]) {
+      const move = isSpecial ? MOVE_POOL[cap].special[tier] : MOVE_POOL[cap].physical[tier];
+      return { ...move, type: cap, isSpecial };
+    }
+  }
   if ([74, 75, 76, 95].includes(speciesId)) {
     const move = MOVE_POOL['Rock'][isSpecial ? 'special' : 'physical'][tier];
     return { ...move, type: 'Rock', isSpecial };
+  }
+  if ([170, 171].includes(speciesId)) {
+    const move = MOVE_POOL['Electric'][isSpecial ? 'special' : 'physical'][tier];
+    return { ...move, type: 'Electric', isSpecial };
   }
   for (const t of types) {
     // Skip Normal if the Pokémon also has a more specific type (e.g. Normal/Flying → use Flying)
@@ -255,7 +270,7 @@ const ELITE_4 = [
       { speciesId: 87,  name: 'Dewgong',   types: ['Water','Ice'], baseStats: { hp:90,atk:70,def:80,speed:70,special:95 }, level: 54, heldItem: { id: 'mystic_water', name: 'Mystic Water', icon: '💧' } },
       { speciesId: 91,  name: 'Cloyster',  types: ['Water','Ice'], baseStats: { hp:50,atk:95,def:180,speed:70,special:85 }, level: 53, heldItem: { id: 'rocky_helmet', name: 'Rocky Helmet', icon: '⛑️' } },
       { speciesId: 80,  name: 'Slowbro',   types: ['Water','Psychic'], baseStats: { hp:95,atk:75,def:110,speed:30,special:100 }, level: 54, heldItem: { id: 'leftovers', name: 'Leftovers', icon: '🍃' } },
-      { speciesId: 124, name: 'Jynx',      types: ['Ice','Psychic'], baseStats: { hp:65,atk:50,def:35,speed:95,special:95 }, level: 56, heldItem: { id: 'wise_glasses', name: 'Wise Glasses', icon: '🔬' } },
+      { speciesId: 124, name: 'Jynx',      types: ['Ice','Psychic'], baseStats: { hp:65,atk:50,def:35,speed:95,special:95 }, level: 56, heldItem: { id: 'twisted_spoon', name: 'Twisted Spoon', icon: '🥄' } },
       { speciesId: 131, name: 'Lapras',    types: ['Water','Ice'], baseStats: { hp:130,atk:85,def:80,speed:60,special:95 }, level: 56, heldItem: { id: 'shell_bell', name: 'Shell Bell', icon: '🐚' } },
     ]
   },
@@ -264,7 +279,7 @@ const ELITE_4 = [
     team: [
       { speciesId: 95,  name: 'Onix',      types: ['Rock','Ground'], baseStats: { hp:35,atk:45,def:160,speed:70,special:30 }, level: 53, heldItem: { id: 'rocky_helmet', name: 'Rocky Helmet', icon: '⛑️' } },
       { speciesId: 107, name: 'Hitmonchan',types: ['Fighting'], baseStats: { hp:50,atk:105,def:79,speed:76,special:35 }, level: 55, heldItem: { id: 'black_belt', name: 'Black Belt', icon: '🥋' } },
-      { speciesId: 106, name: 'Hitmonlee', types: ['Fighting'], baseStats: { hp:50,atk:120,def:53,speed:87,special:35 }, level: 55, heldItem: { id: 'muscle_band', name: 'Muscle Band', icon: '💪' } },
+      { speciesId: 106, name: 'Hitmonlee', types: ['Fighting'], baseStats: { hp:50,atk:120,def:53,speed:87,special:35 }, level: 55, heldItem: { id: 'life_orb', name: 'Life Orb', icon: '🔮' } },
       { speciesId: 95,  name: 'Onix',      types: ['Rock','Ground'], baseStats: { hp:35,atk:45,def:160,speed:70,special:30 }, level: 54, heldItem: { id: 'hard_stone', name: 'Hard Stone', icon: '🪨' } },
       { speciesId: 68,  name: 'Machamp',   types: ['Fighting'], baseStats: { hp:90,atk:130,def:80,speed:55,special:65 }, level: 58, heldItem: { id: 'choice_band', name: 'Choice Band', icon: '🎀' } },
     ]
@@ -301,15 +316,172 @@ const ELITE_4 = [
   },
 ];
 
+const GEN2_ELITE_4 = [
+  { name: 'Will', title: 'Elite Four', type: 'Psychic',
+    team: [
+      { speciesId: 178, name: 'Xatu',      types: ['Psychic','Flying'], baseStats: { hp:65,  atk:75,  def:70,  speed:95,  special:95  }, level: 77 },
+      { speciesId: 178, name: 'Xatu',      types: ['Psychic','Flying'], baseStats: { hp:65,  atk:75,  def:70,  speed:95,  special:95  }, level: 77 },
+      { speciesId: 80,  name: 'Slowbro',   types: ['Water','Psychic'],  baseStats: { hp:95,  atk:75,  def:110, speed:30,  special:100 }, level: 79 },
+      { speciesId: 124, name: 'Jynx',      types: ['Ice','Psychic'],    baseStats: { hp:65,  atk:50,  def:35,  speed:95,  special:95  }, level: 79 },
+      { speciesId: 103, name: 'Exeggutor', types: ['Grass','Psychic'],  baseStats: { hp:95,  atk:95,  def:85,  speed:55,  special:125 }, level: 81 },
+    ]
+  },
+  { name: 'Koga', title: 'Elite Four', type: 'Poison',
+    team: [
+      { speciesId: 168, name: 'Ariados',   types: ['Bug','Poison'],    baseStats: { hp:70,  atk:90,  def:70,  speed:40,  special:60  }, level: 81 },
+      { speciesId: 49,  name: 'Venomoth',  types: ['Bug','Poison'],    baseStats: { hp:70,  atk:65,  def:60,  speed:90,  special:90  }, level: 81 },
+      { speciesId: 205, name: 'Forretress',types: ['Bug','Steel'],     baseStats: { hp:75,  atk:90,  def:140, speed:40,  special:60  }, level: 81 },
+      { speciesId: 89,  name: 'Muk',       types: ['Poison'],          baseStats: { hp:105, atk:105, def:75,  speed:50,  special:65  }, level: 81 },
+      { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85,  atk:90,  def:80,  speed:130, special:70  }, level: 85 },
+    ]
+  },
+  { name: 'Bruno', title: 'Elite Four', type: 'Fighting',
+    team: [
+      { speciesId: 237, name: 'Hitmontop', types: ['Fighting'],        baseStats: { hp:50,  atk:95,  def:95,  speed:70,  special:35  }, level: 87 },
+      { speciesId: 106, name: 'Hitmonlee', types: ['Fighting'],        baseStats: { hp:50,  atk:120, def:53,  speed:87,  special:35  }, level: 87 },
+      { speciesId: 107, name: 'Hitmonchan',types: ['Fighting'],        baseStats: { hp:50,  atk:105, def:79,  speed:76,  special:35  }, level: 87 },
+      { speciesId: 95,  name: 'Onix',      types: ['Rock','Ground'],   baseStats: { hp:35,  atk:45,  def:160, speed:70,  special:30  }, level: 87 },
+      { speciesId: 68,  name: 'Machamp',   types: ['Fighting'],        baseStats: { hp:90,  atk:130, def:80,  speed:55,  special:65  }, level: 87 },
+    ]
+  },
+  { name: 'Karen', title: 'Elite Four', type: 'Dark',
+    team: [
+      { speciesId: 197, name: 'Umbreon',   types: ['Dark'],            baseStats: { hp:95,  atk:65,  def:110, speed:65,  special:60  }, level: 85 },
+      { speciesId: 45,  name: 'Vileplume', types: ['Grass','Poison'],  baseStats: { hp:75,  atk:80,  def:85,  speed:50,  special:100 }, level: 85 },
+      { speciesId: 94,  name: 'Gengar',    types: ['Ghost','Poison'],  baseStats: { hp:60,  atk:65,  def:60,  speed:110, special:130 }, level: 87 },
+      { speciesId: 198, name: 'Murkrow',   types: ['Dark','Flying'],   baseStats: { hp:60,  atk:85,  def:42,  speed:91,  special:85  }, level: 87 },
+      { speciesId: 229, name: 'Houndoom',  types: ['Dark','Fire'],     baseStats: { hp:75,  atk:90,  def:50,  speed:95,  special:110 }, level: 89 },
+    ]
+  },
+  { name: 'Lance', title: 'Champion', type: 'Dragon',
+    team: [
+      { speciesId: 130, name: 'Gyarados',  types: ['Water','Flying'],  baseStats: { hp:95,  atk:125, def:79,  speed:81,  special:60  }, level: 87 },
+      { speciesId: 142, name: 'Aerodactyl',types: ['Rock','Flying'],   baseStats: { hp:80,  atk:105, def:65,  speed:130, special:60  }, level: 88 },
+      { speciesId: 149, name: 'Dragonite', types: ['Dragon','Flying'], baseStats: { hp:91,  atk:134, def:95,  speed:80,  special:100 }, level: 89 },
+      { speciesId: 149, name: 'Dragonite', types: ['Dragon','Flying'], baseStats: { hp:91,  atk:134, def:95,  speed:80,  special:100 }, level: 90 },
+      { speciesId: 149, name: 'Dragonite', types: ['Dragon','Flying'], baseStats: { hp:91,  atk:134, def:95,  speed:80,  special:100 }, level: 91 },
+    ]
+  },
+];
+
+const JOHTO_GYM_LEADERS = [
+  { name: 'Falkner', badge: 'Zephyr Badge', type: 'Flying', moveTier: 0,
+    team: [
+      { speciesId: 16,  name: 'Pidgey',    types: ['Normal','Flying'], baseStats: { hp:40,  atk:45,  def:40,  speed:56,  special:35  }, level: 9 },
+      { speciesId: 17,  name: 'Pidgeotto', types: ['Normal','Flying'], baseStats: { hp:63,  atk:60,  def:55,  speed:71,  special:50  }, level: 10 },
+    ]
+  },
+  { name: 'Bugsy', badge: 'Hive Badge', type: 'Bug', moveTier: 0,
+    team: [
+      { speciesId: 11,  name: 'Metapod',  types: ['Bug'],          baseStats: { hp:50,  atk:20,  def:55,  speed:30,  special:25  }, level: 21 },
+      { speciesId: 14,  name: 'Kakuna',   types: ['Bug','Poison'], baseStats: { hp:45,  atk:25,  def:50,  speed:35,  special:25  }, level: 22 },
+      { speciesId: 123, name: 'Scyther',  types: ['Bug','Flying'], baseStats: { hp:70,  atk:110, def:80,  speed:105, special:55  }, level: 23 },
+    ]
+  },
+  { name: 'Whitney', badge: 'Plain Badge', type: 'Normal', moveTier: 0,
+    team: [
+      { speciesId: 35,  name: 'Clefairy', types: ['Normal'], baseStats: { hp:70,  atk:45,  def:48,  speed:35,  special:60  }, level: 32 },
+      { speciesId: 241, name: 'Miltank',  types: ['Normal'], baseStats: { hp:95,  atk:80,  def:105, speed:100, special:60  }, level: 35 },
+    ]
+  },
+  { name: 'Morty', badge: 'Fog Badge', type: 'Ghost', moveTier: 1,
+    team: [
+      { speciesId: 92,  name: 'Gastly',  types: ['Ghost','Poison'], baseStats: { hp:30,  atk:35,  def:30,  speed:80,  special:100 }, level: 41 },
+      { speciesId: 93,  name: 'Haunter', types: ['Ghost','Poison'], baseStats: { hp:45,  atk:50,  def:45,  speed:95,  special:115 }, level: 42 },
+      { speciesId: 93,  name: 'Haunter', types: ['Ghost','Poison'], baseStats: { hp:45,  atk:50,  def:45,  speed:95,  special:115 }, level: 43 },
+      { speciesId: 94,  name: 'Gengar',  types: ['Ghost','Poison'], baseStats: { hp:60,  atk:65,  def:60,  speed:110, special:130 }, level: 45 },
+    ]
+  },
+  { name: 'Chuck', badge: 'Storm Badge', type: 'Fighting', moveTier: 1,
+    team: [
+      { speciesId: 57,  name: 'Primeape',  types: ['Fighting'],         baseStats: { hp:65,  atk:105, def:60,  speed:95,  special:60  }, level: 54 },
+      { speciesId: 62,  name: 'Poliwrath', types: ['Water','Fighting'], baseStats: { hp:90,  atk:95,  def:95,  speed:70,  special:70  }, level: 59 },
+    ]
+  },
+  { name: 'Jasmine', badge: 'Mineral Badge', type: 'Steel', moveTier: 1,
+    team: [
+      { speciesId: 81,  name: 'Magnemite', types: ['Electric','Steel'], baseStats: { hp:25,  atk:35,  def:70,  speed:45,  special:95  }, level: 64 },
+      { speciesId: 81,  name: 'Magnemite', types: ['Electric','Steel'], baseStats: { hp:25,  atk:35,  def:70,  speed:45,  special:95  }, level: 64 },
+      { speciesId: 208, name: 'Steelix',   types: ['Steel','Ground'],   baseStats: { hp:75,  atk:85,  def:200, speed:30,  special:55  }, level: 69 },
+    ]
+  },
+  { name: 'Pryce', badge: 'Glacier Badge', type: 'Ice', moveTier: 2,
+    team: [
+      { speciesId: 86,  name: 'Seel',      types: ['Water'],        baseStats: { hp:65,  atk:45,  def:55,  speed:45,  special:70  }, level: 74 },
+      { speciesId: 87,  name: 'Dewgong',   types: ['Water','Ice'],  baseStats: { hp:90,  atk:70,  def:80,  speed:70,  special:95  }, level: 77 },
+      { speciesId: 221, name: 'Piloswine', types: ['Ice','Ground'], baseStats: { hp:100, atk:100, def:80,  speed:50,  special:60  }, level: 79 },
+    ]
+  },
+  { name: 'Clair', badge: 'Rising Badge', type: 'Dragon', moveTier: 2,
+    team: [
+      { speciesId: 130, name: 'Gyarados',  types: ['Water','Flying'], baseStats: { hp:95,  atk:125, def:79,  speed:81,  special:60  }, level: 84 },
+      { speciesId: 148, name: 'Dragonair', types: ['Dragon'],         baseStats: { hp:61,  atk:84,  def:65,  speed:70,  special:70  }, level: 84 },
+      { speciesId: 148, name: 'Dragonair', types: ['Dragon'],         baseStats: { hp:61,  atk:84,  def:65,  speed:70,  special:70  }, level: 84 },
+      { speciesId: 230, name: 'Kingdra',   types: ['Water','Dragon'], baseStats: { hp:75,  atk:95,  def:95,  speed:85,  special:95  }, level: 84 },
+    ]
+  },
+];
+
+const SILVER_ENCOUNTERS = [
+  // Map 1 — enc 0: starter 1st evo replaces last slot; map max=20, Silver ace=18
+  { team: [
+    { speciesId: 92,  name: 'Gastly',    types: ['Ghost','Poison'],  baseStats: { hp:30, atk:35, def:30, speed:80,  special:100 }, level: 15 },
+    { speciesId: 41,  name: 'Zubat',     types: ['Poison','Flying'], baseStats: { hp:40, atk:45, def:35, speed:55,  special:40  }, level: 17 },
+    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 17 },
+  ]},
+  // Map 3 — enc 1: starter evo replaces last slot; map max=40, Silver ace=38
+  { team: [
+    { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45,  speed:95,  special:115 }, level: 35 },
+    { speciesId: 42,  name: 'Golbat',    types: ['Poison','Flying'], baseStats: { hp:75, atk:80, def:70,  speed:90,  special:75  }, level: 35 },
+    { speciesId: 82,  name: 'Magneton',  types: ['Electric','Steel'],baseStats: { hp:50, atk:60, def:95,  speed:70,  special:120 }, level: 33 },
+    { speciesId: 93,  name: 'Haunter',   types: ['Ghost','Poison'],  baseStats: { hp:45, atk:50, def:45,  speed:95,  special:115 }, level: 35 },
+    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43,  speed:65,  special:60  }, level: 39 },
+  ]},
+  // Map 5 — enc 2: starter evo replaces last slot; map max=60, Silver ace=58
+  { team: [
+    { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85, atk:90, def:80, speed:130, special:70  }, level: 54 },
+    { speciesId: 462, name: 'Magnezone', types: ['Electric','Steel'],baseStats: { hp:70, atk:70, def:115,speed:60,  special:130 }, level: 57 },
+    { speciesId: 94,  name: 'Gengar',    types: ['Ghost','Poison'],  baseStats: { hp:60, atk:65, def:60, speed:110, special:130 }, level: 54 },
+    { speciesId: 461, name: 'Weavile',   types: ['Dark','Ice'],      baseStats: { hp:70, atk:120,def:65, speed:125, special:45  }, level: 57 },
+    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 59 },
+  ]},
+  // Map 7 — enc 3: starter evo replaces last slot; map max=80, Silver ace=78
+  { team: [
+    { speciesId: 169, name: 'Crobat',    types: ['Poison','Flying'], baseStats: { hp:85, atk:90, def:80, speed:130, special:70  }, level: 75 },
+    { speciesId: 462, name: 'Magnezone', types: ['Electric','Steel'],baseStats: { hp:70, atk:70, def:115,speed:60,  special:130 }, level: 73 },
+    { speciesId: 94,  name: 'Gengar',    types: ['Ghost','Poison'],  baseStats: { hp:60, atk:65, def:60, speed:110, special:130 }, level: 75 },
+    { speciesId: 461, name: 'Weavile',   types: ['Dark','Ice'],      baseStats: { hp:70, atk:120,def:65, speed:125, special:45  }, level: 77 },
+    { speciesId: 155, name: 'Cyndaquil', types: ['Fire'],            baseStats: { hp:39, atk:52, def:43, speed:65,  special:60  }, level: 79 },
+  ]},
+];
+
+// Silver always carries the starter that counters the player's choice.
+// Indexed by player's starterSpeciesId; stages = [base, 1st evo, final evo].
+const SILVER_STARTER_LINES = {
+  152: [ // Player: Chikorita (Grass) → Silver: Cyndaquil line (Fire beats Grass)
+    { speciesId: 155, name: 'Cyndaquil',  types: ['Fire'], baseStats: { hp:39, atk:52,  def:43,  speed:65,  special:60  } },
+    { speciesId: 156, name: 'Quilava',    types: ['Fire'], baseStats: { hp:58, atk:64,  def:58,  speed:80,  special:80  } },
+    { speciesId: 157, name: 'Typhlosion', types: ['Fire'], baseStats: { hp:78, atk:84,  def:78,  speed:100, special:109 } },
+  ],
+  155: [ // Player: Cyndaquil (Fire) → Silver: Totodile line (Water beats Fire)
+    { speciesId: 158, name: 'Totodile',   types: ['Water'], baseStats: { hp:50, atk:65,  def:64,  speed:43,  special:44 } },
+    { speciesId: 159, name: 'Croconaw',   types: ['Water'], baseStats: { hp:65, atk:80,  def:80,  speed:58,  special:59 } },
+    { speciesId: 160, name: 'Feraligatr', types: ['Water'], baseStats: { hp:85, atk:105, def:100, speed:78,  special:79 } },
+  ],
+  158: [ // Player: Totodile (Water) → Silver: Chikorita line (Grass beats Water)
+    { speciesId: 152, name: 'Chikorita',  types: ['Grass'], baseStats: { hp:45, atk:49,  def:65,  speed:45,  special:65 } },
+    { speciesId: 153, name: 'Bayleef',    types: ['Grass'], baseStats: { hp:60, atk:62,  def:80,  speed:60,  special:63 } },
+    { speciesId: 154, name: 'Meganium',   types: ['Grass'], baseStats: { hp:80, atk:82,  def:100, speed:80,  special:83 } },
+  ],
+};
+
 // Item pool
 const ITEM_POOL = [
   { id: 'lucky_egg',          name: 'Lucky Egg',          desc: '30% chance: holder gains +1 extra level after each battle',        icon: '🥚', minMap: 4 },
   { id: 'life_orb',           name: 'Life Orb',           desc: '+30% damage; holder loses 10% max HP per hit',                       icon: '🔮' },
   { id: 'choice_band',        name: 'Choice Band',        desc: '+40% physical damage, -20% DEF',                                     icon: '🎀' },
-  { id: 'choice_specs',       name: 'Choice Specs',       desc: '+40% special damage, -20% Sp.Def',                                   icon: '👓' },
-  { id: 'muscle_band',         name: 'Muscle Band',        desc: '+50% ATK & DEF if 4+ Pokémon on your team are physical attackers', icon: '💪' },
-  { id: 'wise_glasses',       name: 'Wise Glasses',       desc: '+50% Sp.Atk & Sp.Def if 4+ Pokémon on your team are special attackers', icon: '🔍' },
-  { id: 'metronome',          name: 'Metronome',          desc: '+50% damage if 4+ Pokémon on your team share a type with the attacker', icon: '🎵' },
+  { id: 'choice_specs',       name: 'Choice Specs',       desc: '+30% special damage',                                                icon: '👓' },
+  { id: 'metronome',          name: 'Metronome',          desc: 'Dual-type holder uses its OTHER type for attacks; +20% damage on all moves', icon: '🎵' },
   { id: 'scope_lens',         name: 'Scope Lens',         desc: '20% crit chance (+50% damage on crit)',                              icon: '🔭' },
   { id: 'rocky_helmet',       name: 'Rocky Helmet',       desc: 'Attacker takes 12% of their max HP on each hit',                     icon: '⛑️' },
   { id: 'shell_bell',         name: 'Shell Bell',         desc: 'Heal 15% of damage dealt',                                           icon: '🐚' },
@@ -328,22 +500,32 @@ const ITEM_POOL = [
   { id: 'poison_barb',        name: 'Poison Barb',        desc: '+50% Poison move damage',                                            icon: '☠️', minMap: 4 },
   { id: 'spell_tag',          name: 'Spell Tag',          desc: '+50% Ghost move damage',                                             icon: '👻', minMap: 4 },
   { id: 'silk_scarf',         name: 'Silk Scarf',         desc: '+50% Normal move damage',                                            icon: '🤍' },
+  { id: 'metal_coat',         name: 'Metal Coat',         desc: '+50% Steel move damage',                                             icon: '🔩', minMap: 4 },
+  { id: 'black_glasses',      name: 'Black Glasses',      desc: '+50% Dark move damage',                                              icon: '🕶️', minMap: 4 },
+  { id: 'pixie_plate',        name: 'Pixie Plate',        desc: '+50% Fairy move damage',                                             icon: '🧚', minMap: 4 },
   // Stat items
   { id: 'assault_vest',       name: 'Assault Vest',       desc: '+50% Sp.Def',                                                        icon: '🦺' },
   { id: 'choice_scarf',       name: 'Choice Scarf',       desc: '+50% Speed',                                                         icon: '🧣' },
   // Battle effect items
   { id: 'leftovers',          name: 'Leftovers',          desc: 'Restore 10% max HP each round',                                      icon: '🍃' },
-  { id: 'expert_belt',        name: 'Expert Belt',        desc: '+30% damage on super effective hits',                                 icon: '🥊' },
-  { id: 'focus_band',         name: 'Focus Band',         desc: '20% chance to survive a KO with 1 HP',                               icon: '🩹' },
+  { id: 'expert_belt',        name: 'Expert Belt',        desc: '+100% damage on super effective hits',                                icon: '🥊' },
   { id: 'focus_sash',         name: 'Focus Sash',         desc: 'If at full HP, guaranteed to survive any hit with 1 HP',             icon: '🎗️' },
   { id: 'wide_lens',          name: 'Wide Lens',          desc: '+20% damage on all moves',                                            icon: '🔎' },
-  { id: 'air_balloon',        name: 'Air Balloon',        desc: 'Immune to Ground-type moves',                                         icon: '🎈' },
+  { id: 'quick_claw',         name: 'Quick Claw',         desc: '50% chance to attack first regardless of speed',                     icon: '🪝' },
+  { id: 'kings_rock',         name: "King's Rock",         desc: '30% chance to flinch the target on a hit',                          icon: '👑' },
+  { id: 'lagging_tail',       name: 'Lagging Tail',       desc: 'Always moves last, but +100% move damage',                            icon: '🐌' },
+  { id: 'adrenaline_orb',     name: 'Adrenaline Orb',     desc: 'When YOU land a SUPER-EFFECTIVE hit (×2+): +1 ATK / +1 Sp.Atk this battle', icon: '⚡' },
+  { id: 'red_card',           name: 'Red Card',           desc: 'Take 50% less damage from super-effective hits',                      icon: '🟥' },
+  { id: 'loaded_dice',        name: 'Loaded Dice',        desc: 'Start of each battle: 37% chance for +2 to ATK/DEF/Sp.Atk/Sp.Def/Speed, else -1', icon: '🎲', iconUrl: 'sprites/items/loaded_dice.png', gen2Only: true },
 ];
 
 const USABLE_ITEM_POOL = [
-  { id: 'max_revive',  name: 'Max Revive',       desc: 'Fully revives a fainted Pokémon',              icon: '💊', usable: true },
-  { id: 'rare_candy',  name: 'Rare Candy',        desc: 'Gives a Pokémon +3 levels',                   icon: '🍬', usable: true },
-  { id: 'moon_stone',  name: 'Moon Stone',        desc: 'Force evolves a Pokémon regardless of level',  icon: '🌙', usable: true },
+  { id: 'max_revive',   name: 'Max Revive',  desc: 'Fully revives a fainted Pokémon',                          icon: '💊', usable: true },
+  { id: 'full_restore', name: 'Full Restore',desc: 'Fully restores HP of a Pokémon',                           icon: '🍶', usable: true },
+  { id: 'rare_candy',   name: 'Rare Candy',  desc: 'Gives a Pokémon +3 levels',                                icon: '🍬', usable: true },
+  { id: 'moon_stone',   name: 'Moon Stone',  desc: 'Force evolves a Pokémon regardless of level',              icon: '🌙', usable: true },
+  { id: 'tm_normal',    name: 'TM',          desc: "Upgrades a Pokémon's move tier by 1",                      icon: '💿', usable: true },
+  { id: 'escape_rope',  name: 'Escape Rope', desc: 'Survive a non-boss loss with 1 HP instead of game over',   icon: '🪢', usable: true },
 ];
 
 const TYPE_ITEM_MAP = {
@@ -351,6 +533,7 @@ const TYPE_ITEM_MAP = {
   Grass: 'miracle_seed', Psychic: 'twisted_spoon', Fighting: 'black_belt',
   Ground: 'soft_sand', Bug: 'silver_powder', Rock: 'hard_stone', Dragon: 'dragon_fang',
   Poison: 'poison_barb', Ghost: 'spell_tag', Normal: 'silk_scarf',
+  Steel: 'metal_coat', Dark: 'black_glasses', Fairy: 'pixie_plate',
 };
 
 // Bust stale pokemon species cache entries missing the 'special' stat
@@ -386,10 +569,51 @@ const MAP_BST_RANGES = [
   { min: 530, max: 999 },   // Final
 ];
 
+// Gen 2 has 18 maps — fall back to MAP_BST_RANGES (clamped to map 8) would
+// stuff every Kanto encounter into veryHigh. Use a tailored ladder so each
+// Kanto map has a distinct BST band.
+const GEN2_MAP_BST_RANGES = [
+  { min: 200, max: 310 }, // 0  Falkner
+  { min: 250, max: 360 }, // 1  Bugsy
+  { min: 290, max: 400 }, // 2  Whitney
+  { min: 320, max: 430 }, // 3  Morty
+  { min: 350, max: 460 }, // 4  Chuck
+  { min: 380, max: 490 }, // 5  Jasmine
+  { min: 410, max: 510 }, // 6  Pryce
+  { min: 440, max: 530 }, // 7  Clair
+  { min: 460, max: 999 }, // 8  Lance / Mt Silver
+  { min: 470, max: 999 }, // 9  Brock (Kanto starts)
+  { min: 485, max: 999 }, // 10 Misty
+  { min: 495, max: 999 }, // 11 Lt. Surge
+  { min: 505, max: 999 }, // 12 Erika
+  { min: 515, max: 999 }, // 13 Janine
+  { min: 525, max: 999 }, // 14 Sabrina
+  { min: 535, max: 999 }, // 15 Blaine
+  { min: 545, max: 999 }, // 16 Blue
+  { min: 555, max: 999 }, // 17 Red
+];
+
 const MAP_LEVEL_RANGES = [
   [1, 5], [8, 15], [14, 21], [21, 29],
   [29, 37], [37, 43], [43, 47], [47, 52], [53, 64]
 ];
+
+const GEN2_MAP_LEVEL_RANGES = [
+  [1,   10],  // Map 0 — Falkner
+  [11,  20],  // Map 1 — Bugsy
+  [21,  30],  // Map 2 — Whitney
+  [31,  40],  // Map 3 — Morty
+  [41,  50],  // Map 4 — Chuck
+  [51,  60],  // Map 5 — Jasmine
+  [61,  70],  // Map 6 — Pryce
+  [71,  80],  // Map 7 — Clair
+  [81,  90],  // Map 8 — Elite Four (Will/Koga/Bruno/Karen/Lance) — final
+];
+
+// Gen 2 deterministic level offsets for layers 1..7 (boss layer 8 uses leader data).
+// Curve sits cleanly in mapMin..mapMin+9 with the gym at exactly mapMin+9.
+// Map 1 example: layers = 1,2,3,5,6,8,9 ; gym = 10. Map 2: 11,12,13,15,16,18,19 ; gym = 20.
+const GEN2_LAYER_OFFSETS = [0, 1, 2, 4, 5, 7, 8];
 
 const MAP_NAMES = [
   'Route 1', 'Mt Moon', 'Nugget Bridge', 'Rock Tunnel',
@@ -439,6 +663,29 @@ function getPokemonLocations(speciesId, bst) {
 
 // PokeAPI cache helpers
 const CACHE_KEY_SPECIES = 'pkrl_species_list';
+
+// Bundled static pokedex — populated once at boot from data/pokedex.json.
+// Keyed by numeric id. Avoids per-pokemon PokeAPI fetches for the 649 covered species.
+let _staticPokedex = null;
+let _staticPokedexPromise = null;
+
+function loadStaticPokedex() {
+  if (_staticPokedex) return Promise.resolve(_staticPokedex);
+  if (_staticPokedexPromise) return _staticPokedexPromise;
+  _staticPokedexPromise = fetch('data/pokedex.json')
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { _staticPokedex = d || {}; return _staticPokedex; })
+    .catch(() => { _staticPokedex = {}; return _staticPokedex; });
+  return _staticPokedexPromise;
+}
+
+// Best-effort sync lookup once the bundle is loaded
+function getStaticPokedexEntry(id) {
+  return _staticPokedex ? _staticPokedex[id] : null;
+}
+
+// Kick off the load eagerly so the catch screen can use it without blocking
+if (typeof window !== 'undefined') loadStaticPokedex();
 
 function getCached(key) {
   try {
@@ -492,6 +739,23 @@ function formatFormName(apiName) {
 }
 
 async function fetchPokemonById(idOrSlug) {
+  // Static bundle short-circuit (numeric IDs only — form slugs still go through the network)
+  if (typeof idOrSlug === 'number') {
+    const dex = _staticPokedex || await loadStaticPokedex();
+    const entry = dex[idOrSlug];
+    if (entry) {
+      return {
+        id: idOrSlug,
+        name: entry.name,
+        types: entry.types,
+        baseStats: entry.baseStats,
+        bst: Object.values(entry.baseStats).reduce((a,b)=>a+b,0),
+        base_experience: entry.base_experience,
+        spriteUrl: entry.spriteUrl,
+        shinySpriteUrl: entry.shinySpriteUrl,
+      };
+    }
+  }
   const key = `pkrl_poke_${idOrSlug}`;
   const cached = getCached(key);
   if (cached && cached.baseStats?.special !== undefined && cached.baseStats?.spdef !== undefined) return cached;
@@ -528,6 +792,13 @@ async function fetchPokemonById(idOrSlug) {
 }
 
 async function fetchPokemonSpecies(id) {
+  if (typeof id === 'number') {
+    const dex = _staticPokedex || await loadStaticPokedex();
+    const entry = dex[id];
+    if (entry) {
+      return { id, flavorText: entry.flavorText || '' };
+    }
+  }
   const key = `pkrl_species_${id}`;
   const cached = getCached(key);
   if (cached) return cached;
@@ -621,7 +892,7 @@ const GEN1_BST_APPROX = {
     25,30,33,35,37,39,43,50,58,61,63,66,73,77,83,92,95,96,104,109,
     113,114,116,120,122,126,127,128,138,140,
     // Gen 2
-    166,168,180,188,190,193,222,239,240,
+    164,166,168,180,185,188,190,193,198,206,215,222,234,239,240,246,
     // Gen 3
     267,269,271,274,294,299,302,303,329,345,347,
     // Gen 4
@@ -636,7 +907,7 @@ const GEN1_BST_APPROX = {
     2,5,8,42,49,51,64,67,70,75,82,85,93,97,101,105,107,110,119,
     121,124,125,130,137,
     // Gen 2
-    153,156,159,162,176,184,185,192,195,198,202,206,207,215,219,247,
+    153,156,159,162,176,178,184,185,192,195,198,200,202,203,205,206,207,210,215,219,226,227,247,
     // Gen 3
     253,256,259,262,264,277,279,284,288,301,305,308,311,312,313,314,
     315,320,337,338,351,352,358,364,372,
@@ -650,7 +921,7 @@ const GEN1_BST_APPROX = {
     // Gen 1 (added 26/36 — need lv36, reachable at map 6+; 117 also here for more coverage)
     26,36,40,44,55,62,76,80,87,88,89,90,91,99,106,115,117,123,131,132,137,142,143,
     // Gen 2
-    164,176,178,200,203,205,207,210,211,215,221,224,226,227,234,237,
+    164,171,176,178,181,186,196,197,199,200,203,205,207,210,211,215,217,221,224,226,227,229,232,233,234,237,
     // Gen 3
     272,275,286,291,297,310,317,319,323,324,326,332,335,336,340,342,
     354,356,357,359,362,367,368,369,375,
@@ -713,7 +984,9 @@ const LEGENDARY_POOL_HIGH     = [144, 145, 146]; // Birds ~485-490
 const LEGENDARY_POOL_VERYHIGH = [150,151,243,244,245,249,250,251,377,378,379,380,381,382,383,384,385,386];
 
 async function getRandomLegendary(mapIndex, allowAllGens = false) {
-  const range = MAP_BST_RANGES[Math.min(mapIndex, MAP_BST_RANGES.length - 1)];
+  const isGen2 = typeof state !== 'undefined' && state.gen2Mode;
+  const ranges = isGen2 ? GEN2_MAP_BST_RANGES : MAP_BST_RANGES;
+  const range  = ranges[Math.min(mapIndex, ranges.length - 1)];
   const veryHighPool = allowAllGens ? LEGENDARY_POOL_VERYHIGH : [150, 151];
   let pool;
   if (range.min >= 530) pool = veryHighPool;
@@ -723,28 +996,81 @@ async function getRandomLegendary(mapIndex, allowAllGens = false) {
   return fetchPokemonById(id);
 }
 
+// Gen 1 Pokemon that gained an evolution in Gen 2. Whitelisted in Gen 2 mode so
+// the player can actually reach Espeon / Slowking / Steelix / Blissey / Kingdra
+// / Scizor / Porygon2 / Bellossom / Crobat without time-traveling to a Gen 1 run.
+const GEN1_WITH_GEN2_EVO = new Set([41, 42, 44, 79, 95, 113, 117, 123, 133, 137]);
+
 // Get random pokemon from the right BST bucket for a given mapIndex.
 // maxGenId restricts to IDs <= that number (151 = Gen 1 only, 649 = all gens).
-async function getCatchChoices(mapIndex, count = 3, maxGenId = 151, excludeStarters = false) {
-  const range = MAP_BST_RANGES[Math.min(mapIndex, MAP_BST_RANGES.length - 1)];
-  const pool = await getSpeciesPool();
+// allowLevelledOutOfGen: tower-only opt-in. Rolls from the full all-gens bucket,
+// then swaps any out-of-gen pick that has no persistent buffs for a random in-gen
+// species — so previously-levelled out-of-gen Pokemon appear at their natural
+// pre-gating per-slot rate while unlevelled out-of-gen ones still can't show up.
+async function getCatchChoices(mapIndex, count = 3, maxGenId = 151, excludeStarters = false, minGenId = 1, allowLevelledOutOfGen = false) {
+  const isGen2  = typeof state !== 'undefined' && state.gen2Mode;
+  const ranges  = isGen2 ? GEN2_MAP_BST_RANGES : MAP_BST_RANGES;
+  const range   = ranges[Math.min(mapIndex, ranges.length - 1)];
+  const pool    = await getSpeciesPool();
 
+  // Gen 2 widens the bucket at higher tiers by combining it with the next-lower
+  // tier (deduped). The default Kanto pool was ~36 mostly-overlapping species
+  // — pulling in the band below roughly doubles diversity without dragging
+  // BST through the floor.
+  const widen = (a, b) => isGen2 ? [...new Set([...a, ...b])] : a;
   let bucket;
-  if (range.min >= 530) bucket = GEN1_BST_APPROX.veryHigh;
-  else if (range.min >= 460) bucket = GEN1_BST_APPROX.high;
-  else if (range.min >= 400) bucket = GEN1_BST_APPROX.midHigh;
+  if (range.min >= 530)      bucket = widen(GEN1_BST_APPROX.veryHigh, GEN1_BST_APPROX.high);
+  else if (range.min >= 460) bucket = widen(GEN1_BST_APPROX.high,     GEN1_BST_APPROX.midHigh);
+  else if (range.min >= 400) bucket = widen(GEN1_BST_APPROX.midHigh,  GEN1_BST_APPROX.mid);
   else if (range.min >= 340) bucket = GEN1_BST_APPROX.mid;
   else if (range.min >= 280) bucket = GEN1_BST_APPROX.midLow;
-  else bucket = GEN1_BST_APPROX.low;
+  else                        bucket = GEN1_BST_APPROX.low;
 
-  const starterSet = excludeStarters ? new Set(STARTER_IDS) : new Set();
-  const filtered = bucket.filter(id => !LEGENDARY_IDS.includes(id) && id <= maxGenId && !starterSet.has(id));
-  const shuffled = [...filtered];
+  const starterIds = excludeStarters ? (minGenId >= 152 ? GEN2_STARTER_IDS : STARTER_IDS) : [];
+  const starterSet = new Set(starterIds);
+  const larvitarLine = new Set([246, 247, 248]);
+  // Base eligibility: drops legendaries, starters, and the larvitar back-half gate.
+  // No gen-range check here so the same predicate seeds both the full and in-gen pools.
+  const baseEligible = id => {
+    if (LEGENDARY_IDS.includes(id) || starterSet.has(id)) return false;
+    if (larvitarLine.has(id) && typeof state !== 'undefined' && state.gen2Mode && state.currentMap < 2) return false;
+    return true;
+  };
+  const inGenOk = id => {
+    if (isGen2 && GEN1_WITH_GEN2_EVO.has(id)) return true;
+    return id >= minGenId && id <= maxGenId;
+  };
+
+  const rollPool = bucket.filter(id => baseEligible(id) && (allowLevelledOutOfGen || inGenOk(id)));
+  const shuffled = [...rollPool];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  const ids = shuffled.slice(0, Math.max(9, count * 3));
+  let ids = shuffled.slice(0, Math.max(9, count * 3));
+
+  if (allowLevelledOutOfGen) {
+    // Replacement pass: out-of-gen + unlevelled -> random in-gen pick (no duplicates).
+    const buffs = (typeof loadPersistentBuffs === 'function') ? loadPersistentBuffs() : {};
+    const evoRoot = (typeof getEvoLineRoot === 'function') ? getEvoLineRoot : (id => id);
+    const totalPts = (typeof getTotalBuffPoints === 'function') ? getTotalBuffPoints : (() => 0);
+    const inGenPool = bucket.filter(id => baseEligible(id) && inGenOk(id));
+    const out = [];
+    const used = new Set();
+    for (const id of ids) {
+      if (inGenOk(id) || totalPts(buffs[evoRoot(id)] ?? {}) > 0) {
+        out.push(id);
+        used.add(id);
+        continue;
+      }
+      const candidates = inGenPool.filter(x => !used.has(x));
+      if (candidates.length === 0) continue;
+      const swap = candidates[Math.floor(rng() * candidates.length)];
+      out.push(swap);
+      used.add(swap);
+    }
+    ids = out;
+  }
 
   const results = await Promise.all(ids.map(id => fetchPokemonById(id)));
   return results.filter(Boolean).slice(0, count);
@@ -756,8 +1082,12 @@ function calcHp(baseHp, level) {
 
 function createInstance(species, level, isShiny = false, moveTier = 1) {
   const lvl = level || 5;
-  const maxHp = calcHp(species.baseStats.hp, lvl);
   const id = species.id ?? species.speciesId;
+  const gen2ShinyBoost = isShiny && typeof state !== 'undefined' && state.gen2Mode;
+  const baseStats = gen2ShinyBoost
+    ? Object.fromEntries(Object.entries(species.baseStats).map(([k, v]) => [k, Math.round(v * 1.2)]))
+    : species.baseStats;
+  const maxHp = calcHp(baseStats.hp, lvl);
   const spriteUrl = isShiny
     ? (species.shinySpriteUrl || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`)
     : (species.spriteUrl      || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`);
@@ -770,7 +1100,7 @@ function createInstance(species, level, isShiny = false, moveTier = 1) {
     maxHp,
     isShiny,
     types: species.types,
-    baseStats: species.baseStats,
+    baseStats,
     spriteUrl,
     megaStone: null,
     heldItem: null,
@@ -780,6 +1110,7 @@ function createInstance(species, level, isShiny = false, moveTier = 1) {
 
 // Starters
 const STARTER_IDS = [1, 4, 7];
+const GEN2_STARTER_IDS = [152, 155, 158];
 
 
 // Trainer sprites from Pokemon Showdown CDN
@@ -911,7 +1242,7 @@ const EVOLUTIONS = {
   147:{ into: 148, level: 30, name: 'Dragonair' },
   148:{ into: 149, level: 55, name: 'Dragonite' },
   // Gen 1 -> Gen 2 cross-gen evolutions
-  42: { into: 169, level: 30, name: 'Crobat' },
+  42: { into: 169, level: 50, name: 'Crobat' },
   // Gen 2 starters
   152:{ into: 153, level: 16, name: 'Bayleef' },
   153:{ into: 154, level: 32, name: 'Meganium' },
@@ -1159,8 +1490,15 @@ function resolveEvoForLevel(speciesId, level) {
   let changed = true;
   while (changed) {
     changed = false;
+    // Linear pre-evolution
     for (const [pre, evo] of Object.entries(EVOLUTIONS)) {
       if (evo.into === id && level < evo.level) { id = Number(pre); changed = true; break; }
+    }
+    if (changed) continue;
+    // Branching pre-evolution (e.g. Politoed → Poliwhirl, Bellossom → Gloom)
+    for (const [pre, branches] of Object.entries(BRANCHING_EVOLUTIONS)) {
+      const branch = branches.find(b => b.into === id);
+      if (branch && level < branch.level) { id = Number(pre); changed = true; break; }
     }
   }
   return id;
@@ -1210,6 +1548,10 @@ const BRANCHING_EVOLUTIONS = {
     { into: 414, level: 20, name: 'Mothim',   types: ['Bug', 'Flying'] },
     { into: 413, level: 20, name: 'Wormadam', types: ['Bug', 'Grass']  },
   ],
+  366: [ // Clamperl
+    { into: 367, level: 40, name: 'Huntail',  types: ['Water'] },
+    { into: 368, level: 40, name: 'Gorebyss', types: ['Water'] },
+  ],
 };
 
 // ---- Achievements ----
@@ -1230,7 +1572,7 @@ const ACHIEVEMENTS = [
   { id: 'starter_4', name: 'Fire Champion',   desc: 'Choose Charmander as your starter and beat the game',                  icon: '🔥', category: 'normal' },
   { id: 'starter_7', name: 'Water Champion',  desc: 'Choose Squirtle as your starter and beat the game',                    icon: '🌊', category: 'normal' },
   { id: 'solo_run',    name: 'One is Enough',        desc: 'Beat the game while keeping only 1 Pokémon on your team',       icon: '⭐', category: 'normal' },
-  { id: 'nuzlocke_win',      name: 'True Master',    desc: 'Enable Nuzlocke Mode in Settings, then beat the game — if any Pokémon faints, it\'s gone for good', icon: '☠️', category: 'normal' },
+  { id: 'nuzlocke_win',      name: 'True Master',    desc: 'Beat the game in Nuzlocke Mode — every faint is permanent. No second chances.', icon: '☠️', category: 'normal' },
   { id: 'three_birds',       name: 'Bird Keeper',    desc: 'Beat the game with Articuno, Zapdos, and Moltres all on your team', icon: '🦅', category: 'normal' },
   { id: 'no_pokecenter',     name: 'No Rest for the Wicked', desc: 'Beat the game without stopping at a Pokémon Center',   icon: '🏃', category: 'normal' },
   { id: 'no_items',          name: 'Minimalist',     desc: 'Beat the game without picking up a single item',                icon: '🎒', category: 'normal' },
@@ -1327,10 +1669,11 @@ function incrementEliteWins() {
   return wins;
 }
 
-// Returns an <img> for the item's official sprite, falling back to its emoji if the sprite 404s
+// Returns an <img> for the item's official sprite, falling back to its emoji if the sprite 404s.
+// Items can override the URL with `iconUrl` for sprites not hosted on PokeAPI.
 function itemIconHtml(item, size = 24) {
   const slug = item.id.replace(/_/g, '-');
-  const url = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${slug}.png`;
+  const url = item.iconUrl || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${slug}.png`;
   const esc = item.icon.replace(/'/g, "\\'");
   return `<img src="${url}" alt="${item.name}" title="${item.name}" class="item-sprite-icon" `
        + `style="width:${size}px;height:${size}px;image-rendering:pixelated;vertical-align:middle;" `
@@ -1377,13 +1720,26 @@ function recordUsedStarter(speciesId) {
   }
 }
 
-function saveHallOfFameEntry(team, runNumber, hardMode, endless = false, stageNumber = null, starterSpeciesId = null) {
+// "Last used" timestamp per evolution-line root — for sorting the Battle Tower
+// HoF PC so recently-picked Pokemon surface first.
+function getLastUsedTimes() {
+  try { return JSON.parse(localStorage.getItem('poke_last_used') || '{}'); }
+  catch { return {}; }
+}
+function setLastUsedTime(rootId, when = Date.now()) {
+  const map = getLastUsedTimes();
+  map[rootId] = when;
+  try { localStorage.setItem('poke_last_used', JSON.stringify(map)); } catch {}
+}
+
+function saveHallOfFameEntry(team, runNumber, hardMode, endless = false, stageNumber = null, starterSpeciesId = null, gen2Mode = false) {
   const entries = getHallOfFame();
   entries.push({
     savedAt: Date.now(),
     runNumber,
     hardMode: !!hardMode,
     endless: !!endless,
+    gen2Mode: !!gen2Mode,
     stageNumber: stageNumber ?? null,
     starterSpeciesId: starterSpeciesId ?? null,
     date: new Date().toLocaleDateString(),

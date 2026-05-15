@@ -1,17 +1,52 @@
 const SAVE_SERVER = 'https://save.pokelike.xyz';
+const SAVE_SCHEMA_VERSION = 2;
 
 const SYNC_KEYS = [
   'poke_trainer', 'poke_tutorial_seen', 'poke_settings',
   'poke_achievements', 'poke_dex', 'poke_shiny_dex',
   'poke_elite_wins', 'poke_hall_of_fame', 'poke_last_run_won',
-  'poke_stat_buffs', 'poke_used_starters',
+  'poke_stat_buffs', 'poke_used_starters', 'poke_last_used',
 ];
+
+// Primitive keys use "newest wins" by per-key updatedAt timestamp.
+// Collection keys do union-merge with per-item conflict resolution.
+const PRIMITIVE_KEYS = new Set([
+  'poke_trainer', 'poke_tutorial_seen', 'poke_settings',
+  'poke_last_run_won', 'poke_elite_wins',
+]);
 
 function _getSaveUuid() { return localStorage.getItem('poke_save_uuid'); }
 function _getUsername()  { return localStorage.getItem('poke_username'); }
 
+function _getMeta() {
+  try { return JSON.parse(localStorage.getItem('poke_meta') || '{}'); }
+  catch { return {}; }
+}
+function _setMeta(meta) {
+  try { localStorage.setItem('poke_meta', JSON.stringify(meta)); } catch {}
+}
+function _touchKey(key) {
+  const m = _getMeta();
+  m[key] = Date.now();
+  _setMeta(m);
+}
+
+// Wrap localStorage.setItem to track updates for SYNC_KEYS. This lets the
+// cloud merger pick the newer side for primitive keys without needing every
+// caller to remember to bump a timestamp.
+(function patchSetItem() {
+  if (typeof localStorage === 'undefined') return;
+  if (localStorage.__pokePatched) return;
+  const origSet = localStorage.setItem.bind(localStorage);
+  localStorage.setItem = function(key, val) {
+    origSet(key, val);
+    if (SYNC_KEYS.includes(key)) _touchKey(key);
+  };
+  localStorage.__pokePatched = true;
+})();
+
 function _getLocalSave() {
-  const save = { lastSaved: Date.now() };
+  const save = { lastSaved: Date.now(), v: SAVE_SCHEMA_VERSION, meta: _getMeta() };
   for (const key of SYNC_KEYS) {
     const val = localStorage.getItem(key);
     if (val !== null) save[key] = val;
@@ -20,6 +55,25 @@ function _getLocalSave() {
 }
 
 function _applyCloudSave(save) {
+  const cloudMeta = save.meta || {};
+  const localMeta = _getMeta();
+  const mergeReport = { primitiveSwaps: [], collectionMerges: [], dropped: 0 };
+
+  // For a primitive key, prefer whichever side has the newer updatedAt. If
+  // local has no record at all (older client), take cloud.
+  function takeNewerPrimitive(key) {
+    const localVal = localStorage.getItem(key);
+    const cloudVal = save[key];
+    if (cloudVal === undefined) return;
+    if (localVal === null) { localStorage.setItem(key, cloudVal); mergeReport.primitiveSwaps.push(key); return; }
+    const lt = localMeta[key] ?? 0;
+    const ct = cloudMeta[key] ?? 0;
+    if (ct > lt && cloudVal !== localVal) {
+      localStorage.setItem(key, cloudVal);
+      mergeReport.primitiveSwaps.push(key);
+    }
+  }
+
   for (const key of SYNC_KEYS) {
     if (save[key] === undefined) continue;
 
@@ -27,20 +81,19 @@ function _applyCloudSave(save) {
       const parse = s => { try { return JSON.parse(s || '[]'); } catch { return []; } };
       const local = parse(localStorage.getItem(key));
       const cloud = parse(save[key]);
-      // Pass 1: keep every local entry unconditionally, index by savedAt
-      const merged = [...local];
-      const localSavedAts = new Set(local.map(e => e.savedAt).filter(Boolean).map(String));
-      // Pass 2: append cloud entries that are genuinely absent from local
-      for (const e of cloud) {
-        if (e.savedAt) {
-          if (!localSavedAts.has(String(e.savedAt))) merged.push(e);
-        } else {
-          // Legacy entry (no savedAt): append unless local already has identical runNumber+date+endless
-          const dup = local.some(l => !l.savedAt && l.runNumber === e.runNumber && l.date === e.date && !!l.endless === !!e.endless);
-          if (!dup) merged.push(e);
-        }
+      // Index by stable hash (savedAt OR runNumber+date+endless fallback).
+      const hash = e => e.savedAt ? `t:${e.savedAt}` : `r:${e.runNumber}|${e.date}|${!!e.endless}`;
+      const seen = new Set();
+      const merged = [];
+      for (const e of [...local, ...cloud]) {
+        const h = hash(e);
+        if (seen.has(h)) continue;
+        seen.add(h);
+        merged.push(e);
       }
+      merged.sort((a, b) => (a.savedAt ?? 0) - (b.savedAt ?? 0));
       localStorage.setItem(key, JSON.stringify(merged));
+      mergeReport.collectionMerges.push(key);
       continue;
     }
 
@@ -48,10 +101,20 @@ function _applyCloudSave(save) {
       const parse = s => { try { return JSON.parse(s || '[]'); } catch { return []; } };
       const merged = [...new Set([...parse(localStorage.getItem(key)), ...parse(save[key])])];
       localStorage.setItem(key, JSON.stringify(merged));
+      mergeReport.collectionMerges.push(key);
+      continue;
+    }
+
+    if (key === 'poke_used_starters') {
+      const parse = s => { try { return JSON.parse(s || '[]'); } catch { return []; } };
+      const merged = [...new Set([...parse(localStorage.getItem(key)), ...parse(save[key])])];
+      localStorage.setItem(key, JSON.stringify(merged));
+      mergeReport.collectionMerges.push(key);
       continue;
     }
 
     if (key === 'poke_elite_wins') {
+      // Numeric: max() never loses progress.
       const localVal = parseInt(localStorage.getItem(key) || '0', 10);
       const cloudVal = parseInt(save[key] || '0', 10);
       localStorage.setItem(key, String(Math.max(localVal, cloudVal)));
@@ -62,11 +125,19 @@ function _applyCloudSave(save) {
       const parse = s => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
       const local = parse(localStorage.getItem(key));
       const cloud = parse(save[key]);
-      const merged = { ...cloud, ...local };
+      const merged = { ...local };
+      // Bring in cloud species the local dex doesn't have at all.
       for (const [id, ce] of Object.entries(cloud)) {
-        if (ce.caught && merged[id] && !merged[id].caught) merged[id].caught = true;
+        if (!merged[id]) { merged[id] = ce; continue; }
+        // Caught flag: once caught, always caught.
+        if (ce.caught) merged[id].caught = true;
+        // Preserve richer fields (name/types/sprite) if local lacks them.
+        if (!merged[id].name && ce.name) merged[id].name = ce.name;
+        if (!merged[id].types && ce.types) merged[id].types = ce.types;
+        if (!merged[id].spriteUrl && ce.spriteUrl) merged[id].spriteUrl = ce.spriteUrl;
       }
       localStorage.setItem(key, JSON.stringify(merged));
+      mergeReport.collectionMerges.push(key);
       continue;
     }
 
@@ -74,7 +145,12 @@ function _applyCloudSave(save) {
       const parse = s => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
       const local = parse(localStorage.getItem(key));
       const cloud = parse(save[key]);
-      localStorage.setItem(key, JSON.stringify({ ...cloud, ...local }));
+      const merged = { ...local };
+      for (const [id, ce] of Object.entries(cloud)) {
+        if (!merged[id]) merged[id] = ce;
+      }
+      localStorage.setItem(key, JSON.stringify(merged));
+      mergeReport.collectionMerges.push(key);
       continue;
     }
 
@@ -83,6 +159,8 @@ function _applyCloudSave(save) {
       const local = parse(localStorage.getItem(key));
       const cloud = parse(save[key]);
       const merged = { ...local };
+      // Bring in cloud species the local store doesn't have, and max-merge
+      // the ones it does. Loss-free: a stat earned anywhere wins.
       for (const [specId, cBufs] of Object.entries(cloud)) {
         if (!merged[specId]) { merged[specId] = cBufs; continue; }
         for (const stat of ['hp', 'atk', 'def', 'special', 'spdef', 'speed']) {
@@ -90,28 +168,43 @@ function _applyCloudSave(save) {
         }
       }
       localStorage.setItem(key, JSON.stringify(merged));
+      mergeReport.collectionMerges.push(key);
       continue;
     }
 
-    if (key === 'poke_tutorial_seen') {
-      if (localStorage.getItem(key) !== 'true') localStorage.setItem(key, save[key]);
+    if (key === 'poke_last_used') {
+      // Per-evo-line timestamp. Newest wins per line.
+      const parse = s => { try { return JSON.parse(s || '{}'); } catch { return {}; } };
+      const local = parse(localStorage.getItem(key));
+      const cloud = parse(save[key]);
+      const merged = { ...local };
+      for (const [id, t] of Object.entries(cloud)) {
+        merged[id] = Math.max(merged[id] ?? 0, Number(t) || 0);
+      }
+      localStorage.setItem(key, JSON.stringify(merged));
+      mergeReport.collectionMerges.push(key);
       continue;
     }
 
-    if (key === 'poke_settings') {
-      if (!localStorage.getItem(key)) localStorage.setItem(key, save[key]);
-      continue;
-    }
-
-    if (key === 'poke_last_run_won') {
-      if (!localStorage.getItem(key)) localStorage.setItem(key, save[key]);
+    if (PRIMITIVE_KEYS.has(key)) {
+      takeNewerPrimitive(key);
       continue;
     }
 
     localStorage.setItem(key, save[key]);
   }
+
+  // Persist merged meta as max(local, cloud) per key so subsequent compares
+  // use the latest known timestamp.
+  const newMeta = { ...localMeta };
+  for (const [k, t] of Object.entries(cloudMeta)) {
+    newMeta[k] = Math.max(newMeta[k] ?? 0, Number(t) || 0);
+  }
+  _setMeta(newMeta);
+
   localStorage.setItem('poke_last_cloud_sync', String(save.lastSaved));
   if (typeof applyDarkMode === 'function') applyDarkMode();
+  if (typeof window !== 'undefined') window._lastCloudMergeReport = mergeReport;
 }
 
 async function syncToCloud() {

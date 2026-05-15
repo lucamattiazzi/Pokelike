@@ -22,7 +22,7 @@ const TRAIT_DESCRIPTIONS = {
   Fairy:   ['Enemy: -1 ATK & Sp.ATK at fight start',     'Enemy: -2 ATK & Sp.ATK at fight start',     'Enemy: -3 ATK & Sp.ATK at fight start'],
   Fighting:['When a pokemon faints, survivors get +1 ATK & Sp.ATK', 'When a pokemon faints, survivors get +2 ATK & Sp.ATK', 'When a pokemon faints, survivors get +3 ATK & Sp.ATK'],
   Fire:    ['+1 ATK & Sp.ATK stages at fight start',     '+2 ATK & Sp.ATK stages at fight start',     '+3 ATK & Sp.ATK stages at fight start'],
-  Flying:  ['15% chance to dodge incoming attacks',       '30% chance to dodge incoming attacks',       '50% chance to dodge incoming attacks'],
+  Flying:  ['10% chance to dodge incoming attacks',       '15% chance to dodge incoming attacks',       '20% chance to dodge incoming attacks'],
   Ghost:   ['Execute enemies below 15% HP',               'Execute enemies below 30% HP',               'Execute enemies below 50% HP'],
   Grass:   ['Heal 5% of damage dealt',                    'Heal 10% of damage dealt',                   'Heal 15% of damage dealt'],
   Ground:  ['+2 DEF stages at fight start',               '+4 DEF stages at fight start',               '+6 DEF stages at fight start'],
@@ -273,6 +273,9 @@ function buildFixedRegion(stageNum, regionNum, fixedTrainers) {
     const isBigBoss = i === 2;
     const [, maxL] = getEndlessLevelRange(stageNum, regionNum, i);
     const levelOffsets = spec.ids.map((_, j) => j + (spec.levelBonus ?? 0) + ((spec.extraLevels && spec.extraLevels[j]) || 0));
+    // Display the actual highest team level (ace), not just the floor's max —
+    // levelBonus / extraLevels are applied per slot in battle.
+    const displayLevel = maxL + Math.max(0, ...levelOffsets);
     // For the region panel tooltip, resolve form slugs to their numeric sprite IDs
     const displayIds = spec.ids.map(id =>
       typeof id === 'string' ? (POKEMON_FORM_SPRITE_IDS[id] ?? POKEMON_FORM_SLUGS[id] ?? id) : id
@@ -280,6 +283,7 @@ function buildFixedRegion(stageNum, regionNum, fixedTrainers) {
     return {
       archetype: { id: `fixed_${stageNum}_${regionNum}_${i}`, name: spec.name, type: spec.type, sprite: spec.sprite },
       level: maxL,
+      displayLevel,
       moveTier: isBigBoss ? moveTier + 1 : moveTier,
       teamSize: spec.ids.length,
       speciesIds: displayIds,  // numeric IDs for tooltip sprites
@@ -592,7 +596,7 @@ function buildTraitsConfig(playerTiers, enemyTiers = {}) {
       // Rock: 33/66/100% chance of +1/+2/+3 DEF and Sp.DEF to attacker after each attack
       if (activeFor('Rock', aSide) && attacker.currentHp > 0) {
         const rockTier = tierFor('Rock', aSide);
-        if (Math.random() < sp(rockTier / 3)) {
+        if (rng() < sp(rockTier / 3)) {
           const boost = sc(rockTier);
           triggers.push({ type: 'trait_trigger', traitType: 'Rock', side: aSide, idx: aIdx,
             name: attacker.nickname || attacker.name, description: `Rock Trait: +${boost} DEF, +${boost} Sp.DEF!` });
@@ -604,7 +608,7 @@ function buildTraitsConfig(playerTiers, enemyTiers = {}) {
       // Water: 33/66/100% chance to apply -tier Speed, ATK, Sp.ATK to target
       if (activeFor('Water', aSide) && tSide !== aSide && target.currentHp > 0) {
         const tier = tierFor('Water', aSide);
-        if (Math.random() < sp(tier / 3)) {
+        if (rng() < sp(tier / 3)) {
           const boost = sc(tier);
           triggers.push({ type: 'trait_trigger', traitType: 'Water', side: aSide, idx: aIdx,
             name: attacker.nickname || attacker.name, description: `Water Trait T${tier}: debuffed enemy!` });
@@ -696,16 +700,19 @@ function buildTraitsConfig(playerTiers, enemyTiers = {}) {
     },
 
     whenAttacked(defender, dIdx, dSide, attacker, aIdx, aSide, damage, log) {
-      // Flying: chance to dodge (retroactively heal back)
-      if (activeFor('Flying', dSide) && defender.currentHp > 0) {
+      // Flying: chance to retroactively dodge — heals back the damage taken
+      // (capped at maxHp). Fires even on a KO from full HP, and even if the
+      // defender is already at full HP (the log+animation still play).
+      if (activeFor('Flying', dSide)) {
         const tier = tierFor('Flying', dSide);
-        const chance = sp([0, 0.15, 0.30, 0.50][tier]);
+        const chance = sp([0, 0.10, 0.15, 0.20][tier]);
         if (rng() < chance) {
-          const recovered = Math.min(damage, defender.maxHp - defender.currentHp);
+          const hpBefore = defender.currentHp;
+          defender.currentHp = Math.min(defender.maxHp, defender.currentHp + damage);
+          const recovered = defender.currentHp - hpBefore;
+          log.push({ type: 'trait_trigger', traitType: 'Flying', side: dSide, idx: dIdx,
+            name: defender.nickname || defender.name, description: `Flying Trait T${tier}: Dodged!` });
           if (recovered > 0) {
-            defender.currentHp = Math.min(defender.maxHp, defender.currentHp + recovered);
-            log.push({ type: 'trait_trigger', traitType: 'Flying', side: dSide, idx: dIdx,
-              name: defender.nickname || defender.name, description: `Flying Trait T${tier}: Dodged!` });
             log.push({ type: 'effect', side: dSide, idx: dIdx, name: defender.nickname || defender.name,
               hpChange: recovered, hpAfter: defender.currentHp, reason: `Flying Trait: dodged! +${recovered} HP` });
           }
