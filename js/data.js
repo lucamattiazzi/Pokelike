@@ -1003,7 +1003,11 @@ const GEN1_WITH_GEN2_EVO = new Set([41, 42, 44, 79, 95, 113, 117, 123, 133, 137]
 
 // Get random pokemon from the right BST bucket for a given mapIndex.
 // maxGenId restricts to IDs <= that number (151 = Gen 1 only, 649 = all gens).
-async function getCatchChoices(mapIndex, count = 3, maxGenId = 151, excludeStarters = false, minGenId = 1) {
+// allowLevelledOutOfGen: tower-only opt-in. Rolls from the full all-gens bucket,
+// then swaps any out-of-gen pick that has no persistent buffs for a random in-gen
+// species — so previously-levelled out-of-gen Pokemon appear at their natural
+// pre-gating per-slot rate while unlevelled out-of-gen ones still can't show up.
+async function getCatchChoices(mapIndex, count = 3, maxGenId = 151, excludeStarters = false, minGenId = 1, allowLevelledOutOfGen = false) {
   const isGen2  = typeof state !== 'undefined' && state.gen2Mode;
   const ranges  = isGen2 ? GEN2_MAP_BST_RANGES : MAP_BST_RANGES;
   const range   = ranges[Math.min(mapIndex, ranges.length - 1)];
@@ -1025,22 +1029,48 @@ async function getCatchChoices(mapIndex, count = 3, maxGenId = 151, excludeStart
   const starterIds = excludeStarters ? (minGenId >= 152 ? GEN2_STARTER_IDS : STARTER_IDS) : [];
   const starterSet = new Set(starterIds);
   const larvitarLine = new Set([246, 247, 248]);
-  const filtered = bucket.filter(id => {
+  // Base eligibility: drops legendaries, starters, and the larvitar back-half gate.
+  // No gen-range check here so the same predicate seeds both the full and in-gen pools.
+  const baseEligible = id => {
     if (LEGENDARY_IDS.includes(id) || starterSet.has(id)) return false;
-    // Larvitar line: gate to the back half of the run (Pryce onward) so Tyranitar isn't trivial.
     if (larvitarLine.has(id) && typeof state !== 'undefined' && state.gen2Mode && state.currentMap < 2) return false;
-    // Gen 1 Pokemon with Gen 2 evos bypass the strict gen range in Gen 2 mode,
-    // so players can still reach Eevee / Slowking / Steelix / Blissey / Kingdra etc.
-    if (isGen2 && GEN1_WITH_GEN2_EVO.has(id)) return true;
-    if (id < minGenId || id > maxGenId) return false;
     return true;
-  });
-  const shuffled = [...filtered];
+  };
+  const inGenOk = id => {
+    if (isGen2 && GEN1_WITH_GEN2_EVO.has(id)) return true;
+    return id >= minGenId && id <= maxGenId;
+  };
+
+  const rollPool = bucket.filter(id => baseEligible(id) && (allowLevelledOutOfGen || inGenOk(id)));
+  const shuffled = [...rollPool];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  const ids = shuffled.slice(0, Math.max(9, count * 3));
+  let ids = shuffled.slice(0, Math.max(9, count * 3));
+
+  if (allowLevelledOutOfGen) {
+    // Replacement pass: out-of-gen + unlevelled -> random in-gen pick (no duplicates).
+    const buffs = (typeof loadPersistentBuffs === 'function') ? loadPersistentBuffs() : {};
+    const evoRoot = (typeof getEvoLineRoot === 'function') ? getEvoLineRoot : (id => id);
+    const totalPts = (typeof getTotalBuffPoints === 'function') ? getTotalBuffPoints : (() => 0);
+    const inGenPool = bucket.filter(id => baseEligible(id) && inGenOk(id));
+    const out = [];
+    const used = new Set();
+    for (const id of ids) {
+      if (inGenOk(id) || totalPts(buffs[evoRoot(id)] ?? {}) > 0) {
+        out.push(id);
+        used.add(id);
+        continue;
+      }
+      const candidates = inGenPool.filter(x => !used.has(x));
+      if (candidates.length === 0) continue;
+      const swap = candidates[Math.floor(rng() * candidates.length)];
+      out.push(swap);
+      used.add(swap);
+    }
+    ids = out;
+  }
 
   const results = await Promise.all(ids.map(id => fetchPokemonById(id)));
   return results.filter(Boolean).slice(0, count);

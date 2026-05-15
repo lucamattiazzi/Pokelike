@@ -1070,7 +1070,7 @@ async function doCatchNode(node) {
   } else {
     choicesEl.innerHTML = '<div class="loading">Finding Pokemon...</div>';
 
-    let choices = await getCatchChoices(getEncounterMapIndex(), 18, getCatchGenRange().maxGenId, !state.isEndlessMode, getCatchGenRange().minGenId);
+    let choices = await getCatchChoices(getEncounterMapIndex(), 18, getCatchGenRange().maxGenId, !state.isEndlessMode, getCatchGenRange().minGenId, state.isEndlessMode);
     const isFirstMap = state.currentMap === 0 || (state.isEndlessMode && endlessState.regionNumber === 1 && endlessState.mapIndexInRegion === 0);
     level = isFirstMap ? Math.max(4, getLevelForNode(node)) : getLevelForNode(node);
     const lvlFiltered = choices.filter(sp => minLevelForSpecies(sp.id ?? sp.speciesId) <= level);
@@ -1123,7 +1123,7 @@ async function doCatchNode(node) {
           const lowerIdx = Math.max(0, getEncounterMapIndex() - 1);
           if (lowerIdx < getEncounterMapIndex()) {
             const maxGen = getEndlessMaxGenId(endlessState.stageNumber);
-            const lowerPool = await getCatchChoices(lowerIdx, 18, maxGen);
+            const lowerPool = await getCatchChoices(lowerIdx, 18, maxGen, false, 1, state.isEndlessMode);
             const choiceRoots = new Set(choices.map(sp => getEvoLineRoot(sp.id ?? sp.speciesId)));
             const extras = lowerPool.filter(sp =>
               !teamRoots.has(getEvoLineRoot(sp.id ?? sp.speciesId)) &&
@@ -1181,7 +1181,7 @@ async function doCatchNode(node) {
         ]);
         let src = rerollPool.filter(sp => !otherRoots.has(getEvoLineRoot(sp.id ?? sp.speciesId)));
         if (src.length === 0) {
-          const fresh = await getCatchChoices(getEncounterMapIndex(), 6, getCatchGenRange().maxGenId, !state.isEndlessMode, getCatchGenRange().minGenId);
+          const fresh = await getCatchChoices(getEncounterMapIndex(), 6, getCatchGenRange().maxGenId, !state.isEndlessMode, getCatchGenRange().minGenId, state.isEndlessMode);
           const otherRootsPost = new Set([
             ...instances.filter((_, i) => i !== slotIdx).map(i => getEvoLineRoot(i.speciesId)),
             ...state.team.map(p => getEvoLineRoot(p.speciesId)),
