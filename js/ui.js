@@ -3802,6 +3802,58 @@ function openDexDetailModal(speciesId, name, spriteUrl, shinySpriteUrl, types) {
 
 const PATCH_NOTES = [
   {
+    version: '1.5',
+    title: 'Gen 2: Johto Mode',
+    date: '2026-05-15',
+    sections: [
+      {
+        heading: 'New Mode — Gen 2 (Johto)',
+        entries: [
+          'Title screen now has a Gen I / Gen II toggle — pick your region before starting a run. The choice persists across reloads.',
+          '9-map Johto run with Falkner, Bugsy, Whitney, Morty, Chuck, Jasmine, Pryce and Clair as gym leaders, the Johto Elite Four (Will / Koga / Bruno / Karen / Lance), and Red as the final boss in Kanto',
+          'Silver rival: 7 canonical encounters across Johto and Kanto. He always picks the starter that counters yours and rewards Double XP',
+          'HGSS-accurate gym teams, levels, and trainer rosters throughout',
+          'Per-Pokémon XP and level — each team member has its own XP curve. The lead earns the full share, others get a reduced cut. XP bar shown under the HP bar with smooth animation and level-up effects',
+          'Per-route map backgrounds (routes 1–9) plus new trainer sprites and themed encounter pools (Firebreather, Bird Keeper, Super Nerd, Bug Catcher, Hiker, Fisherman, Biker, Old Man, and more)',
+          'Larvitar line gated behind map 3 in Gen 2 mode',
+        ],
+      },
+      {
+        heading: 'New Items',
+        entries: [
+          'Loaded Dice (Gen 2 only) — at the start of each battle, 37% chance for +2 to ATK / DEF / Sp.Atk / Sp.Def / Speed, otherwise −1 (one battle). The roll is announced in the battle log.',
+          'Adrenaline Orb — when YOU land a super-effective hit (×2+), +1 ATK / +1 Sp.Atk for the rest of the battle',
+          'Red Card — take 50% less damage from super-effective hits',
+          'Quick Claw — chance to strike first regardless of Speed',
+          'Lagging Tail — always moves last, +100% move damage',
+          'King\'s Rock, Steel / Dark / Fairy type-boost items, TM, and Escape Rope',
+        ],
+      },
+      {
+        heading: 'Changes',
+        entries: [
+          'Player level is now capped at 100 in all modes except Battle Tower',
+          'Reset run no longer shows a confirmation popup — restarts immediately',
+          'Battle Tower encounters are now anchored to the gen they came from',
+          'Stat-buff math correctly handles negative stages (matters for Loaded Dice and similar items)',
+          'Gen 2 trainer class names updated to canon (Burglar → Firebreather, Bird Catcher → Bird Keeper, Super Nerd uses the proper Showdown sprite)',
+          'Static Pokédex bundled with the client — catch screens no longer need a PokeAPI round-trip',
+        ],
+      },
+      {
+        heading: 'Bug Fixes',
+        entries: [
+          '22-bug issue sweep across battle, map, and UI',
+          'XP bar no longer renders as 0% when the share is < 1% of next level',
+          'XP bar no longer goes dark after evolution',
+          'Reverse-evolution through branching chains (Eevee, Tyrogue, Burmy, etc.) now resolves the correct prevo for level checks',
+          'Gen 2 Elite Four levels rebalanced and Lance now fields three Dragonites as in canon',
+          'Tyrogue evolution table no longer has a redundant entry',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.4.5',
     title: 'Bug Fix Patch',
     date: '2026-05-03',
