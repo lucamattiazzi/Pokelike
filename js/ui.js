@@ -3810,7 +3810,7 @@ const PATCH_NOTES = [
         heading: 'Changes',
         entries: [
           'Battle Tower: Pokémon you\'ve previously levelled can now appear in catch nodes regardless of the stage\'s generation cap, at the same per-slot rate they had in v1.4.5 (before gen anchoring)',
-          'R key now resets the current run from any screen (Ctrl+R / Cmd+R still reloads the page)',
+          'R key now resets the current run from any screen',
           'Resetting by accident is recoverable — refresh the page and the run you reset is restored',
         ],
       },
@@ -3825,11 +3825,10 @@ const PATCH_NOTES = [
         heading: 'New Mode — Gen 2 (Johto)',
         entries: [
           'Title screen now has a Gen I / Gen II toggle — pick your region before starting a run. The choice persists across reloads.',
-          '9-map Johto run with Falkner, Bugsy, Whitney, Morty, Chuck, Jasmine, Pryce and Clair as gym leaders, the Johto Elite Four (Will / Koga / Bruno / Karen / Lance), and Red as the final boss in Kanto',
-          'Silver rival: 7 canonical encounters across Johto and Kanto. He always picks the starter that counters yours and rewards Double XP',
-          'HGSS-accurate gym teams, levels, and trainer rosters throughout',
+          '9-map Johto run with Falkner, Bugsy, Whitney, Morty, Chuck, Jasmine, Pryce and Clair as gym leaders, and the Johto Elite Four (Will / Koga / Bruno / Karen / Lance)',
+          'Silver rival: 4 canonical encounters during the run. He always picks the starter that counters yours and rewards Double XP',
+          'HGSS-accurate gym teams and trainer rosters throughout',
           'Per-route map backgrounds (routes 1–9) plus new trainer sprites and themed encounter pools (Firebreather, Bird Keeper, Super Nerd, Bug Catcher, Hiker, Fisherman, Biker, Old Man, and more)',
-          'Larvitar line gated behind map 3 in Gen 2 mode',
         ],
       },
       {
