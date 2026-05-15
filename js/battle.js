@@ -10,6 +10,18 @@ function stageMultiplier(n) {
 function initBattleState(p) {
   p.stages = { atk: 0, def: 0, speed: 0, special: 0, spdef: 0 };
   p.status = null; // null | 'poison' | 'freeze'
+  // Loaded Dice: roll once at battle start and write directly into statBuffs
+  // (same field Battle Tower uses). statBuffs is cloned so we never mutate the
+  // persistent buffs stored on the source Pokemon. HP is intentionally skipped
+  // — HP buffing isn't a Gen 2 mechanic.
+  if (p.heldItem?.id === 'loaded_dice') {
+    const roll = rng() < 0.37 ? 2 : -1;
+    p._loadedDiceRoll = roll; // surfaced once in the battle log, then ignored
+    p.statBuffs = { ...(p.statBuffs || {}) };
+    for (const k of ['atk', 'def', 'speed', 'special', 'spdef']) {
+      p.statBuffs[k] = (p.statBuffs[k] ?? 0) + roll;
+    }
+  }
   return p;
 }
 
@@ -53,28 +65,19 @@ function calcDamage(attacker, defender, move, items, defItems = []) {
 
   if (hasItem(items, 'life_orb'))    damage = Math.floor(damage * 1.3);
   if (hasItem(items, 'wide_lens'))   damage = Math.floor(damage * 1.2);
+  if (hasItem(items, 'metronome'))   damage = Math.floor(damage * 1.20);
 
   // Physical/special split items
   if (isSpecial) {
-    if (hasItem(items, 'choice_specs'))  damage = Math.floor(damage * 1.4);
+    if (hasItem(items, 'choice_specs')) damage = Math.floor(damage * 1.3);
   } else {
-    if (hasItem(items, 'choice_band'))   damage = Math.floor(damage * 1.4);
+    if (hasItem(items, 'choice_band')) damage = Math.floor(damage * 1.4);
   }
 
-  // Adaptability Band: +50% if every Pokémon on the team shares a type
-  if (hasItem(items, 'metronome')) {
-    const team = typeof state !== 'undefined' ? state.team : [];
-    if (team.length > 0) {
-      const sharedType = (attacker.types || []).find(t => {
-        const count = team.filter(p => (p.types || []).some(pt => pt.toLowerCase() === t.toLowerCase())).length;
-        return count >= 4;
-      });
-      if (sharedType) damage = Math.floor(damage * 1.5);
-    }
-  }
-
-  if (hasItem(items, 'expert_belt') && typeEff >= 2) damage = Math.floor(damage * 1.3);
-  if (hasItem(defItems, 'air_balloon') && moveType.toLowerCase() === 'ground') damage = 0;
+  if (hasItem(items, 'lagging_tail')) damage = Math.floor(damage * 2.0);
+  if (hasItem(items, 'expert_belt') && typeEff >= 2) damage = Math.floor(damage * 2.0);
+  // Red Card: defender takes half damage from super-effective hits
+  if (hasItem(defItems, 'red_card') && typeEff >= 2) damage = Math.floor(damage * 0.5);
 
   // Crit chance: 6.25% base, +20% with scope_lens or razor_claw
   let critChance = 0.0625;
@@ -95,30 +98,15 @@ function getEffectiveStat(pokemon, stat, items, stages = null) {
     : (pokemon.baseStats?.[stat] ?? 50);
   const buffCount = pokemon.statBuffs?.[stat] ?? 0;
   let val = Math.floor((rawStat || 50) * pokemon.level / 50) + 5;
-  if (buffCount > 0) val = Math.floor(val * (1 + 0.1 * buffCount));
+  if (buffCount !== 0) val = Math.max(1, Math.floor(val * Math.max(0.1, 1 + 0.1 * buffCount)));
 
-  const team = typeof state !== 'undefined' ? state.team : [];
-  const physicalCount = team.filter(p => (p.baseStats?.atk || 0) > (p.baseStats?.special || 0)).length;
-  const specialCount  = team.filter(p => (p.baseStats?.special || 0) >= (p.baseStats?.atk || 0)).length;
-  const allPhysical = team.length > 0 && physicalCount >= 4;
-  const allSpecial  = team.length > 0 && specialCount  >= 4;
-
-  if (stat === 'atk') {
-    if (hasItem(items, 'muscle_band') && allPhysical) val = Math.floor(val * 1.5);
-  }
   if (stat === 'def') {
     if (hasItem(items, 'eviolite') && canEvolve(pokemon.speciesId)) val = Math.floor(val * 1.5);
-    if (hasItem(items, 'muscle_band') && allPhysical) val = Math.floor(val * 1.5);
     if (hasItem(items, 'choice_band'))                   val = Math.floor(val * 0.8);
-  }
-  if (stat === 'special') {
-    if (hasItem(items, 'wise_glasses') && allSpecial)    val = Math.floor(val * 1.5);
   }
   if (stat === 'spdef') {
     if (hasItem(items, 'eviolite') && canEvolve(pokemon.speciesId)) val = Math.floor(val * 1.5);
     if (hasItem(items, 'assault_vest'))                  val = Math.floor(val * 1.5);
-    if (hasItem(items, 'wise_glasses') && allSpecial)    val = Math.floor(val * 1.5);
-    if (hasItem(items, 'choice_specs'))                  val = Math.floor(val * 0.8);
   }
   if (stat === 'speed') {
     if (hasItem(items, 'choice_scarf')) val = Math.floor(val * 1.5);
@@ -164,6 +152,19 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
   if (firstP.currentHp > 0) playerParticipants.add(0);
   detailedLog.push({ type: 'send_out', side: 'player', idx: 0, name: firstP.nickname || firstP.name });
   detailedLog.push({ type: 'send_out', side: 'enemy',  idx: 0, name: firstE.name });
+
+  // Loaded Dice: announce the roll outcome for any holder on either side.
+  for (const [team, side] of [[pTeam, 'player'], [eTeam, 'enemy']]) {
+    for (let i = 0; i < team.length; i++) {
+      const dice = team[i]._loadedDiceRoll;
+      if (dice === undefined) continue;
+      const name = team[i].nickname || team[i].name;
+      const msg = dice > 0
+        ? `🎲 ${name}'s Loaded Dice rolled high — +${dice} to all stats!`
+        : `🎲 ${name}'s Loaded Dice rolled low — ${dice} to all stats!`;
+      addLog(msg, side === 'player' ? 'log-player' : 'log-enemy');
+    }
+  }
 
   // Start-of-fight trait hooks (Fire, Ground, Normal)
   if (traitsConfig?.onStartFight) {
@@ -213,11 +214,23 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
     const eSpeed = getEffectiveStat(eActive, 'speed', eActiveItems, eActive.stages);
 
     // If both active Pokemon can only use noDamage moves, force Struggle to break the stalemate
-    const pMove = getBestMove(pActive.types || ['Normal'], pActive.baseStats, pActive.speciesId, pActive.moveTier ?? 1);
-    const eMove = getBestMove(eActive.types || ['Normal'], eActive.baseStats, eActive.speciesId, eActive.moveTier ?? 1);
+    const pMove = getBestMove(pActive.types || ['Normal'], pActive.baseStats, pActive.speciesId, pActive.moveTier ?? 1, pActive.heldItem);
+    const eMove = getBestMove(eActive.types || ['Normal'], eActive.baseStats, eActive.speciesId, eActive.moveTier ?? 1, eActive.heldItem);
     const bothUseless = pMove.noDamage && eMove.noDamage;
 
-    const playerFirst = pSpeed >= eSpeed;
+    // Quick Claw: 50% chance to attack first regardless of speed. If both
+    // sides roll, fall back to normal speed comparison.
+    const pQuick = pActive.heldItem?.id === 'quick_claw' && rng() < 0.5;
+    const eQuick = eActive.heldItem?.id === 'quick_claw' && rng() < 0.5;
+    // Lagging Tail: holder always moves last. If both sides have it, it cancels.
+    const pLagging = pActive.heldItem?.id === 'lagging_tail';
+    const eLagging = eActive.heldItem?.id === 'lagging_tail';
+    let playerFirst;
+    if (pLagging && !eLagging)      playerFirst = false;
+    else if (eLagging && !pLagging) playerFirst = true;
+    else if (pQuick && !eQuick)     playerFirst = true;
+    else if (eQuick && !pQuick)     playerFirst = false;
+    else                             playerFirst = pSpeed >= eSpeed;
     const turns = playerFirst
       ? [{ attacker: pActive, aIdx: pIdx, side: 'player', target: eActive, tIdx: eIdx, tSide: 'enemy' },
          { attacker: eActive, aIdx: eIdx, side: 'enemy',  target: pActive, tIdx: pIdx, tSide: 'player' }]
@@ -226,6 +239,16 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
 
     for (const { attacker, aIdx, side, target, tIdx, tSide } of turns) {
       if (attacker.currentHp <= 0 || target.currentHp <= 0) continue;
+
+      // King's Rock flinch: skip attacker's turn if it was flinched this round
+      if (attacker.flinch) {
+        addLog(`${attacker.nickname || attacker.name} flinched!`, side === 'player' ? 'log-player' : 'log-enemy');
+        detailedLog.push({ type: 'status_tick', side, idx: aIdx,
+          name: attacker.nickname || attacker.name, status: 'flinch',
+          hpChange: 0, hpAfter: attacker.currentHp });
+        attacker.flinch = false;
+        continue;
+      }
 
       // Frozen pokemon skip their attack turn
       if (attacker.status === 'freeze') {
@@ -254,7 +277,7 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
         }
       }
 
-      let move = getBestMove(attacker.types || ['Normal'], attacker.baseStats, attacker.speciesId, attacker.moveTier ?? 1);
+      let move = getBestMove(attacker.types || ['Normal'], attacker.baseStats, attacker.speciesId, attacker.moveTier ?? 1, attacker.heldItem);
       // If both sides are stuck with useless moves, force Struggle on both
       if (bothUseless) {
         move = { name: 'Struggle', power: 50, type: 'Normal', isSpecial: false, typeless: true };
@@ -287,13 +310,22 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
       const targetPreHp = target.currentHp;
       target.currentHp = Math.max(0, target.currentHp - damage);
 
-      // Focus Band: 20% chance to survive a KO at 1 HP
-      if (target.currentHp === 0 && targetPreHp > 0 && tSide === 'player' && target.heldItem?.id === 'focus_band' && rng() < 0.2) {
-        target.currentHp = 1;
-      }
       // Focus Sash: guaranteed survive from full HP
       if (target.currentHp === 0 && targetPreHp === target.maxHp && tSide === 'player' && target.heldItem?.id === 'focus_sash') {
         target.currentHp = 1;
+      }
+
+      // King's Rock: 30% chance to flinch the target on a hit (only if target is still alive)
+      if (target.currentHp > 0 && hasItem(attackerItems, 'kings_rock') && rng() < 0.3) {
+        target.flinch = true;
+      }
+
+      // Adrenaline Orb: when the holder lands a super-effective hit, gain +1
+      // ATK / +1 Sp.Atk battle stages (resets after the fight, like Battle
+      // Tower trait buffs). Stacks with subsequent SE hits up to the +10 cap.
+      if (typeEff >= 2 && attacker.heldItem?.id === 'adrenaline_orb') {
+        applyStageChange(attacker, 'atk',     1, side, aIdx, detailedLog);
+        applyStageChange(attacker, 'special', 1, side, aIdx, detailedLog);
       }
 
       const aName = attacker.nickname || attacker.name;
@@ -315,8 +347,9 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
         attackerHpAfter: attacker.currentHp, targetHpAfter: target.currentHp,
       });
 
-      // whenAttacked hook — events pushed here appear after the attack event in the log
-      if (target.currentHp > 0 && traitsConfig?.whenAttacked) {
+      // whenAttacked hook — events pushed here appear after the attack event in the log.
+      // Called even on a KO so traits like Flying can retroactively revive/heal.
+      if (traitsConfig?.whenAttacked) {
         traitsConfig.whenAttacked(target, tIdx, tSide, attacker, aIdx, side, damage, detailedLog);
       }
 
@@ -448,7 +481,7 @@ function getLevelGain(team, bagItems) {
 // Applies level gains and returns an array of level-up events for animation.
 // Each entry: { idx, pokemon, oldLevel, newLevel, preHp }
 // baseGainOverride: if set, uses this as the base gain (e.g. 1 for wild battles)
-function applyLevelGain(team, bagItems, participantIdxs, maxEnemyLevel = 0, hardMode = false, baseGainOverride = null) {
+function applyLevelGain(team, bagItems, participantIdxs, maxEnemyLevel = 0, hardMode = false, baseGainOverride = null, levelCap = Infinity) {
   const isWild = baseGainOverride !== null;
   const baseGain = isWild ? baseGainOverride : (hardMode ? 1 : getLevelGain(team, bagItems));
   const levelUps = [];
@@ -461,7 +494,7 @@ function applyLevelGain(team, bagItems, participantIdxs, maxEnemyLevel = 0, hard
     const luckyBonus = p.heldItem?.id === 'lucky_egg' && rng() < 0.30 ? 1 : 0;
     const gain = baseGain + luckyBonus;
     const oldLevel = p.level;
-    const newLevel = oldLevel + gain;
+    const newLevel = Math.min(oldLevel + gain, levelCap);
     if (newLevel === oldLevel) continue; // already at cap
 
     const preHp = p.currentHp;

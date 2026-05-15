@@ -23,6 +23,8 @@ let state = {
   starterSpeciesId: null,
   maxTeamSize: 1,
   nuzlockeMode: false,
+  gen2Mode: false,
+  silverBeaten: 0,
 };
 
 // ---- Run persistence ----
@@ -59,8 +61,23 @@ async function initGame() {
   showScreen('title-screen');
   if (typeof initCloudSave === 'function') initCloudSave();
   if (typeof syncToCloud === 'function') syncToCloud();
-  document.getElementById('btn-new-run').onclick = () => startNewRun(false);
-  document.getElementById('btn-hard-run').onclick = () => startNewRun(true);
+  // Generation toggle — selection is read when Normal/Nuzlocke is clicked
+  // and persists across reloads via localStorage.
+  let selectedGen = Number(localStorage.getItem('poke_selected_gen')) === 2 ? 2 : 1;
+  const syncGenButtons = () => {
+    document.querySelectorAll('#gen-toggle .gen-btn').forEach(b =>
+      b.classList.toggle('gen-btn--active', Number(b.dataset.gen) === selectedGen));
+  };
+  syncGenButtons();
+  document.querySelectorAll('#gen-toggle .gen-btn').forEach(btn => {
+    btn.onclick = () => {
+      selectedGen = Number(btn.dataset.gen) || 1;
+      localStorage.setItem('poke_selected_gen', String(selectedGen));
+      syncGenButtons();
+    };
+  });
+  document.getElementById('btn-new-run').onclick  = () => startNewRun(false, selectedGen === 2);
+  document.getElementById('btn-hard-run').onclick = () => startNewRun(true,  selectedGen === 2);
 
   const endlessBtn = document.getElementById('btn-endless-run');
   if (endlessBtn) {
@@ -125,17 +142,34 @@ async function initGame() {
   }
 }
 
-async function startNewRun(nuzlockeMode = false) {
+async function startNewRun(nuzlockeMode = false, gen2Mode = false, forcedStarterId = null) {
   clearEndlessState();
   const savedTrainer = localStorage.getItem('poke_trainer') || null;
   const seed = (Date.now() ^ (Math.random() * 0x100000000 | 0)) >>> 0;
   seedRng(seed);
-  state = { currentMap: 0, currentNode: null, team: [], items: [], badges: 0, map: null, eliteIndex: 0, trainer: savedTrainer || 'boy', starterSpeciesId: null, maxTeamSize: 1, nuzlockeMode, usedPokecenter: false, pickedUpItem: false, runSeed: seed };
+  state = { currentMap: 0, currentNode: null, team: [], items: [], badges: 0, map: null, eliteIndex: 0, trainer: savedTrainer || 'boy', starterSpeciesId: null, maxTeamSize: 1, nuzlockeMode, gen2Mode, silverBeaten: 0, usedPokecenter: false, pickedUpItem: false, runSeed: seed };
+  if (forcedStarterId && savedTrainer) {
+    await pickForcedStarter(forcedStarterId);
+    return;
+  }
   if (savedTrainer) {
     await showStarterSelect();
   } else {
     await showTrainerSelect();
   }
+}
+
+// Skip the starter chooser by instancing the requested species directly. Used
+// by the reset-run button so the player gets the same starter back.
+async function pickForcedStarter(speciesId) {
+  const species = await fetchPokemonById(speciesId);
+  if (!species) {
+    await showStarterSelect();
+    return;
+  }
+  const isShiny = rng() < (hasShinyCharm() ? 0.02 : 0.01);
+  const inst = createInstance(species, 5, isShiny, 0);
+  await selectStarter(inst);
 }
 
 async function showTrainerSelect() {
@@ -196,7 +230,7 @@ async function showStarterSelect() {
         return `<div class="${rowClass}" data-species="${speciesAttr}" style="cursor:default;">
           <span class="type-badge type-${typeClass}" style="font-size:6px;padding:1px 3px;">${type}</span>
           <span class="region-stage-name">${isBigBoss ? '★ ' : ''}${name}</span>
-          <span class="region-stage-level">Lv${trainer.level}</span>
+          <span class="region-stage-level">Lv${trainer.displayLevel ?? trainer.level}</span>
         </div>`;
       }).join('');
       panel.innerHTML = header + `<div class="region-stage-list">${rows}</div>`;
@@ -206,7 +240,8 @@ async function showStarterSelect() {
   }
 
   const startLevel = 5;
-  const starters = state.isEndlessMode ? [] : await Promise.all(STARTER_IDS.map(id => fetchPokemonById(id)));
+  const activeStarterIds = state.gen2Mode ? GEN2_STARTER_IDS : STARTER_IDS;
+  const starters = state.isEndlessMode ? [] : await Promise.all(activeStarterIds.map(id => fetchPokemonById(id)));
 
   container.innerHTML = '';
   container.style.cssText = '';
@@ -256,7 +291,7 @@ async function showStarterSelect() {
     hofBox.className = 'pc-box';
     const hasEntries = hofSpecies.length > 0;
     const sortBtnsHtml = hasEntries
-      ? `<div class="hof-sort-btns"><button class="hof-sort-btn active" data-sort="stars">★ Stars</button><button class="hof-sort-btn" data-sort="type">Type</button><button class="hof-sort-btn" data-sort="id">#</button><span class="hof-sort-sep"></span><button class="hof-sort-btn hof-filter-shiny" data-filter="shiny">★ Shiny</button></div>`
+      ? `<div class="hof-sort-btns"><button class="hof-sort-btn active" data-sort="stars">★ Stars</button><button class="hof-sort-btn" data-sort="lastused">Last Used</button><button class="hof-sort-btn" data-sort="id">#</button><span class="hof-sort-sep"></span><button class="hof-sort-btn hof-filter-shiny" data-filter="shiny">★ Shiny</button></div>`
       : '';
     const hofTitle = hasEntries ? `HALL OF FAME PC (${hofX}/${hofY})` : 'HALL OF FAME PC';
     hofBox.innerHTML = `<div class="pc-box-titlebar${hasEntries ? ' with-sort' : ''}"><span>${hofTitle}</span>${sortBtnsHtml}</div><div class="pc-box-body"><div class="pc-box-grid" style="grid-template-columns:repeat(6,1fr);"></div></div>`;
@@ -323,10 +358,15 @@ async function showStarterSelect() {
     let showOnlyShiny = false;
     let currentSort = 'stars';
 
+    const lastUsedTimes = getLastUsedTimes();
     function sortHof(mode) {
       const pool = showOnlyShiny ? hofInstances.filter(i => i.isShiny) : [...hofInstances];
       if (mode === 'stars') pool.sort((a, b) => { const d = hofStarScore(b.speciesId) - hofStarScore(a.speciesId); return d !== 0 ? d : a.speciesId - b.speciesId; });
-      else if (mode === 'type') pool.sort((a, b) => { const ta = (a.types?.[0]||'').toLowerCase(), tb = (b.types?.[0]||'').toLowerCase(); return ta !== tb ? (ta < tb ? -1 : 1) : a.speciesId - b.speciesId; });
+      else if (mode === 'lastused') pool.sort((a, b) => {
+        const ra = getEvoLineRoot(a.speciesId), rb = getEvoLineRoot(b.speciesId);
+        const ta = lastUsedTimes[ra] ?? 0, tb = lastUsedTimes[rb] ?? 0;
+        return tb !== ta ? tb - ta : a.speciesId - b.speciesId;
+      });
       else pool.sort((a, b) => a.speciesId - b.speciesId);
       buildHofGrid(pool);
     }
@@ -383,6 +423,7 @@ async function selectStarter(pokemon) {
   state.team = [pokemon];
   state.starterSpeciesId = pokemon.speciesId;
   recordUsedStarter(pokemon.speciesId);
+  setLastUsedTime(getEvoLineRoot(pokemon.speciesId));
   state.maxTeamSize = 1;
   if (state.isEndlessMode) {
     startEndlessRegion();
@@ -395,7 +436,7 @@ async function selectStarter(pokemon) {
 
 function startMap(mapIndex) {
   state.currentMap = mapIndex;
-  state.map = generateMap(mapIndex, state.nuzlockeMode);
+  state.map = generateMap(mapIndex, state.nuzlockeMode, state.gen2Mode);
 
   // Full heal between arenas (skip the very first map)
   if (mapIndex > 0) {
@@ -421,20 +462,39 @@ function showMapScreen() {
   showScreen('map-screen');
   const mapInfo = document.getElementById('map-info');
   if (mapInfo) {
-    const isFinal = state.currentMap === 8;
-    const leader = isFinal ? null : GYM_LEADERS[state.currentMap];
-    mapInfo.innerHTML = isFinal
-      ? `<span>Elite Four & Champion</span>`
-      : `<span>Map ${state.currentMap+1}: vs <b>${leader.name}</b> (${leader.type})</span>`;
+    if (state.gen2Mode) {
+      const isElite = state.currentMap === 8;
+      const leader = isElite ? null : JOHTO_GYM_LEADERS[state.currentMap];
+      mapInfo.innerHTML = isElite
+        ? `<span>Map 9: Elite Four &amp; Lance</span>`
+        : `<span>Map ${state.currentMap+1}: vs <b>${leader.name}</b> (${leader.type})</span>`;
+    } else {
+      const isFinal = state.currentMap === 8;
+      const leader = isFinal ? null : GYM_LEADERS[state.currentMap];
+      mapInfo.innerHTML = isFinal
+        ? `<span>Elite Four & Champion</span>`
+        : `<span>Map ${state.currentMap+1}: vs <b>${leader.name}</b> (${leader.type})</span>`;
+    }
   }
   const BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/';
-  const badgeHtml = Array.from({ length: 8 }, (_, i) => {
-    const earned = i < state.badges;
-    const label = GYM_LEADERS[i].badge;
-    return earned
-      ? `<img src="${BASE}${i + 1}.png" alt="${label}" title="${label}" class="badge-icon-img">`
-      : `<span class="badge-icon-empty" title="${label}"></span>`;
-  }).join('');
+  let badgeHtml;
+  if (state.gen2Mode) {
+    badgeHtml = Array.from({ length: 8 }, (_, i) => {
+      const earned = i < state.badges;
+      const label = JOHTO_GYM_LEADERS[i].badge;
+      return earned
+        ? `<img src="${BASE}${i + 9}.png" alt="${label}" title="${label}" class="badge-icon-img">`
+        : `<span class="badge-icon-empty" title="${label}"></span>`;
+    }).join('');
+  } else {
+    badgeHtml = Array.from({ length: 8 }, (_, i) => {
+      const earned = i < state.badges;
+      const label = GYM_LEADERS[i].badge;
+      return earned
+        ? `<img src="${BASE}${i + 1}.png" alt="${label}" title="${label}" class="badge-icon-img">`
+        : `<span class="badge-icon-empty" title="${label}"></span>`;
+    }).join('');
+  }
   const badgeEl = document.getElementById('badge-count');
   if (badgeEl) badgeEl.innerHTML = badgeHtml;
   const badgePanelEl = document.getElementById('badge-count-panel');
@@ -444,7 +504,14 @@ function showMapScreen() {
   renderItemBadges(state.items);
 
   const mapContainer = document.getElementById('map-container');
-  mapContainer.style.backgroundImage = `url('ui/mapsNormalMode/map${state.currentMap + 1}.png')`;
+  let bgUrl;
+  if (state.gen2Mode) {
+    // Johto routes 1-9 (route 9 covers Elite Four at map 8)
+    bgUrl = `ui/mapsGen2/${state.currentMap + 1}.png`;
+  } else {
+    bgUrl = `ui/mapsNormalMode/map${state.currentMap + 1}.png`;
+  }
+  mapContainer.style.backgroundImage = `url('${bgUrl}')`;
   renderMap(state.map, mapContainer, onNodeClick);
   saveRun();
 
@@ -565,6 +632,9 @@ async function onNodeClick(node) {
       if (state.isEndlessMode) { advanceFromNode(state.map, node.id); showMapScreen(); }
       else await doTradeNode(node);
       break;
+    case NODE_TYPES.SILVER:
+      await doSilverNode(node);
+      break;
     case 'shiny':
       await doShinyNode(node);
       break;
@@ -590,6 +660,98 @@ function resolveQuestionMark() {
 }
 
 // ---- Node Handlers ----
+
+// Each Battle Tower stage anchors to one generation. Stage 1 = Kanto (Gen 1),
+// stage 2 = Johto (Gen 2), etc. Encounters are restricted to that gen's range.
+const STAGE_GEN_RANGES = {
+  1: { minGenId: 1,   maxGenId: 151 },
+  2: { minGenId: 152, maxGenId: 251 },
+  3: { minGenId: 252, maxGenId: 386 },
+  4: { minGenId: 387, maxGenId: 493 },
+  5: { minGenId: 494, maxGenId: 649 },
+};
+function getStageGenRange(stage) {
+  return STAGE_GEN_RANGES[stage] || { minGenId: 1, maxGenId: 649 };
+}
+function getCatchGenRange() {
+  if (state.isEndlessMode) return getStageGenRange(endlessState.stageNumber);
+  if (state.gen2Mode) return { minGenId: 152, maxGenId: 251 };
+  return { minGenId: 1, maxGenId: 151 };
+}
+
+// Build the set of forms a base-species ID can become at or below maxLevel,
+// walking both linear and branching evolutions. Used by the reverse lookup so
+// e.g. Pidgey + level 36 reports Pidgey/Pidgeotto/Pidgeot, and Eevee reports
+// all of its eeveelutions.
+function _reachableEvoForms(baseId, maxLevel) {
+  const seen = new Set([baseId]);
+  const stack = [baseId];
+  while (stack.length) {
+    const id = stack.pop();
+    const linear = EVOLUTIONS[id];
+    if (linear && linear.level <= maxLevel && !seen.has(linear.into)) {
+      seen.add(linear.into);
+      stack.push(linear.into);
+    }
+    const branches = BRANCHING_EVOLUTIONS[id];
+    if (branches) {
+      for (const b of branches) {
+        if (b.level <= maxLevel && !seen.has(b.into)) {
+          seen.add(b.into);
+          stack.push(b.into);
+        }
+      }
+    }
+  }
+  return seen;
+}
+
+function _bucketForBstMin(min) {
+  if (min >= 530) return GEN1_BST_APPROX.veryHigh;
+  if (min >= 460) return GEN1_BST_APPROX.high;
+  if (min >= 400) return GEN1_BST_APPROX.midHigh;
+  if (min >= 340) return GEN1_BST_APPROX.mid;
+  if (min >= 280) return GEN1_BST_APPROX.midLow;
+  return GEN1_BST_APPROX.low;
+}
+
+// Reverse lookup: every (stage, region, map) where this Pokemon — or any
+// member of its evolution line — can spawn in the Battle Tower. Some species
+// (e.g. Crobat) only appear by leveling up a base that spawns at low-tier
+// floors; the location of the base is what's reported in that case.
+function getBattleTowerLocations(pokemonId) {
+  // Build the full evolution line for this species. Walk down to the root and
+  // then forward through every reachable form (with no level cap) so the line
+  // covers babies, both branches of branching evos, and final forms.
+  const root = (typeof getEvoLineRoot === 'function') ? getEvoLineRoot(pokemonId) : pokemonId;
+  const lineForms = _reachableEvoForms(root, Infinity);
+  const out = [];
+  for (let stage = 1; stage <= 5; stage++) {
+    const stageRange = STAGE_GEN_RANGES[stage];
+    for (let region = 1; region <= 3; region++) {
+      for (let map = 0; map < 3; map++) {
+        const [minL, maxL] = getEndlessLevelRange(stage, region, map);
+        const mapIdx = levelToMapIndex(maxL);
+        const r = MAP_BST_RANGES[Math.min(mapIdx, MAP_BST_RANGES.length - 1)];
+        const bucket = _bucketForBstMin(r.min);
+        let matched = false;
+        for (const baseId of bucket) {
+          if (baseId < stageRange.minGenId || baseId > stageRange.maxGenId) continue;
+          if (lineForms.has(baseId)) { matched = true; break; }
+        }
+        if (matched) {
+          out.push({
+            stage, stageName: getStageName(stage),
+            region, map: map + 1,
+            minL, maxL,
+            label: `${getStageName(stage)} R${region}M${map + 1} (L${minL}-${maxL})`,
+          });
+        }
+      }
+    }
+  }
+  return out;
+}
 
 // Maps a max level to an appropriate map index for BST bucket selection.
 function levelToMapIndex(maxLevel) {
@@ -620,17 +782,32 @@ function getLevelForNode(node) {
     const spread = Math.max(1, Math.round((maxL - minL) / 8));
     return Math.min(maxL, Math.max(minL, base + Math.floor(rng() * spread)));
   }
-  // Normal mode (original behaviour)
+  // Gen 2: deterministic per-layer curve. Layers 1-7 use fixed offsets so each
+  // map reads cleanly as Lv mapMin..mapMin+9 (e.g. 1,2,3,5,6,8,9 in map 1, gym
+  // at 10). Boss layer 8 uses leader data, not this function.
+  if (state.gen2Mode) {
+    const [minL, maxL] = GEN2_MAP_LEVEL_RANGES[state.currentMap];
+    if (node.layer >= GEN2_LAYER_OFFSETS.length + 1) return maxL;
+    const layerIdx = Math.min(GEN2_LAYER_OFFSETS.length, Math.max(1, node.layer)) - 1;
+    return minL + GEN2_LAYER_OFFSETS[layerIdx];
+  }
+  // Non-gen2: spread levels evenly across layers 1..7 (highest non-boss layer).
   const [minL, maxL] = MAP_LEVEL_RANGES[state.currentMap];
-  const t = Math.min(1, Math.max(0, (node.layer - 1) / 5)); // 0.0 at layer 1, 1.0 at layer 6
+  const t = Math.min(1, Math.max(0, (node.layer - 1) / 6));
   const base = Math.round(minL + t * (maxL - minL));
   const spread = Math.max(1, Math.round((maxL - minL) / 8));
   return Math.min(maxL, Math.max(minL, base + Math.floor(rng() * spread)));
 }
 
 async function doBattleNode(node) {
-  const level = (!state.isEndlessMode && state.currentMap >= 1) ? getLevelForNode(node) - 1 : getLevelForNode(node);
-  let choices = await getCatchChoices(getEncounterMapIndex(), 3, state.isEndlessMode ? getEndlessMaxGenId(endlessState.stageNumber) : 151, !state.isEndlessMode);
+  // Gen 2: wild Pokemon scale below the node's level on a stair-step curve —
+  // -1 from map 2, -2 from map 4, -3 from map 6, -4 from map 8 onward.
+  // Other modes keep the legacy -1 from map 2 onward.
+  const reduction = state.gen2Mode
+    ? Math.min(4, Math.floor((state.currentMap + 1) / 2))
+    : (!state.isEndlessMode && state.currentMap >= 1 ? 1 : 0);
+  const level = Math.max(1, getLevelForNode(node) - reduction);
+  let choices = await getCatchChoices(getEncounterMapIndex(), 3, getCatchGenRange().maxGenId, !state.isEndlessMode, getCatchGenRange().minGenId);
   const lvlFiltered = choices.filter(sp => minLevelForSpecies(sp.id ?? sp.speciesId) <= level);
   if (lvlFiltered.length > 0) choices = lvlFiltered;
 
@@ -674,6 +851,26 @@ async function doBattleNode(node) {
 }
 
 async function doBossNode(node) {
+  if (state.gen2Mode) {
+    if (state.currentMap === 8) { await doGen2Elite4(); return; }
+    const leader = JOHTO_GYM_LEADERS[state.currentMap];
+    const enemyTeam = leader.team.map(p => ({
+      ...createInstance(p, p.level, false, leader.moveTier ?? 1),
+      heldItem: p.heldItem || null,
+    }));
+    showScreen('battle-screen');
+    document.getElementById('battle-title').textContent = `Gym Battle vs ${leader.name}!`;
+    document.getElementById('battle-subtitle').textContent = `${leader.badge} is on the line!`;
+    await runBattleScreen(enemyTeam, true, () => {
+      state.badges++;
+      advanceFromNode(state.map, node.id);
+      showBadgeScreen(leader);
+      const ach = unlockAchievement(`gym_${state.currentMap}`);
+      if (ach) showAchievementToast(ach);
+    }, () => { showGameOver(); }, leader.name, [], 2);
+    return;
+  }
+
   if (state.currentMap === 8) {
     await doElite4();
     return;
@@ -722,16 +919,134 @@ async function doElite4() {
   showWinScreen();
 }
 
-function showEliteTransition(defeatedName, nextIndex) {
+async function doSilverNode(node) {
+  // Encounter index is keyed off the current map so skipping earlier Silver
+  // fights doesn't make a later one trivial.
+  const SILVER_ENC_BY_MAP = { 1: 0, 3: 1, 5: 2, 7: 3 };
+  const encounterIdx = Math.min(
+    SILVER_ENC_BY_MAP[state.currentMap] ?? (state.silverBeaten || 0),
+    SILVER_ENCOUNTERS.length - 1,
+  );
+  const silverData = SILVER_ENCOUNTERS[encounterIdx];
+  // Move tier scales with the current map so enc 0 isn't slammed with T2 moves.
+  const silverTier = getMoveТierForMap(state.currentMap);
+  const enemyTeam = silverData.team.map(p => ({
+    ...createInstance(p, p.level, false, silverTier),
+    heldItem: p.heldItem || null,
+  }));
+  const starterLine = SILVER_STARTER_LINES[state.starterSpeciesId];
+  if (starterLine) {
+    // Use natural evolution thresholds against the encounter level.
+    const lastIdx = enemyTeam.length - 1;
+    const lvl = enemyTeam[lastIdx].level;
+    const evolvedId = resolveEvoForLevel(starterLine[0].speciesId, lvl);
+    const stageIdx = Math.max(0, starterLine.findIndex(s => s.speciesId === evolvedId));
+    const starterSpecies = starterLine[stageIdx];
+    enemyTeam[lastIdx] = { ...createInstance(starterSpecies, lvl, false, silverTier), heldItem: starterSpecies.heldItem || null };
+  }
+  showScreen('battle-screen');
+  document.getElementById('battle-title').textContent = 'Silver wants to battle!';
+  document.getElementById('battle-subtitle').textContent = 'Rival Battle — Double XP';
+  const won = await new Promise(resolve => {
+    // Silver gives +4 base (Double XP), to every team member regardless of
+    // whether they participated or fainted. Lucky egg etc. still apply.
+    runBattleScreen(enemyTeam, true, () => resolve(true), () => resolve(false), 'silver', [], 4, null, null, true);
+  });
+  if (!won) { showGameOver(); return; }
+  // Full heal after the rival battle.
+  for (const p of state.team) p.currentHp = p.maxHp;
+  state.silverBeaten = (state.silverBeaten || 0) + 1;
+  advanceFromNode(state.map, node.id);
+  showMapScreen();
+}
+
+function showEliteTransition(defeatedName, nextIndex, bossArray = ELITE_4) {
   return new Promise(resolve => {
     const el = document.getElementById('transition-screen');
     if (!el) { resolve(); return; }
     document.getElementById('transition-msg').textContent = `${defeatedName} defeated!`;
     document.getElementById('transition-sub').textContent =
-      nextIndex < 4 ? `Next: ${ELITE_4[nextIndex].name}...` : `The Champion awaits!`;
+      nextIndex < bossArray.length - 1 ? `Next: ${bossArray[nextIndex].name}...` : `The Champion awaits!`;
     showScreen('transition-screen');
     setTimeout(() => resolve(), 2000);
   });
+}
+
+// Prep screen shown between Elite 4 / Champion battles. Shows the next
+// opponent's roster, lets the player drag-reorder their team and use items,
+// then proceeds on Continue.
+function showElitePrepScreen({ title, subtitle, nextBoss }) {
+  return new Promise(resolve => {
+    document.getElementById('elite-prep-title').textContent = title;
+    document.getElementById('elite-prep-sub').textContent = subtitle;
+
+    const enemyEl = document.getElementById('elite-prep-enemy-team');
+    enemyEl.innerHTML = nextBoss.team.map(p => {
+      const sprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.speciesId}.png`;
+      const types  = (p.types || []).map(t => `<span class="type-badge type-${t.toLowerCase()}" style="font-size:5px;padding:1px 2px;">${t}</span>`).join('');
+      const item   = p.heldItem ? `<div style="font-size:7px;color:var(--text-dim);margin-top:2px;">${itemIconHtml(p.heldItem, 12)}</div>` : '';
+      return `<div class="elite-prep-enemy-slot">
+        <img src="${sprite}" alt="${p.name}" onerror="this.style.display='none'">
+        <div class="name">${p.name}</div>
+        <div class="lv">Lv ${p.level}</div>
+        <div class="types">${types}</div>
+        ${item}
+      </div>`;
+    }).join('');
+
+    const teamEl  = document.getElementById('elite-prep-player-team');
+    const itemsEl = document.getElementById('elite-prep-items');
+    const refresh = () => {
+      renderTeamBar(state.team, teamEl, false, true, refresh);
+      renderItemBadges(state.items, itemsEl, refresh);
+    };
+    refresh();
+
+    showScreen('elite-prep-screen');
+
+    const btn = document.getElementById('btn-elite-prep-continue');
+    const onContinue = () => {
+      btn.removeEventListener('click', onContinue);
+      resolve();
+    };
+    btn.addEventListener('click', onContinue);
+  });
+}
+
+async function doGen2Elite4() {
+  const bosses = GEN2_ELITE_4;
+  const resumeFrom = state.eliteIndex;
+  for (let i = state.eliteIndex; i < bosses.length; i++) {
+    state.eliteIndex = i;
+    saveRun();
+    const boss = bosses[i];
+    // Prep screen before each Elite battle — but skip it on the resumed
+    // fight so reloading drops the player straight back into the battle.
+    const isResumedFight = i === resumeFrom && resumeFrom > 0;
+    if (!isResumedFight) {
+      const prevName = i === 0 ? null : bosses[i - 1].name;
+      await showElitePrepScreen({
+        title: prevName ? `${prevName} defeated!` : 'The Elite Four await!',
+        subtitle: `Next: ${boss.name} (${boss.type}) — Battle ${i + 1}/${bosses.length}`,
+        nextBoss: boss,
+      });
+    }
+    const enemyTeam = boss.team.map(p => ({ ...createInstance(p, p.level, false, 2), heldItem: p.heldItem || null }));
+    showScreen('battle-screen');
+    document.getElementById('battle-title').textContent = `${boss.title}: ${boss.name}!`;
+    document.getElementById('battle-subtitle').textContent =
+      i < bosses.length - 1 ? `Elite Four — Battle ${i + 1}/${bosses.length - 1}` : 'Final Battle!';
+    const won = await new Promise(resolve => {
+      runBattleScreen(enemyTeam, true, () => resolve(true), () => resolve(false), boss.name);
+    });
+    if (!won) { showGameOver(); return; }
+  }
+  const eliteAch = unlockAchievement('elite_four');
+  if (eliteAch) showAchievementToast(eliteAch);
+  const winAch = unlockAchievement('gen2_win');
+  if (winAch) showAchievementToast(winAch);
+  state.eliteIndex = 0;
+  showWinScreen();
 }
 
 
@@ -750,7 +1065,7 @@ async function doCatchNode(node) {
   } else {
     choicesEl.innerHTML = '<div class="loading">Finding Pokemon...</div>';
 
-    let choices = await getCatchChoices(getEncounterMapIndex(), 18, state.isEndlessMode ? getEndlessMaxGenId(endlessState.stageNumber) : 151, !state.isEndlessMode);
+    let choices = await getCatchChoices(getEncounterMapIndex(), 18, getCatchGenRange().maxGenId, !state.isEndlessMode, getCatchGenRange().minGenId);
     const isFirstMap = state.currentMap === 0 || (state.isEndlessMode && endlessState.regionNumber === 1 && endlessState.mapIndexInRegion === 0);
     level = isFirstMap ? Math.max(4, getLevelForNode(node)) : getLevelForNode(node);
     const lvlFiltered = choices.filter(sp => minLevelForSpecies(sp.id ?? sp.speciesId) <= level);
@@ -761,8 +1076,8 @@ async function doCatchNode(node) {
         : lvlFiltered;
     }
 
-    // Nuzlocke map 1: restrict to curated pool
-    if (state.nuzlockeMode && state.currentMap === 0) {
+    // Nuzlocke map 1: restrict to curated pool (Gen 1 only)
+    if (state.nuzlockeMode && state.currentMap === 0 && !state.gen2Mode) {
       const nuzlockeMap1Ids = new Set([10,11,27,54,56,60,69,72,74,79,81,86,96,98,100,102,111,116,118,120,129,133]);
       const filtered = choices.filter(sp => nuzlockeMap1Ids.has(sp.id ?? sp.speciesId));
       if (filtered.length > 0) choices = filtered;
@@ -770,8 +1085,8 @@ async function doCatchNode(node) {
 
     // Map 1, layer 1: guarantee at least one Grass AND one Water Pokemon (non-nuzlocke only)
     if (!state.nuzlockeMode && state.currentMap === 0 && node.layer === 1) {
-      const grassIds = [43, 69, 102]; // Oddish, Bellsprout, Exeggcute
-      const waterIds = [54, 60, 72, 79, 86, 98, 116, 118, 120, 129];
+      const grassIds = state.gen2Mode ? [187, 191] : [43, 69, 102]; // Gen2: Hoppip, Sunkern | Gen1: Oddish, Bellsprout, Exeggcute
+      const waterIds = state.gen2Mode ? [183, 194, 223] : [54, 60, 72, 79, 86, 98, 116, 118, 120, 129]; // Gen2: Marill, Wooper, Remoraid
       if (!choices.some(p => p.types?.includes('Grass'))) {
         const id = grassIds[Math.floor(rng() * grassIds.length)];
         const r = await fetchPokemonById(id);
@@ -834,7 +1149,7 @@ async function doCatchNode(node) {
     const myRoot = getEvoLineRoot(inst.speciesId);
     const hofStarterBadge = inst.isShiny
       ? (!caught && getUsedStarters().some(id => getEvoLineRoot(id) === myRoot))
-      : getHallOfFame().some(e => e.team?.some(p => getEvoLineRoot(p.speciesId) === myRoot));
+      : hofHasEvoLine(inst.speciesId);
     const wrapper = document.createElement('div');
     wrapper.innerHTML = renderPokemonCard(inst, true, false, caught, hofStarterBadge);
     const card = wrapper.querySelector('.poke-card');
@@ -861,7 +1176,7 @@ async function doCatchNode(node) {
         ]);
         let src = rerollPool.filter(sp => !otherRoots.has(getEvoLineRoot(sp.id ?? sp.speciesId)));
         if (src.length === 0) {
-          const fresh = await getCatchChoices(getEncounterMapIndex(), 6, state.isEndlessMode ? getEndlessMaxGenId(endlessState.stageNumber) : 151, !state.isEndlessMode);
+          const fresh = await getCatchChoices(getEncounterMapIndex(), 6, getCatchGenRange().maxGenId, !state.isEndlessMode, getCatchGenRange().minGenId);
           const otherRootsPost = new Set([
             ...instances.filter((_, i) => i !== slotIdx).map(i => getEvoLineRoot(i.speciesId)),
             ...state.team.map(p => getEvoLineRoot(p.speciesId)),
@@ -1089,24 +1404,35 @@ function doItemNode(node) {
     ...state.team.filter(p => p.heldItem).map(p => p.heldItem.id),
   ]);
   const heldAvailable = ITEM_POOL.filter(it =>
-    !usedIds.has(it.id) && (it.minMap === undefined || state.currentMap >= it.minMap)
+    !usedIds.has(it.id) &&
+    (it.minMap === undefined || state.currentMap >= it.minMap) &&
+    (!it.gen2Only || state.gen2Mode)
   );
 
   // Usable items: filter out ones that can't be applied to current team
-  const canUseMaxRevive = state.team.some(p => p.currentHp <= 0);
-  const canUseEvoStone  = state.team.some(p => {
-    if (p.speciesId === 133) return true;
+  const canUseMaxRevive   = state.team.some(p => p.currentHp <= 0);
+  const canUseFullRestore = state.team.some(p => p.currentHp > 0 && p.currentHp < p.maxHp);
+  const canUseEvoStone    = state.team.some(p => {
+    if (BRANCHING_EVOLUTIONS[p.speciesId]) return true;
     const evo = EVOLUTIONS[p.speciesId];
     return evo && evo.into !== p.speciesId;
   });
+  const canUseTm          = state.team.some(p => (p.moveTier ?? 1) < 2);
   const usableAvailable = USABLE_ITEM_POOL.filter(it => {
-    if (it.id === 'max_revive') return canUseMaxRevive;
-    if (it.id === 'moon_stone')  return canUseEvoStone;
+    if (it.id === 'max_revive')   return canUseMaxRevive;
+    if (it.id === 'full_restore') return canUseFullRestore;
+    if (it.id === 'moon_stone')   return canUseEvoStone;
+    if (it.id === 'tm_normal')    return canUseTm;
     return true;
   });
 
   const available = [...heldAvailable, ...usableAvailable];
-  const shuffled = [...available].sort(() => rng() - 0.5);
+  // Fisher-Yates shuffle — sort(() => rng() - 0.5) is famously biased.
+  const shuffled = [...available];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
   const picks = shuffled.slice(0, 3);
 
   const el = document.getElementById('item-choices');
@@ -1134,7 +1460,9 @@ function doItemNode(node) {
     el.appendChild(div);
   }
 
-  document.getElementById('btn-skip-item').onclick = () => {
+  const itemSkipBtn = document.getElementById('btn-skip-item');
+  itemSkipBtn.style.display = '';
+  itemSkipBtn.onclick = () => {
     advanceFromNode(state.map, node.id);
     showMapScreen();
   };
@@ -1171,7 +1499,6 @@ function openItemEquipModal(item, { fromBagIdx = -1, fromPokemonIdx = -1, onComp
         ${isSelf
           ? `<button class="equip-btn equip-btn-unequip" data-unequip="${i}">Unequip</button>`
           : `<button class="equip-btn${hasHeld ? ' equip-btn-swap' : ''}" data-idx="${i}">${btnLabel}</button>`}
-        ${hasHeld && !isSelf ? `<button class="equip-btn equip-btn-unequip" data-unequip="${i}" title="Unequip ${p.heldItem.name}">×</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -1251,17 +1578,25 @@ function openItemEquipModal(item, { fromBagIdx = -1, fromPokemonIdx = -1, onComp
 
 }
 
-function openUsableItemModal(item, bagIdx) {
+function openUsableItemModal(item, bagIdx, afterUse = null) {
+  // Escape Rope auto-triggers from runBattleScreen on a non-boss loss; clicking
+  // it manually just informs the player so they don't accidentally consume it.
+  if (item.id === 'escape_rope') {
+    showMapNotification('🪢 Escape Rope auto-uses on a non-boss loss to save your run.');
+    return;
+  }
   document.getElementById('usable-item-modal')?.remove();
 
   const canTarget = p => {
-    if (item.id === 'max_revive') return p.currentHp <= 0;
+    if (item.id === 'max_revive')   return p.currentHp <= 0;
+    if (item.id === 'full_restore') return p.currentHp > 0 && p.currentHp < p.maxHp;
     if (item.id === 'moon_stone') {
       if (p.currentHp <= 0) return false;
-      if (p.speciesId === 133) return true;
+      if (BRANCHING_EVOLUTIONS[p.speciesId]) return true;
       const evo = EVOLUTIONS[p.speciesId];
       return !!(evo && evo.into !== p.speciesId);
     }
+    if (item.id === 'tm_normal') return p.currentHp > 0 && (p.moveTier ?? 1) < 2;
     return true;
   };
 
@@ -1311,6 +1646,12 @@ function openUsableItemModal(item, bagIdx) {
         renderItemBadges(state.items);
         renderTeamBar(state.team);
 
+      } else if (item.id === 'full_restore') {
+        pokemon.currentHp = pokemon.maxHp;
+        showMapNotification(`${pokemon.nickname || pokemon.name} was fully restored!`);
+        renderItemBadges(state.items);
+        renderTeamBar(state.team);
+
       } else if (item.id === 'rare_candy') {
         for (let i = 0; i < 3; i++) {
           if (pokemon.level < 100) pokemon.level++;
@@ -1324,12 +1665,23 @@ function openUsableItemModal(item, bagIdx) {
         renderItemBadges(state.items);
         await applyEvolution(pokemon);
 
+      } else if (item.id === 'tm_normal') {
+        pokemon.moveTier = Math.min(2, (pokemon.moveTier ?? 1) + 1);
+        const newMove = getBestMove(pokemon.types || ['Normal'], pokemon.baseStats, pokemon.speciesId, pokemon.moveTier, pokemon.heldItem);
+        showMapNotification(`${pokemon.nickname || pokemon.name} learned ${newMove.name}!`);
+        renderItemBadges(state.items);
+        renderTeamBar(state.team);
+
       }
+      if (afterUse) afterUse();
     });
   });
 }
 
 async function applyEvolution(pokemon) {
+  // Eviolite blocks all evolutions — check before showing any branching popup.
+  if (pokemon.heldItem?.id === 'eviolite') return;
+
   let evo;
   const branchingChoices = BRANCHING_EVOLUTIONS[pokemon.speciesId];
   if (branchingChoices) {
@@ -1338,8 +1690,6 @@ async function applyEvolution(pokemon) {
     evo = EVOLUTIONS[pokemon.speciesId];
     if (!evo) return;
   }
-
-  if (pokemon.heldItem?.id === 'eviolite') return;
   await playEvoAnimation(pokemon, evo);
 
   const oldHpRatio = pokemon.currentHp / pokemon.maxHp;
@@ -1382,22 +1732,99 @@ function doPokeCenterNode(node) {
 // Species pools for each trainer archetype (Gen 1 IDs).
 // null = use the map's random BST pool instead.
 const TRAINER_BATTLE_CONFIG = {
+  // ── Bug Catcher: classic insect collector. Adds Scyther's Scizor evo line. ──
   bugCatcher:  { name: 'Bug Catcher',   sprite: 'bugcatcher',
-                 pool: [10,11,12,13,14,15,46,47,48,49,123,127] },
+                 pool: [10,11,12,13,14,15,46,47,48,49,123,127],
+                 gen2Pool: [10,11,12,13,14,15,46,47,48,49,123,165,166,167,168,193,204,205,212,213,214] },
+
+  // ── Hiker: rocks/ground/mountain Pokémon. ──
   hiker:       { name: 'Hiker',         sprite: 'hiker',
-                 pool: [27,28,50,51,66,67,68,74,75,76,95,111,112] },
+                 pool: [27,28,50,51,66,67,68,74,75,76,95,111,112],
+                 gen2Pool: [74,75,76,95,194,195,208,220,221] },
+
+  // ── Fisherman: rod-and-line catchable fish — small, sport-fishing vibe. ──
+  // Differs from Captain by featuring rod-caught water Pokémon (Magikarp,
+  // Goldeen, Horsea, Marill, Remoraid, Krabby, Chinchou) instead of the
+  // ocean-going giants the Captain favors.
   fisher:      { name: 'Fisherman',     sprite: 'fisherman',
-                 pool: [54,55,60,61,62,72,73,86,87,90,91,98,99,116,117,118,119,129,130] },
-  Scientist:   { name: 'Scientist',     sprite: 'scientist',
-                 pool: [81,82,88,89,92,93,94,100,101,137] },
-  teamRocket:  { name: 'Rocket Grunt',  sprite: 'teamrocket',
-                 pool: [19,20,23,24,41,42,52,53,88,89,109,110] },
+                 pool: [54,55,60,61,98,99,116,117,118,119,129,130],
+                 gen2Pool: [98,99,116,117,118,119,129,130,170,171,183,184,194,211,222,223,224,230] },
+
+  // ── Captain: naval / open-ocean Water — big, intimidating sea creatures. ──
+  // Differs from Fisherman by leaning into Tentacruel, Slowbro/Slowking,
+  // Cloyster, Starmie, Lapras, Mantine, Politoed — things you'd see from
+  // the deck of a ship, not pulled in on a rod.
+  captain:     { name: 'Sailor',        sprite: 'sailor',
+                 pool: [8,9,72,73,80,90,91,121,131],
+                 gen2Pool: [8,9,72,73,80,90,91,121,131,186,199,226] },
+
+  // ── Team Rocket Grunt: criminal vibe — pests, scavengers, dark types. ──
+  // Differs from Biker by mixing Dark (Houndour, Sneasel, Murkrow) and rats /
+  // alley cats (Rattata, Meowth) with the classic Grimer/Muk. The Biker keeps
+  // the pure-Poison sewer Pokémon.
+  teamRocket:  { name: 'Team Rocket Grunt', sprite: 'teamrocket',
+                 pool: [19,20,23,24,41,42,52,53,88,89],
+                 gen2Pool: [19,20,41,42,52,53,88,89,169,198,215,228,229] },
+
+  // ── Biker: pure Poison street thug. ──
+  // Differs from Team Rocket by being strictly Poison-type — no rats, no Dark
+  // types. Ekans / Koffing / Nidoran / Tentacool / Spinarak / Qwilfish.
+  biker:       { name: 'Biker',         sprite: 'biker',
+                 pool: [23,24,29,30,31,32,33,34,72,73,109,110],
+                 gen2Pool: [23,24,29,30,31,32,33,34,72,73,109,110,167,168,211] },
+
+  // ── Officer: police K9 unit — fire dogs + investigative themes. ──
   policeman:   { name: 'Officer',       sprite: 'policeman',
-                 pool: [58,59] },
-  fireSpitter: { name: 'Fire Trainer',  sprite: 'burglar',
-                 pool: [4,5,6,37,38,58,59,77,78,126,136] },
-  aceTrainer:  { name: 'Ace Trainer',   sprite: 'acetrainer', pool: null },
-  oldGuy:      { name: 'Old Man',       sprite: 'gentleman',    pool: null },
+                 pool: [58,59],
+                 gen2Pool: [58,59,228,229] },
+
+  // ── Fire trainer (Burglar): all-Fire arsonist. ──
+  fireSpitter: { name: 'Firebreather',  sprite: 'burglar',
+                 pool: [4,5,6,37,38,58,59,77,78,126,136],
+                 gen2Pool: [37,38,58,59,126,136,228,229,240] },
+
+  // ── Super Nerd: pure Electric specialists. Replaces Scientist in Gen 2. ──
+  nerd:        { name: 'Super Nerd',    sprite: 'supernerd',
+                 pool: [25,26,81,82,100,101,125,135],
+                 gen2Pool: [25,26,81,82,100,101,125,135,170,171,179,180,181,239] },
+
+  // ── Scientist: kept for Gen 1 mode only. ──
+  Scientist:   { name: 'Scientist',     sprite: 'scientist',
+                 pool: [81,82,88,89,92,93,94,100,101,137],
+                 gen2Pool: [81,82,201,233,239] },
+
+  // ── Medium: pure Ghost (small pool intentional). ──
+  medium:      { name: 'Medium',        sprite: 'medium',
+                 pool: [92,93,94],
+                 gen2Pool: [92,93,94,200] },
+
+  // ── School Kid: beginner Normal-types — youngster's first team. ──
+  // Differs from Old Man by leaning younger/smaller (Rattata, Eevee, Sentret,
+  // Aipom, baby Pokémon) instead of the bulky veteran-Normal lineup.
+  schoolBoy:   { name: 'Schoolboy',     sprite: 'schoolkid',
+                 pool: [19,20,133,143],
+                 gen2Pool: [19,20,133,161,162,172,173,174,175,190,206] },
+
+  // ── Bird Catcher: pure Flying — actual birds and raptors. ──
+  // Differs from Old Man by being strictly flying / avian (Pidgey, Spearow,
+  // Doduo, Farfetch'd, Hoothoot, Natu, Murkrow, Skarmory, Aerodactyl), while
+  // Old Man keeps the bulky ground-bound Normal-types.
+  birdCatcher: { name: 'Bird Keeper',   sprite: 'birdkeeper',
+                 pool: [16,17,18,21,22,83,84,85,142],
+                 gen2Pool: [16,17,18,21,22,83,84,85,142,163,164,177,178,198,225,227] },
+
+  // ── Ace Trainer: elite mixed-type fighters. Adds the new Gen 2 cross-gen evos. ──
+  aceTrainer:  { name: 'Ace Trainer',   sprite: 'acetrainer',
+                 pool: null,
+                 gen2Pool: [56,63,66,79,96,102,106,107,113,116,137,147,177,196,197,199,201,202,203,212,214,230,233,236,238,242] },
+
+  // ── Old Man / Gentleman: veteran Normal-types — bulky, well-established. ──
+  // Strips the pure-Flying birds (moved to Bird Catcher) and keeps the
+  // grandfatherly mix of Tauros / Miltank / Granbull / Stantler / Furret /
+  // Chansey-Blissey / Lickitung.
+  oldGuy:      { name: 'Gentleman',     sprite: 'gentleman',
+                 pool: null,
+                 gen2Pool: [53,108,113,128,161,162,190,206,209,210,234,241,242] },
 };
 
 async function doTrainerNode(node) {
@@ -1411,21 +1838,42 @@ async function doTrainerNode(node) {
   } else {
     teamSize = state.currentMap === 0 ? 1 : state.currentMap <= 2 ? 2 : 3;
   }
-  const level = getLevelForNode(node);
+  // Gen 2: random trainers run below the node level — -1 from map 2, -2 from
+  // map 3, -3 from map 5 onward. Gym leaders / Silver / Elite 4 unaffected.
+  const trainerReduction = state.gen2Mode
+    ? (state.currentMap >= 4 ? 3 : state.currentMap >= 2 ? 2 : state.currentMap >= 1 ? 1 : 0)
+    : 0;
+  const level = Math.max(1, getLevelForNode(node) - trainerReduction);
   const moveTier = getMoveТierForMap(state.currentMap);
 
   let speciesList;
-  if (config.pool) {
+  const activePool = (state.gen2Mode && config.gen2Pool) ? config.gen2Pool : config.pool;
+  if (activePool) {
     // Dedupe pool, filter out evolved forms the battle level can't reach, then shuffle
-    const eligible = [...new Set(config.pool)]
+    const eligible = [...new Set(activePool)]
       .filter(id => minLevelForSpecies(id) <= level);
-    const pool = eligible.length ? eligible : [...new Set(config.pool)]; // fallback: use full pool
-    const shuffled = pool.sort(() => rng() - 0.5);
+    const raw = eligible.length ? eligible : [...new Set(activePool)]; // fallback: use full pool
+    // Collapse evolution chains: at high level, e.g. Zubat/Golbat/Crobat all
+    // resolve to Crobat, which would let a trainer roll 3 of the same mon.
+    // Keep one pool entry per distinct evolved species.
+    const seenEvolved = new Set();
+    const pool = [];
+    for (const id of raw) {
+      const ev = resolveEvoForLevel(id, level);
+      if (seenEvolved.has(ev)) continue;
+      seenEvolved.add(ev);
+      pool.push(id);
+    }
+    const shuffled = [...pool];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
     const ids = Array.from({ length: teamSize }, (_, i) => resolveEvoForLevel(shuffled[i % shuffled.length], level));
     const fetched = await Promise.all(ids.map(id => fetchPokemonById(id)));
     speciesList = fetched.filter(Boolean);
   } else {
-    const rawChoices = await getCatchChoices(getEncounterMapIndex(), 3, state.isEndlessMode ? getEndlessMaxGenId(endlessState.stageNumber) : 151, !state.isEndlessMode);
+    const rawChoices = await getCatchChoices(getEncounterMapIndex(), 3, getCatchGenRange().maxGenId, !state.isEndlessMode, getCatchGenRange().minGenId);
     speciesList = (await Promise.all(rawChoices.slice(0, teamSize).map(async sp => {
       const rawId = sp.id ?? sp.speciesId;
       const evoId = resolveEvoForLevel(rawId, level);
@@ -1434,23 +1882,7 @@ async function doTrainerNode(node) {
   }
 
   if (!speciesList.length) { advanceFromNode(state.map, node.id); showMapScreen(); return; }
-  const ENDLESS_ENEMY_ITEM_POOL = [
-    { id: 'choice_band',  name: 'Choice Band',  icon: '🎀' },
-    { id: 'choice_specs', name: 'Choice Specs', icon: '👓' },
-    { id: 'choice_scarf', name: 'Choice Scarf', icon: '🧣' },
-    { id: 'life_orb',     name: 'Life Orb',     icon: '🔮' },
-    { id: 'rocky_helmet', name: 'Rocky Helmet', icon: '⛑️' },
-    { id: 'leftovers',    name: 'Leftovers',    icon: '🍖' },
-    { id: 'shell_bell',   name: 'Shell Bell',   icon: '🔔' },
-    { id: 'assault_vest', name: 'Assault Vest', icon: '🦺' },
-    { id: 'scope_lens',   name: 'Scope Lens',   icon: '🔭' },
-  ];
-  const enemyTeam = speciesList.map(sp => {
-    const inst = createInstance(sp, level, false, moveTier);
-    if (state.isEndlessMode && rng() < 0.25)
-      inst.heldItem = ENDLESS_ENEMY_ITEM_POOL[Math.floor(rng() * ENDLESS_ENEMY_ITEM_POOL.length)];
-    return inst;
-  });
+  const enemyTeam = speciesList.map(sp => createInstance(sp, level, false, moveTier));
 
   const titleEl = document.getElementById('battle-title');
   const subEl   = document.getElementById('battle-subtitle');
@@ -1470,14 +1902,23 @@ async function doTrainerNode(node) {
 
 async function doLegendaryNode(node) {
   const teamLegendIds = state.team.map(p => p.speciesId);
-  const maxLegendId = state.isEndlessMode ? getEndlessMaxGenId(endlessState.stageNumber) : 151;
-  const available = LEGENDARY_IDS.filter(id => id <= maxLegendId && !teamLegendIds.includes(id));
+  let minLegendId, maxLegendId;
+  if (state.isEndlessMode) {
+    const range = getStageGenRange(endlessState.stageNumber);
+    minLegendId = range.minGenId;
+    maxLegendId = range.maxGenId;
+  } else if (state.gen2Mode) {
+    minLegendId = 152; maxLegendId = 251;
+  } else {
+    minLegendId = 1; maxLegendId = 151;
+  }
+  const available = LEGENDARY_IDS.filter(id => id >= minLegendId && id <= maxLegendId && !teamLegendIds.includes(id));
   if (available.length === 0) { advanceFromNode(state.map, node.id); showMapScreen(); return; }
   const legendId = available[Math.floor(rng() * available.length)];
   const species = await fetchPokemonById(legendId);
   if (!species) { advanceFromNode(state.map, node.id); showMapScreen(); return; }
 
-  const level = state.isEndlessMode ? getLevelForNode(node) + 5 : MAP_LEVEL_RANGES[state.currentMap][1];
+  const level = state.isEndlessMode ? getLevelForNode(node) + 5 : (state.gen2Mode ? GEN2_MAP_LEVEL_RANGES : MAP_LEVEL_RANGES)[state.currentMap][1];
   const legendary = createInstance(species, level, rng() < (hasShinyCharm() ? 0.02 : 0.01), 2);
 
   const titleEl = document.getElementById('battle-title');
@@ -1486,6 +1927,13 @@ async function doLegendaryNode(node) {
   if (subEl) subEl.textContent = `Lv ${legendary.level} — Defeat it to add it to your team!`;
 
   await runBattleScreen([legendary], false, async () => {
+    // Escape Rope was used — skip the capture flow but keep the run going.
+    if (state._escapedViaRope) {
+      state._escapedViaRope = false;
+      advanceFromNode(state.map, node.id);
+      showMapScreen();
+      return;
+    }
     // Win — offer to add legendary to team
     const normalUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${legendary.speciesId}.png`;
     markPokedexCaught(legendary.speciesId, legendary.name, legendary.types, normalUrl);
@@ -1509,8 +1957,8 @@ function doMoveTutorNode(node) {
   const rows = state.team.map((p, i) => {
     const tier = p.moveTier ?? 1;
     const maxed = tier >= 2;
-    const currentMove = getBestMove(p.types || ['Normal'], p.baseStats, p.speciesId, tier);
-    const nextMove = !maxed ? getBestMove(p.types || ['Normal'], p.baseStats, p.speciesId, tier + 1) : null;
+    const currentMove = getBestMove(p.types || ['Normal'], p.baseStats, p.speciesId, tier, p.heldItem);
+    const nextMove = !maxed ? getBestMove(p.types || ['Normal'], p.baseStats, p.speciesId, tier + 1, p.heldItem) : null;
     const tierLabel = ['Tier 1', 'Tier 2', 'Mastered'][tier];
     return `<div class="equip-pokemon-row" style="${maxed ? 'opacity:0.45;' : ''}">
       <img src="${p.spriteUrl}" class="equip-poke-sprite" onerror="this.style.display='none'">
@@ -1552,7 +2000,7 @@ function doMoveTutorNode(node) {
       const idx = parseInt(btn.dataset.tutor);
       const pokemon = state.team[idx];
       pokemon.moveTier = Math.min(2, (pokemon.moveTier ?? 1) + 1);
-      const newMove = getBestMove(pokemon.types || ['Normal'], pokemon.baseStats, pokemon.speciesId, pokemon.moveTier);
+      const newMove = getBestMove(pokemon.types || ['Normal'], pokemon.baseStats, pokemon.speciesId, pokemon.moveTier, pokemon.heldItem);
       modal.remove();
       advanceFromNode(state.map, node.id);
       showMapScreen();
@@ -1592,8 +2040,12 @@ async function doTradeNode(node) {
 
     const idx = i;
     const doTrade = async () => {
-      let pool = await getCatchChoices(getEncounterMapIndex(), 3, state.isEndlessMode ? getEndlessMaxGenId(endlessState.stageNumber) : 151, !state.isEndlessMode);
-      const species = pool[Math.floor(rng() * pool.length)];
+      let pool = await getCatchChoices(getEncounterMapIndex(), 3, getCatchGenRange().maxGenId, !state.isEndlessMode, getCatchGenRange().minGenId);
+      // Never offer the same species back. The bucket has dozens of options,
+      // so this filter essentially never empties; fall back if it somehow does.
+      const filtered = pool.filter(sp => (sp.id ?? sp.speciesId) !== mine.speciesId);
+      const choices = filtered.length > 0 ? filtered : pool;
+      const species = choices[Math.floor(rng() * choices.length)];
       if (!species) { advanceFromNode(state.map, node.id); showMapScreen(); return; }
       const offerLevel = Math.min(100, mine.level + 3);
       const offer = createInstance(species, offerLevel, rng() < (hasShinyCharm() ? 0.02 : 0.01), Math.max(getMoveТierForMap(state.currentMap), mine.moveTier ?? 0));
@@ -1608,12 +2060,14 @@ async function doTradeNode(node) {
       advanceFromNode(state.map, node.id);
 
       // Show full-screen reveal
+      const offerCaught = !!(getPokedex()[offer.speciesId]?.caught);
+      const offerHofBadge = hofHasEvoLine(offer.speciesId);
       showScreen('shiny-screen');
       document.getElementById('shiny-content').innerHTML = `
         <div class="shiny-title">You received ${offer.name}!</div>
         <div style="color:var(--text-dim);font-size:10px;margin-bottom:8px;">
           ${released.nickname || released.name} was sent to the trainer.</div>
-        ${renderPokemonCard(offer, false, false, false)}
+        ${renderPokemonCard(offer, false, false, offerCaught, offerHofBadge)}
         <button id="btn-trade-continue" class="btn-primary" style="margin-top:12px;">Continue</button>
       `;
       document.getElementById('btn-trade-continue').onclick = () => showMapScreen();
@@ -1630,7 +2084,7 @@ async function doTradeNode(node) {
 }
 
 async function doShinyNode(node) {
-  let choices = await getCatchChoices(getEncounterMapIndex(), 3, state.isEndlessMode ? getEndlessMaxGenId(endlessState.stageNumber) : 151, !state.isEndlessMode);
+  let choices = await getCatchChoices(getEncounterMapIndex(), 3, getCatchGenRange().maxGenId, !state.isEndlessMode, getCatchGenRange().minGenId);
   const level = getLevelForNode(node);
   const species = choices[0];
   if (!species) { advanceFromNode(state.map, node.id); showMapScreen(); return; }
@@ -1639,8 +2093,7 @@ async function doShinyNode(node) {
   loadBuffsIntoPokemon(shiny);
 
   const shinyCaught = !!(getShinyDex()[shiny.speciesId]);
-  const shinyRoot = getEvoLineRoot(shiny.speciesId);
-  const shinyStarterBadge = !shinyCaught && getHallOfFame().some(e => e.team?.some(p => getEvoLineRoot(p.speciesId) === shinyRoot));
+  const shinyStarterBadge = hofHasEvoLine(shiny.speciesId);
   showScreen('shiny-screen');
   document.getElementById('shiny-content').innerHTML = `
     <div class="shiny-title">✨ A Shiny Pokemon appeared!</div>
@@ -1675,7 +2128,9 @@ async function doShinyNode(node) {
 
 // ---- Battle Screen ----
 
-function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, enemyItems = [], baseGainOverride = null, showPlayerPortrait = null, traitsConfig = null) {
+function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, enemyItems = [], baseGainOverride = null, showPlayerPortrait = null, traitsConfig = null, forceAllParticipants = false) {
+  // Clear stale Escape Rope flag from a previous battle.
+  state._escapedViaRope = false;
   // In endless mode, always apply traits — compute them if not pre-computed by the caller
   if (state.isEndlessMode && traitsConfig === null) {
     const tiers = computeTraitTiers(state.team);
@@ -1745,7 +2200,10 @@ function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, ene
         if (resultP[i]) state.team[i].currentHp = resultP[i].currentHp;
       }
       const maxEnemyLevel = Math.max(...resultE.map(p => p.level));
-      const levelUps = applyLevelGain(state.team, state.nuzlockeMode ? [] : state.items, playerParticipants, maxEnemyLevel, state.nuzlockeMode, baseGainOverride);
+      const effectiveParticipants = forceAllParticipants
+        ? new Set(state.team.map((_, i) => i))
+        : playerParticipants;
+      const levelUps = applyLevelGain(state.team, state.nuzlockeMode ? [] : state.items, effectiveParticipants, maxEnemyLevel, state.nuzlockeMode, baseGainOverride, state.isEndlessMode ? Infinity : 100);
       const skipAll = autoSkip || manuallySkipped;
       battleSpeedMultiplier = skipAll ? SKIP_SPEED : 1;
       skipBtn.textContent = 'Skip';
@@ -1789,9 +2247,37 @@ function runBattleScreen(enemyTeam, isBoss, onWin, onLose, enemyName = null, ene
       }
     } else {
       skipBtn.style.display = 'none';
-      document.getElementById('btn-continue-battle').style.display = 'block';
-      document.getElementById('btn-continue-battle').textContent = 'Continue...';
-      document.getElementById('btn-continue-battle').onclick = () => {
+      const continueBtnEl = document.getElementById('btn-continue-battle');
+      continueBtnEl.style.display = 'block';
+      continueBtnEl.textContent = 'Continue...';
+
+      // Escape Rope: on non-boss loss, offer to consume a rope and revive the
+      // last fainted slot at 1 HP instead of game-over.
+      const ropeIdx = (!isBoss && !state.isEndlessMode)
+        ? state.items.findIndex(it => it.id === 'escape_rope')
+        : -1;
+      if (ropeIdx !== -1) {
+        const ropeBtn = document.createElement('button');
+        ropeBtn.className = 'btn-primary';
+        ropeBtn.textContent = '🪢 Use Escape Rope';
+        ropeBtn.style.cssText = 'margin-left:8px;';
+        ropeBtn.onclick = () => {
+          state.items.splice(ropeIdx, 1);
+          // Whole team fainted; revive only the last slot at 1 HP.
+          for (const p of state.team) p.currentHp = 0;
+          const lastIdx = state.team.length - 1;
+          if (state.team[lastIdx]) state.team[lastIdx].currentHp = 1;
+          renderTeamBar(state.team);
+          renderItemBadges(state.items);
+          state._escapedViaRope = true;
+          ropeBtn.remove();
+          continueBtnEl.textContent = 'Continue';
+          continueBtnEl.onclick = () => { if (onWin) onWin(); resolve(true); };
+        };
+        continueBtnEl.parentElement?.insertBefore(ropeBtn, continueBtnEl.nextSibling);
+      }
+
+      continueBtnEl.onclick = () => {
         if (onLose) onLose();
         resolve(false);
       };
@@ -1807,9 +2293,25 @@ function showBadgeScreen(leader) {
   document.getElementById('badge-leader').textContent = '';
   document.getElementById('badge-count-display').textContent = `Badges: ${state.badges}/8`;
   const badgeImg = document.getElementById('badge-icon-img');
-  if (badgeImg) badgeImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/${state.badges}.png`;
+  if (badgeImg) {
+    if (state.gen2Mode) {
+      // Johto sprites are at indices 9-16
+      badgeImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/${state.badges + 8}.png`;
+    } else {
+      badgeImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/${state.badges}.png`;
+    }
+  }
 
-  document.getElementById('btn-next-map').onclick = () => {
+  const nextBtn = document.getElementById('btn-next-map');
+  // Spacebar shortcut while the badge screen is visible
+  const onKey = (e) => {
+    if (e.code !== 'Space' && e.key !== ' ') return;
+    if (!document.getElementById('badge-screen')?.classList.contains('active')) return;
+    e.preventDefault();
+    advance();
+  };
+  const advance = () => {
+    document.removeEventListener('keydown', onKey);
     if (state.currentMap >= 7) {
       state.eliteIndex = 0;
       startMap(8);
@@ -1817,6 +2319,8 @@ function showBadgeScreen(leader) {
       startMap(state.currentMap + 1);
     }
   };
+  nextBtn.onclick = advance;
+  document.addEventListener('keydown', onKey);
 }
 
 async function showGameOver() {
@@ -1836,11 +2340,11 @@ function showWinScreen() {
       : '';
     return `<div style="display:flex;flex-direction:column;align-items:center;">${renderPokemonCard(p, false, false)}${itemHtml}</div>`;
   }).join('');
-  document.getElementById('btn-play-again').onclick = () => startNewRun(state.nuzlockeMode);
+  document.getElementById('btn-play-again').onclick = () => startNewRun(state.nuzlockeMode, state.gen2Mode);
 
   // Track elite four wins
   const wins = incrementEliteWins();
-  saveHallOfFameEntry(state.team, wins, state.nuzlockeMode, false, null, state.starterSpeciesId);
+  saveHallOfFameEntry(state.team, wins, state.nuzlockeMode, false, null, state.starterSpeciesId, state.gen2Mode);
   const winsEl = document.getElementById('win-run-count');
   if (winsEl) winsEl.textContent = `Championship #${wins}`;
   if (wins === 10) {
@@ -1978,11 +2482,11 @@ const MAX_ACCESSIBLE_STAGE = 5;
 
 const STAGE_META = [
   null,
-  { label: 'Kanto',  gens: 'Gen 1',   color: '#e8503a' },
-  { label: 'Johto',  gens: 'Gen 1-2', color: '#c0a050' },
-  { label: 'Hoenn',  gens: 'Gen 1-3', color: '#60a878' },
-  { label: 'Sinnoh', gens: 'Gen 1-4', color: '#7878c8' },
-  { label: 'Unova',  gens: 'Gen 1-5', color: '#808080' },
+  { label: 'Kanto',  gens: 'Gen 1', color: '#e8503a' },
+  { label: 'Johto',  gens: 'Gen 2', color: '#c0a050' },
+  { label: 'Hoenn',  gens: 'Gen 3', color: '#60a878' },
+  { label: 'Sinnoh', gens: 'Gen 4', color: '#7878c8' },
+  { label: 'Unova',  gens: 'Gen 5', color: '#808080' },
 ];
 
 const STAGE_REGION_BG = [
@@ -2036,7 +2540,7 @@ function showEndlessStageSelect() {
   showScreen('endless-stage-select');
 }
 
-async function startEndlessRun(stageNum = 1) {
+async function startEndlessRun(stageNum = 1, forcedStarterId = null) {
   clearSavedRun();
   const seed = (Date.now() ^ (Math.random() * 0x100000000 | 0)) >>> 0;
   seedRng(seed);
@@ -2052,10 +2556,30 @@ async function startEndlessRun(stageNum = 1) {
     currentRegion: null, traitTiers: {},
   };
   clearEndlessState();
+  if (forcedStarterId && localStorage.getItem('poke_trainer')) {
+    await pickForcedStarter(forcedStarterId);
+    return;
+  }
   if (!localStorage.getItem('poke_trainer')) {
     await showTrainerSelect();
   } else {
     await showStarterSelect();
+  }
+}
+
+// Restart the current run with the same starter / mode / Battle Tower stage.
+function confirmResetRun() {
+  if (!state || !state.starterSpeciesId) return;
+  const starterId = state.starterSpeciesId;
+  const nuz = !!state.nuzlockeMode;
+  const gen2 = !!state.gen2Mode;
+  const isEndless = !!state.isEndlessMode;
+  const stage = endlessState?.stageNumber ?? 1;
+  clearSavedRun();
+  if (isEndless) {
+    startEndlessRun(stage, starterId);
+  } else {
+    startNewRun(nuz, gen2, starterId);
   }
 }
 
@@ -2273,7 +2797,7 @@ async function showStatBuffScreen() {
       ['hp',      'HP',  'stat-hp'],
       ['atk',     'ATK', 'stat-atk'],
       ['def',     'DEF', 'stat-def'],
-      ['speed',   'Spe', 'stat-spe'],
+      ['speed',   'SPE', 'stat-spe'],
       ['special', 'SP.A', 'stat-spa'],
       ['spdef',   'SP.D', 'stat-spd'],
     ];
@@ -2427,6 +2951,12 @@ function getEvoLineRoot(speciesId) {
   return id;
 }
 
+// Does the player's Hall of Fame contain any Pokémon from this evolution line?
+function hofHasEvoLine(speciesId) {
+  const root = getEvoLineRoot(speciesId);
+  return getHallOfFame().some(e => e.team?.some(p => getEvoLineRoot(p.speciesId) === root));
+}
+
 function loadBuffsIntoPokemon(p) {
   if (!state.isEndlessMode) return;
   const store = loadPersistentBuffs();
@@ -2472,6 +3002,7 @@ function applyStatBuff(pokemon, statKey) {
   const store = loadPersistentBuffs();
   store[getEvoLineRoot(pokemon.speciesId)] = { ...pokemon.statBuffs };
   savePersistentBuffs(store);
+  checkMaxStatAchievements(pokemon);
   saveRun();
   saveEndlessState();
   if (typeof syncToCloud === 'function') syncToCloud();
