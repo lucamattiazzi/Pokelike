@@ -3820,7 +3820,7 @@ const PATCH_NOTES = [
       {
         heading: 'New Items',
         entries: [
-          'Loaded Dice (Gen 2 only) — at the start of each battle, 37% chance for +2 to ATK / DEF / Sp.Atk / Sp.Def / Speed, otherwise −1 (one battle). The roll is announced in the battle log.',
+          'Loaded Dice (Gen 2 only) — at the start of each battle, 37% chance for +2 to ATK / DEF / Sp.Atk / Sp.Def / Speed, otherwise −1. The roll is announced in the battle log.',
           'Adrenaline Orb — when YOU land a super-effective hit (×2+), +1 ATK / +1 Sp.Atk for the rest of the battle',
           'Red Card — take 50% less damage from super-effective hits',
           'Quick Claw — chance to strike first regardless of Speed',

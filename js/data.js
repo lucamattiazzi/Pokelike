@@ -516,7 +516,7 @@ const ITEM_POOL = [
   { id: 'lagging_tail',       name: 'Lagging Tail',       desc: 'Always moves last, but +100% move damage',                            icon: '🐌' },
   { id: 'adrenaline_orb',     name: 'Adrenaline Orb',     desc: 'When YOU land a SUPER-EFFECTIVE hit (×2+): +1 ATK / +1 Sp.Atk this battle', icon: '⚡' },
   { id: 'red_card',           name: 'Red Card',           desc: 'Take 50% less damage from super-effective hits',                      icon: '🟥' },
-  { id: 'loaded_dice',        name: 'Loaded Dice',        desc: 'Start of each battle: 37% chance for +2 to ATK/DEF/Sp.Atk/Sp.Def/Speed, else -1 (one battle)', icon: '🎲', iconUrl: 'sprites/items/loaded_dice.png', gen2Only: true },
+  { id: 'loaded_dice',        name: 'Loaded Dice',        desc: 'Start of each battle: 37% chance for +2 to ATK/DEF/Sp.Atk/Sp.Def/Speed, else -1', icon: '🎲', iconUrl: 'sprites/items/loaded_dice.png', gen2Only: true },
 ];
 
 const USABLE_ITEM_POOL = [
