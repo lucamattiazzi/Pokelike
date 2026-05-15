@@ -10,6 +10,18 @@ function stageMultiplier(n) {
 function initBattleState(p) {
   p.stages = { atk: 0, def: 0, speed: 0, special: 0, spdef: 0 };
   p.status = null; // null | 'poison' | 'freeze'
+  // Loaded Dice: roll once at battle start and write directly into statBuffs
+  // (same field Battle Tower uses). statBuffs is cloned so we never mutate the
+  // persistent buffs stored on the source Pokemon. HP is intentionally skipped
+  // — HP buffing isn't a Gen 2 mechanic.
+  if (p.heldItem?.id === 'loaded_dice') {
+    const roll = rng() < 0.37 ? 2 : -1;
+    p._loadedDiceRoll = roll; // surfaced once in the battle log, then ignored
+    p.statBuffs = { ...(p.statBuffs || {}) };
+    for (const k of ['atk', 'def', 'speed', 'special', 'spdef']) {
+      p.statBuffs[k] = (p.statBuffs[k] ?? 0) + roll;
+    }
+  }
   return p;
 }
 
@@ -86,7 +98,7 @@ function getEffectiveStat(pokemon, stat, items, stages = null) {
     : (pokemon.baseStats?.[stat] ?? 50);
   const buffCount = pokemon.statBuffs?.[stat] ?? 0;
   let val = Math.floor((rawStat || 50) * pokemon.level / 50) + 5;
-  if (buffCount > 0) val = Math.floor(val * (1 + 0.1 * buffCount));
+  if (buffCount !== 0) val = Math.max(1, Math.floor(val * Math.max(0.1, 1 + 0.1 * buffCount)));
 
   if (stat === 'def') {
     if (hasItem(items, 'eviolite') && canEvolve(pokemon.speciesId)) val = Math.floor(val * 1.5);
@@ -140,6 +152,19 @@ function runBattle(playerTeam, enemyTeam, bagItems, enemyItems, onLog, traitsCon
   if (firstP.currentHp > 0) playerParticipants.add(0);
   detailedLog.push({ type: 'send_out', side: 'player', idx: 0, name: firstP.nickname || firstP.name });
   detailedLog.push({ type: 'send_out', side: 'enemy',  idx: 0, name: firstE.name });
+
+  // Loaded Dice: announce the roll outcome for any holder on either side.
+  for (const [team, side] of [[pTeam, 'player'], [eTeam, 'enemy']]) {
+    for (let i = 0; i < team.length; i++) {
+      const dice = team[i]._loadedDiceRoll;
+      if (dice === undefined) continue;
+      const name = team[i].nickname || team[i].name;
+      const msg = dice > 0
+        ? `🎲 ${name}'s Loaded Dice rolled high — +${dice} to all stats!`
+        : `🎲 ${name}'s Loaded Dice rolled low — ${dice} to all stats!`;
+      addLog(msg, side === 'player' ? 'log-player' : 'log-enemy');
+    }
+  }
 
   // Start-of-fight trait hooks (Fire, Ground, Normal)
   if (traitsConfig?.onStartFight) {

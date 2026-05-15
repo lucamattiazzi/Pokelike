@@ -1404,7 +1404,9 @@ function doItemNode(node) {
     ...state.team.filter(p => p.heldItem).map(p => p.heldItem.id),
   ]);
   const heldAvailable = ITEM_POOL.filter(it =>
-    !usedIds.has(it.id) && (it.minMap === undefined || state.currentMap >= it.minMap)
+    !usedIds.has(it.id) &&
+    (it.minMap === undefined || state.currentMap >= it.minMap) &&
+    (!it.gen2Only || state.gen2Mode)
   );
 
   // Usable items: filter out ones that can't be applied to current team
