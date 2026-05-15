@@ -54,6 +54,38 @@ function clearSavedRun() {
   localStorage.removeItem('poke_current_run');
 }
 
+// Reset-run safety net: before a reset wipes localStorage, copy the current
+// run + endless state into "previous" slots. The IIFE below restores them on
+// the next page load, so an accidental reset can be undone by refreshing.
+const PREVIOUS_RUN_KEY = 'poke_previous_run';
+const PREVIOUS_ENDLESS_KEY = 'poke_previous_endless_state';
+
+function backupSavedRunForReset() {
+  try {
+    const cur = localStorage.getItem('poke_current_run');
+    if (cur) localStorage.setItem(PREVIOUS_RUN_KEY, cur);
+    else localStorage.removeItem(PREVIOUS_RUN_KEY);
+    const endless = localStorage.getItem('poke_endless_state');
+    if (endless) localStorage.setItem(PREVIOUS_ENDLESS_KEY, endless);
+    else localStorage.removeItem(PREVIOUS_ENDLESS_KEY);
+  } catch {}
+}
+
+(function restoreRunBackupOnPageLoad() {
+  try {
+    const prev = localStorage.getItem(PREVIOUS_RUN_KEY);
+    if (prev) {
+      localStorage.setItem('poke_current_run', prev);
+      localStorage.removeItem(PREVIOUS_RUN_KEY);
+    }
+    const prevEndless = localStorage.getItem(PREVIOUS_ENDLESS_KEY);
+    if (prevEndless) {
+      localStorage.setItem('poke_endless_state', prevEndless);
+      localStorage.removeItem(PREVIOUS_ENDLESS_KEY);
+    }
+  } catch {}
+})();
+
 // ---- Initialization ----
 
 async function initGame() {
@@ -2575,6 +2607,7 @@ async function startEndlessRun(stageNum = 1, forcedStarterId = null, forcedStart
 // Restart the current run with the same starter / mode / Battle Tower stage.
 function confirmResetRun() {
   if (!state || !state.starterSpeciesId) return;
+  backupSavedRunForReset();
   const starterId = state.starterSpeciesId;
   const starterShiny = !!state.starterWasShiny;
   const nuz = !!state.nuzlockeMode;
@@ -3050,6 +3083,15 @@ function advanceEndless() {
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
   const activeScreen = document.querySelector('.screen.active')?.id;
+
+  // R = restart the current run from any screen. Modifier guard keeps Ctrl+R / Cmd+R for browser reload.
+  if (e.code === 'KeyR' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (state?.starterSpeciesId) {
+      e.preventDefault();
+      confirmResetRun();
+      return;
+    }
+  }
 
   // Space = skip/cancel on any screen that has such a button
   if (e.code === 'Space' && !e.shiftKey) {
