@@ -22,7 +22,7 @@ const TRAIT_DESCRIPTIONS = {
   Fairy:   ['Enemy: -1 ATK & Sp.ATK at fight start',     'Enemy: -2 ATK & Sp.ATK at fight start',     'Enemy: -3 ATK & Sp.ATK at fight start'],
   Fighting:['When a pokemon faints, survivors get +1 ATK & Sp.ATK', 'When a pokemon faints, survivors get +2 ATK & Sp.ATK', 'When a pokemon faints, survivors get +3 ATK & Sp.ATK'],
   Fire:    ['+1 ATK & Sp.ATK stages at fight start',     '+2 ATK & Sp.ATK stages at fight start',     '+3 ATK & Sp.ATK stages at fight start'],
-  Flying:  ['15% chance to dodge incoming attacks',       '30% chance to dodge incoming attacks',       '50% chance to dodge incoming attacks'],
+  Flying:  ['10% chance to dodge incoming attacks',       '15% chance to dodge incoming attacks',       '20% chance to dodge incoming attacks'],
   Ghost:   ['Execute enemies below 15% HP',               'Execute enemies below 30% HP',               'Execute enemies below 50% HP'],
   Grass:   ['Heal 5% of damage dealt',                    'Heal 10% of damage dealt',                   'Heal 15% of damage dealt'],
   Ground:  ['+2 DEF stages at fight start',               '+4 DEF stages at fight start',               '+6 DEF stages at fight start'],
@@ -705,7 +705,7 @@ function buildTraitsConfig(playerTiers, enemyTiers = {}) {
       // defender is already at full HP (the log+animation still play).
       if (activeFor('Flying', dSide)) {
         const tier = tierFor('Flying', dSide);
-        const chance = sp([0, 0.15, 0.30, 0.50][tier]);
+        const chance = sp([0, 0.10, 0.15, 0.20][tier]);
         if (rng() < chance) {
           const hpBefore = defender.currentHp;
           defender.currentHp = Math.min(defender.maxHp, defender.currentHp + damage);
