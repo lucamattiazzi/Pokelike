@@ -3802,6 +3802,21 @@ function openDexDetailModal(speciesId, name, spriteUrl, shinySpriteUrl, types) {
 
 const PATCH_NOTES = [
   {
+    version: '1.5.1',
+    title: 'Quality of Life Patch',
+    date: '2026-05-15',
+    sections: [
+      {
+        heading: 'Changes',
+        entries: [
+          'Battle Tower: Pokémon you\'ve previously levelled can now appear in catch nodes regardless of the stage\'s generation cap, at the same per-slot rate they had in v1.4.5 (before gen anchoring)',
+          'R key now resets the current run from any screen (Ctrl+R / Cmd+R still reloads the page)',
+          'Resetting by accident is recoverable — refresh the page and the run you reset is restored',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.5',
     title: 'Gen 2: Johto Mode',
     date: '2026-05-15',
