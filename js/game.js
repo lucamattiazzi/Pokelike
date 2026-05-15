@@ -2363,11 +2363,19 @@ function showBadgeScreen(leader) {
 
 async function showGameOver() {
   localStorage.setItem('poke_win_streak', '0');
+  const seed = state.runSeed;
   clearSavedRun();
   if (typeof syncToCloud === 'function') {
     await Promise.race([syncToCloud(), new Promise(r => setTimeout(r, 3000))]);
   }
-  initGame();
+  showScreen('gameover-screen');
+  const seedEl = document.getElementById('gameover-seed');
+  if (seedEl && seed != null) {
+    const replayUrl = `${location.origin}${location.pathname}?seed=${seed}`;
+    seedEl.style.display = 'block';
+    seedEl.innerHTML = `<span style="font-size:9px;color:var(--text-dim);">Seed: ${seed} &nbsp;·&nbsp; <a href="${replayUrl}" style="color:#ff9090;">&#9654; Replay this run</a></span>`;
+  }
+  document.getElementById('btn-retry').onclick = () => initGame();
 }
 
 function showWinScreen() {
@@ -2379,6 +2387,11 @@ function showWinScreen() {
     return `<div style="display:flex;flex-direction:column;align-items:center;">${renderPokemonCard(p, false, false)}${itemHtml}</div>`;
   }).join('');
   document.getElementById('btn-play-again').onclick = () => startNewRun(state.nuzlockeMode, state.gen2Mode);
+  const winSeedEl = document.getElementById('win-seed');
+  if (winSeedEl && state.runSeed != null) {
+    const replayUrl = `${location.origin}${location.pathname}?seed=${state.runSeed}`;
+    winSeedEl.innerHTML = `<span style="font-size:9px;color:var(--text-dim);">Seed: ${state.runSeed} &nbsp;·&nbsp; <a href="${replayUrl}" style="color:#c8a0ff;">&#9654; Replay this run</a></span>`;
+  }
 
   // Track elite four wins
   const wins = incrementEliteWins();
